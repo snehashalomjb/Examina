@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Logs
+logs/*.log
+logs/*.log.*
+logs/*.out
+!logs/.gitkeep
+
+# Scratch snapshots from local investigation - never meant for the repo
+backend/.papers_before.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local storage fallback
+backend/storage/
+
+# Vendored MediaPipe runtime + model (re-fetch: see README)
+frontend/public/mediapipe/
+frontend/public/models/
