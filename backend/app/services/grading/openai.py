@@ -1,8 +1,8 @@
 """OpenAI-backed grader (GPT-4o and later).
 
-Inactive by default, exactly like the Claude adapter: it is only constructed when
-``GRADER_PROVIDER=openai`` and ``OPENAI_API_KEY`` is set, so nothing in the platform
-hard-depends on a model being reachable.
+Inactive by default: it is only constructed when ``GRADER_PROVIDER=openai`` and
+``OPENAI_API_KEY`` is set, so nothing in the platform hard-depends on a model being
+reachable.
 
 Notes on the API shape used here:
 - ``client.responses.parse(..., text_format=GradeResult)`` returns a validated Pydantic
@@ -47,9 +47,7 @@ class OpenAIGrader:
                 "Install it with: uv pip install '.[openai]'"
             ) from exc
 
-        # The shared GRADER_MODEL default names a Claude model, so an OpenAI deployment
-        # that has not set its own model must not inherit it.
-        self.model = model if model and not model.startswith("claude") else DEFAULT_MODEL
+        self.model = model or DEFAULT_MODEL
         self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def _rubric_prefix(self, question: Question, max_marks: float) -> str:

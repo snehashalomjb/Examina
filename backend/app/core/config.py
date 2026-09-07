@@ -54,8 +54,7 @@ class Settings(BaseSettings):
 
     # Grading
     GRADER_PROVIDER: str = "stub"
-    GRADER_MODEL: str = "claude-opus-5"
-    ANTHROPIC_API_KEY: str | None = None
+    GRADER_MODEL: str = "gpt-4o"
     OPENAI_API_KEY: str | None = None
 
     # OCR (handwritten answer scans)

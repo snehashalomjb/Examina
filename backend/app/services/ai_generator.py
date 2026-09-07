@@ -1,7 +1,7 @@
 """AI question generation service.
 
-Generates plausible question drafts using the configured provider (Anthropic, OpenAI)
-or a built-in stub that produces structured questions without a network call.
+Generates plausible question drafts using the configured provider (OpenAI) or a
+built-in stub that produces structured questions without a network call.
 
 The stub is the default for development and demo environments. It produces real,
 well-structured questions for all supported types and categories so the review
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import random
-import uuid
 from typing import Any
 
 from app.core.config import settings
@@ -278,10 +277,6 @@ def _generate_with_llm(
     """Call an LLM to generate questions. Falls back to stub on any error."""
     provider = settings.GRADER_PROVIDER
     try:
-        if provider == "anthropic" and settings.ANTHROPIC_API_KEY:
-            return _anthropic_generate(
-                category, topic, difficulty, question_type, count, extra_instructions, source_text
-            )
         if provider == "openai" and settings.OPENAI_API_KEY:
             return _openai_generate(
                 category, topic, difficulty, question_type, count, extra_instructions, source_text
@@ -326,34 +321,6 @@ Return a JSON array. Each element must have these fields:
 - tags: array of relevant tags
 
 Return ONLY valid JSON, no markdown, no preamble.{extra}{source}"""
-
-
-def _anthropic_generate(
-    category: QuestionCategory,
-    topic: str | None,
-    difficulty: Difficulty,
-    question_type: QuestionType,
-    count: int,
-    extra_instructions: str | None,
-    source_text: str | None = None,
-) -> list[dict[str, Any]]:
-    import anthropic  # type: ignore[import]
-
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    prompt = _build_prompt(
-        category, topic, difficulty, question_type, count, extra_instructions, source_text
-    )
-    message = client.messages.create(
-        model=settings.GRADER_MODEL or "claude-opus-4-5",
-        max_tokens=4096,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    content = message.content[0].text
-    items = json.loads(content)
-    return [
-        {"payload": {**item, "category": category.value, "topic": topic, "difficulty": difficulty.value}, "provider": "anthropic", "model": settings.GRADER_MODEL}
-        for item in items
-    ]
 
 
 def _openai_generate(
@@ -411,9 +378,7 @@ def generate_questions(
     their own document.
     """
     provider = settings.GRADER_PROVIDER
-    if provider == "stub" or (
-        not settings.ANTHROPIC_API_KEY and not settings.OPENAI_API_KEY
-    ):
+    if provider == "stub" or not settings.OPENAI_API_KEY:
         logger.info("Using stub AI generator (%d questions)", count)
         drafts = _generate_stub(category, topic, difficulty, question_type, count)
         if source_text:

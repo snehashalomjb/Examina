@@ -107,9 +107,6 @@ class TestStubGrader:
     def test_unknown_provider_falls_back_to_the_stub(self):
         assert isinstance(get_grader({"grader_provider": "nonesuch"}), StubGrader)
 
-    def test_claude_without_a_key_falls_back_to_the_stub(self):
-        assert isinstance(get_grader({"grader_provider": "claude"}), StubGrader)
-
     def test_blank_answer_scores_zero(self, db):
         from app.db.models import Answer
 

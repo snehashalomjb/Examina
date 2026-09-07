@@ -46,7 +46,7 @@ degrade without losing signal.
 **Grading.** Objective and typed-response types (MCQ, true/false, fill-blank, numerical)
 score automatically at submission. Short/long answer, image uploads and coding go to a
 review queue with a pluggable first-pass grader — an offline deterministic stub by
-default, or a real model (Claude or GPT-4o) if a provider key is configured — with its
+default, or a real model (GPT-4o) if a provider key is configured — with its
 score, justification and confidence shown to the examiner as a suggestion, never as a
 final grade. Handwritten scans get an OCR pass (Tesseract) for a searchable transcript
 alongside the image.
@@ -130,7 +130,7 @@ backend/app/
   db/models/    SQLAlchemy models: users, question bank, exams/sections, sessions,
                 answers, results, proctor events, AI drafts, recruitment
   services/     paper generator, exam engine, auto-evaluator, suspicion scoring,
-                OCR, PDF import/export, pluggable grading (stub / Claude / OpenAI)
+                OCR, PDF import/export, pluggable grading (stub / OpenAI)
   schemas/      Pydantic request/response models
   tests/        pytest suite
 

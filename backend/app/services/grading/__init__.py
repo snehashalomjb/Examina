@@ -5,7 +5,7 @@ Resolution order for a given exam:
 2. ``settings.GRADER_PROVIDER`` (deployment default)
 3. ``stub`` (always available, offline)
 
-Providers: ``stub`` (offline), ``claude``, ``openai``.
+Providers: ``stub`` (offline), ``openai``.
 
 If a provider is requested but cannot be constructed - missing package, missing API key -
 the factory logs it and falls back to the stub rather than failing a candidate's grading.
@@ -30,20 +30,6 @@ def get_grader(grading_config: dict | None = None) -> Grader:
 
     if provider == "stub":
         return StubGrader()
-
-    if provider == "claude":
-        if not settings.ANTHROPIC_API_KEY:
-            logger.warning(
-                "GRADER_PROVIDER=claude but ANTHROPIC_API_KEY is unset - using the stub grader"
-            )
-            return StubGrader()
-        try:
-            from app.services.grading.claude import ClaudeGrader
-
-            return ClaudeGrader(model=model)
-        except Exception as exc:  # noqa: BLE001 - never fail grading over a config problem
-            logger.error("Could not build the Claude grader (%s) - using the stub grader", exc)
-            return StubGrader()
 
     if provider == "openai":
         if not settings.OPENAI_API_KEY:

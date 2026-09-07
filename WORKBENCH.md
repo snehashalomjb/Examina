@@ -110,7 +110,7 @@ is worse than no counter.
       escape hatch yet.
 - [ ] `devtools_open` is in the event enum and weighted, but nothing emits it client-side;
       reliable detection is hostile to do well and easy to do badly.
-- [ ] The `openai` and `claude` graders are wired but have never run against a live API —
+- [ ] The `openai` grader is wired but has never run against a live API —
       only the stub is exercised by tests. The response-parsing shape is the risk.
 - [ ] No load test of the proctor socket. One long-lived connection per sitting holds a DB
       session for the duration; at ~50 concurrent sittings that wants checking against
