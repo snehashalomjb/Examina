@@ -46,6 +46,19 @@ def seconds_remaining(session: ExamSession) -> int:
     return max(0, int((expires - now()).total_seconds()))
 
 
+def passed(percentage: float, exam: Exam) -> bool | None:
+    """Whether a percentage clears the exam's pass mark. None when there is no mark.
+
+    The single place this is decided. An exam with no ``passing_percentage`` has not
+    declared what passing means, so the honest answer is "no verdict" rather than a
+    number invented at the call site - which is how the same script previously came out
+    a pass on one screen and a fail on another.
+    """
+    if exam.passing_percentage is None:
+        return None
+    return percentage >= exam.passing_percentage
+
+
 def needs_integrity_review(session: ExamSession) -> bool:
     """True when a flagged sitting has not yet been ruled on by an examiner.
 

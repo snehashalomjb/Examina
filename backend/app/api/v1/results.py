@@ -52,15 +52,35 @@ def _correct_text(question: Question) -> str | None:
     return question.model_answer
 
 
+def _result_out(result: Result, session: ExamSession) -> ResultOut:
+    """Serialise a result with enough context for the number to mean something.
+
+    A bare percentage on a dashboard row is unreadable - the candidate needs to know
+    which paper it was and what counted as a pass.
+    """
+    out = ResultOut.model_validate(result)
+    out.exam_title = session.exam.title
+    out.subject_name = session.exam.subject.name if session.exam.subject else None
+    out.passing_percentage = session.exam.passing_percentage
+    out.passed = exam_engine.passed(result.percentage, session.exam)
+    return out
+
+
 @router.get("/my/results", response_model=list[ResultOut])
 def my_results(candidate: CurrentCandidate, db: DbSession) -> list[ResultOut]:
+    """Only published results. An unpublished score is not a result yet."""
     results = db.scalars(
         select(Result)
         .join(ExamSession, ExamSession.id == Result.session_id)
         .where(ExamSession.candidate_id == candidate.id, Result.published.is_(True))
+        .options(
+            selectinload(Result.session)
+            .selectinload(ExamSession.exam)
+            .selectinload(Exam.subject)
+        )
         .order_by(Result.published_at.desc().nullslast())
     )
-    return [ResultOut.model_validate(r) for r in results]
+    return [_result_out(r, r.session) for r in results]
 
 
 @router.get("/results/{result_id}", response_model=ResultDetail)

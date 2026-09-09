@@ -571,6 +571,14 @@ export interface CandidateExamCard {
   session_id: string | null;
   result_id: string | null;
   result_published: boolean;
+  /** All null until an examiner releases the result — an unpublished score is not a result. */
+  obtained_marks?: number | null;
+  total_marks?: number | null;
+  percentage?: number | null;
+  passing_percentage?: number | null;
+  /** null when the exam declared no pass mark, or the result is not out yet. */
+  passed?: boolean | null;
+  submitted_at?: string | null;
   can_start: boolean;
   reason: string | null;
   exam_type?: ExamType;
@@ -713,6 +721,12 @@ export interface Result {
   pending_review_count: number;
   published: boolean;
   published_at: string | null;
+  /** Context so a bare percentage is readable on a dashboard row. */
+  exam_title?: string | null;
+  subject_name?: string | null;
+  passing_percentage?: number | null;
+  /** null when the exam declared no pass mark — no verdict, not a failure. */
+  passed?: boolean | null;
 }
 
 export interface SectionScoreResult {

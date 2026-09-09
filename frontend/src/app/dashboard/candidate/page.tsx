@@ -221,11 +221,31 @@ export default function CandidateDashboard() {
                     </Badge>
                   )}
                   {card.result_published && card.result_id ? (
-                    <Link href={`/results/${card.result_id}`}>
-                      <Button size="sm" variant="secondary">View result</Button>
-                    </Link>
+                    <>
+                      {card.percentage !== null && card.percentage !== undefined && (
+                        <span className="whitespace-nowrap text-right">
+                          <span className="text-[13.5px] font-semibold text-ink">
+                            {card.obtained_marks}/{card.total_marks}
+                          </span>
+                          <span className="ml-1.5 text-[12px] text-ink-muted">
+                            {Math.round(card.percentage)}%
+                          </span>
+                        </span>
+                      )}
+                      {/* null means the exam set no pass mark — no verdict to show. */}
+                      {card.passed !== null && card.passed !== undefined && (
+                        <Badge tone={card.passed ? "mint" : "rose"} size="xs">
+                          {card.passed ? "Pass" : "Fail"}
+                        </Badge>
+                      )}
+                      <Link href={`/results/${card.result_id}`}>
+                        <Button size="sm" variant="secondary">View result</Button>
+                      </Link>
+                    </>
                   ) : (
-                    <span className="whitespace-nowrap text-[12px] text-ink-muted">Pending</span>
+                    <span className="whitespace-nowrap text-[12px] text-ink-muted">
+                      Awaiting examiner review
+                    </span>
                   )}
                 </li>
               ))}

@@ -32,7 +32,8 @@ class SectionAnalytics(BaseModel):
     total_marks: float
     avg_obtained: float
     avg_percentage: float
-    pass_rate: float
+    #: None when the exam declared no pass mark - no verdict, as opposed to 0% passing.
+    pass_rate: float | None = None
 
 
 class ExamAnalytics(BaseModel):
@@ -44,7 +45,8 @@ class ExamAnalytics(BaseModel):
     avg_percentage: float
     highest_percentage: float
     lowest_percentage: float
-    pass_rate: float
+    #: None when the exam declared no pass mark - no verdict, as opposed to 0% passing.
+    pass_rate: float | None = None
     avg_time_seconds: int | None = None
     difficulty_breakdown: list[DifficultyBreakdown] = Field(default_factory=list)
     topic_performance: list[TopicPerformance] = Field(default_factory=list)

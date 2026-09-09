@@ -28,6 +28,28 @@ if TYPE_CHECKING:
     from app.schemas.exam_session import ResultDetail
 
 
+#: Verdict colours. The third case is the one worth having: an exam with no declared
+#: pass mark gets neutral ink and no claim either way.
+_PASS_INK = "#059669"
+_FAIL_INK = "#dc2626"
+_NEUTRAL_INK = "#334155"
+
+
+def _verdict_colour(passed: bool | None) -> str:
+    if passed is None:
+        return _NEUTRAL_INK
+    return _PASS_INK if passed else _FAIL_INK
+
+
+def _verdict_markup(passed: bool | None) -> str:
+    """The pass/fail line on the scorecard, or an honest blank when there is no mark."""
+    if passed is None:
+        return "<font color='#334155'><b>SCORE RECORDED</b></font>"
+    if passed:
+        return "<font color='#10b981'><b>PASSED / QUALIFIED</b></font>"
+    return "<font color='#ef4444'><b>NOT QUALIFIED</b></font>"
+
+
 def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None) -> bytes:
     """Renders a candidate's complete exam result into a styled PDF binary."""
     buffer = io.BytesIO()
@@ -165,7 +187,13 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
         if detail.time_taken_seconds
         else "N/A"
     )
-    passed = detail.result.percentage >= (detail.passing_percentage or 40.0)
+    # None when the exam declared no pass mark: the scorecard then reports the score
+    # without claiming a verdict, rather than measuring it against a made-up threshold.
+    passed = (
+        None
+        if detail.passing_percentage is None
+        else detail.result.percentage >= detail.passing_percentage
+    )
 
     meta_data = [
         [
@@ -191,7 +219,7 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
             Paragraph(detail.exam_type.capitalize(), cell_val),
             Paragraph("RESULT STATUS", cell_label),
             Paragraph(
-                f"<font color='{'#10b981' if passed else '#ef4444'}'><b>{'PASSED / QUALIFIED' if passed else 'NOT QUALIFIED'}</b></font>",
+                _verdict_markup(passed),
                 cell_val,
             ),
         ],
@@ -227,7 +255,7 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
             ),
             Paragraph(
                 f"<font size=7 color='#64748b'>FINAL PERCENTAGE</font><br/>"
-                f"<font size=15 color='{'#059669' if passed else '#dc2626'}'><b>{pct}%</b></font>",
+                f"<font size=15 color='{_verdict_colour(passed)}'><b>{pct}%</b></font>",
                 styles["Normal"],
             ),
             Paragraph(

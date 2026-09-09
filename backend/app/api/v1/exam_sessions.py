@@ -281,6 +281,9 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
             for eq in exam.exam_questions
         )
 
+        result = session.result if session else None
+        released = bool(result and result.published)
+
         cards.append(
             CandidateExamCard(
                 exam_id=exam.id,
@@ -293,7 +296,15 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
                 session_status=session.status if session else None,
                 session_id=session.id if session else None,
                 result_id=session.result.id if session and session.result else None,
-                result_published=bool(session and session.result and session.result.published),
+                result_published=released,
+                # Only carried once an examiner has released the result. Reading a score
+                # off a dashboard row before that would bypass the whole review gate.
+                obtained_marks=result.obtained_marks if released else None,
+                total_marks=result.total_marks if released else None,
+                percentage=result.percentage if released else None,
+                passing_percentage=exam.passing_percentage if released else None,
+                passed=exam_engine.passed(result.percentage, exam) if released else None,
+                submitted_at=session.submitted_at if session else None,
                 can_start=can_start,
                 reason=reason,
                 exam_type=exam.exam_type,

@@ -179,13 +179,30 @@ export default function MyExamsPage() {
                           </Badge>
                         )}
                         {card.result_published && card.result_id ? (
-                          <Link href={`/results/${card.result_id}`}>
-                            <Button size="sm" variant="secondary">
-                              View Result
-                            </Button>
-                          </Link>
+                          <>
+                            {card.percentage !== null && card.percentage !== undefined && (
+                              <span className="whitespace-nowrap text-[13px] font-semibold text-ink">
+                                {card.obtained_marks}/{card.total_marks}
+                                <span className="ml-1.5 font-normal text-[12px] text-ink-muted">
+                                  {Math.round(card.percentage)}%
+                                </span>
+                              </span>
+                            )}
+                            {card.passed !== null && card.passed !== undefined && (
+                              <Badge tone={card.passed ? "mint" : "rose"} size="xs">
+                                {card.passed ? "Pass" : "Fail"}
+                              </Badge>
+                            )}
+                            <Link href={`/results/${card.result_id}`}>
+                              <Button size="sm" variant="secondary">
+                                View Result
+                              </Button>
+                            </Link>
+                          </>
                         ) : (
-                          <span className="text-[12px] text-ink-muted">Awaiting Result</span>
+                          <span className="text-[12px] text-ink-muted">
+                            Awaiting examiner review
+                          </span>
                         )}
                       </div>
                     </li>

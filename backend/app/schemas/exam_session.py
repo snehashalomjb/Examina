@@ -154,6 +154,14 @@ class ResultOut(ORMModel):
     published: bool
     published_at: datetime | None = None
 
+    # --- context the candidate needs to read the number ------------------------
+    exam_title: str | None = None
+    subject_name: str | None = None
+    #: The exam's declared pass mark, so a percentage can be read against something.
+    passing_percentage: float | None = None
+    #: None when the exam declared no pass mark - "no verdict", not "failed".
+    passed: bool | None = None
+
 
 class ResultDetail(BaseModel):
     result: ResultOut
@@ -188,6 +196,18 @@ class CandidateExamCard(BaseModel):
     session_id: uuid.UUID | None = None
     result_id: uuid.UUID | None = None
     result_published: bool = False
+
+    # --- the marks, but only once an examiner has released them ----------------
+    #: Populated only when ``result_published`` is true. An unpublished score is not a
+    #: result yet, and a candidate must never read one off a dashboard row.
+    obtained_marks: float | None = None
+    total_marks: float | None = None
+    percentage: float | None = None
+    passing_percentage: float | None = None
+    #: null when the exam declared no pass mark, or the result is not out yet.
+    passed: bool | None = None
+    submitted_at: datetime | None = None
+
     can_start: bool = False
     reason: str | None = None
     exam_type: ExamType = ExamType.ACADEMIC
