@@ -449,6 +449,8 @@ export default function CreateExamWizard() {
   const [declaredTotalMarks, setDeclaredTotalMarks] = useState<number | "">(100);
   const [passingPercentage, setPassingPercentage] = useState<number | "">(50);
   const [negativeMarking, setNegativeMarking] = useState(false);
+  const [maxAttempts, setMaxAttempts] = useState(1);
+  const [difficulty, setDifficulty] = useState<Difficulty | "">("");
 
   // Academic fields
   const [course, setCourse] = useState("");
@@ -611,7 +613,7 @@ export default function CreateExamWizard() {
       });
 
       // Prepare API payload matching ExamCreate
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         exam_type: category,
         subject_id: subjectId,
         title: title.trim(),
@@ -626,6 +628,8 @@ export default function CreateExamWizard() {
         negative_marking: negativeMarking,
         passing_percentage: passingPercentage ? Number(passingPercentage) : null,
         declared_total_marks: declaredTotalMarks ? Number(declaredTotalMarks) : null,
+        max_attempts: maxAttempts,
+        difficulty: difficulty || null,
         question_ids: selectedQuestionIds,
         proctor_config: {
           webcam_enabled: proctorWebcam,
@@ -775,17 +779,18 @@ export default function CreateExamWizard() {
             />
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end gap-2 pt-4">
             <Button
+              variant="secondary"
               onClick={() => {
-                setStep(2);
-                if (!selectedPatternId) {
-                  applyPattern(patterns[0]);
-                }
+                setSelectedPatternId("");
+                setSections([]);
+                setStep(3);
               }}
             >
-              Next: Select Exam Pattern →
+              Skip templates — Create from scratch
             </Button>
+            <Button onClick={() => setStep(2)}>Next: Select Exam Pattern →</Button>
           </div>
         </div>
       )}
@@ -878,7 +883,19 @@ export default function CreateExamWizard() {
             <Button variant="secondary" onClick={() => setStep(1)}>
               ← Back to Category
             </Button>
-            <Button onClick={() => setStep(3)}>Next: Basic Details →</Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedPatternId("");
+                  setSections([]);
+                  setStep(3);
+                }}
+              >
+                Start from scratch instead
+              </Button>
+              <Button onClick={() => setStep(3)}>Next: Basic Details →</Button>
+            </div>
           </div>
         </div>
       )}
@@ -922,6 +939,15 @@ export default function CreateExamWizard() {
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Short overview of syllabus, topics covered, and evaluation structure..."
+            />
+          </Field>
+
+          <Field label="Instructions" hint="Shown to the candidate before they start.">
+            <Textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={3}
+              placeholder="e.g. No calculators. Answer all questions. Read each question carefully..."
             />
           </Field>
 
@@ -1008,6 +1034,36 @@ export default function CreateExamWizard() {
                 value={passingPercentage}
                 onChange={(e) => setPassingPercentage(e.target.value === "" ? "" : Number(e.target.value))}
               />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="Difficulty Level" hint="A descriptive tag shown to candidates.">
+              <Select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as Difficulty | "")}
+              >
+                <option value="">Mixed</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </Select>
+            </Field>
+
+            <Field label="Maximum Attempts">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={maxAttempts}
+                onChange={(e) => setMaxAttempts(Number(e.target.value))}
+              />
+            </Field>
+
+            <Field label="Number of Questions">
+              <div className="flex h-[38px] items-center rounded-[10px] border border-line bg-sunken px-3 text-[13px] font-semibold text-ink">
+                {totalQuestionsNeeded || selectedQuestionIds.length}
+              </div>
             </Field>
           </div>
 

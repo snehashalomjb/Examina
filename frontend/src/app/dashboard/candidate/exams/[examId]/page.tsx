@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { Hero } from "@/components/Hero";
@@ -23,16 +23,19 @@ import {
   IconCheck,
   IconClock,
   IconExam,
+  IconMic,
   IconMonitor,
   IconShield,
+  IconWifi,
 } from "@/components/icons";
-import { ApiError, api } from "@/lib/api";
+import { API_BASE, ApiError, api, tokens } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import type { CandidateExamCard } from "@/lib/types";
+import { detectFaceOnce } from "@/lib/proctor";
+import type { CandidateExamCard, ProctorConfig } from "@/lib/types";
 
 type Stage = "details" | "system-check" | "instructions";
 
-type CheckState = "idle" | "running" | "pass" | "fail";
+type CheckState = "idle" | "running" | "pass" | "fail" | "unsupported";
 
 interface SystemCheck {
   key: string;
@@ -142,6 +145,7 @@ export default function ExamDetailPage() {
 
       {stage === "system-check" && (
         <SystemCheckStage
+          card={card}
           onBack={() => setStage("details")}
           onContinue={() => setStage("instructions")}
         />
@@ -253,150 +257,357 @@ function ExamDetails({
 }
 
 /* ---------------------------------------------------------------- system check */
+type WindowWithScreenDetails = Window & {
+  getScreenDetails?: () => Promise<{ screens: unknown[] }>;
+};
+
+function proctorFlag(config: ProctorConfig | undefined, key: keyof ProctorConfig, fallback: boolean): boolean {
+  const value = config?.[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+async function waitForFrame(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 2) return;
+  await new Promise<void>((resolve) => {
+    const onLoaded = () => {
+      video.removeEventListener("loadeddata", onLoaded);
+      resolve();
+    };
+    video.addEventListener("loadeddata", onLoaded);
+    window.setTimeout(resolve, 1500);
+  });
+}
+
 function SystemCheckStage({
+  card,
   onBack,
   onContinue,
 }: {
+  card: CandidateExamCard;
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const [checks, setChecks] = useState<SystemCheck[]>([
-    {
-      key: "camera",
-      label: "Camera",
-      detail: "Proctoring needs to see you for the whole sitting.",
+  const config = card.proctor_config;
+  const needCamera = proctorFlag(config, "webcam_enabled", true);
+  const needMic = proctorFlag(config, "require_microphone", true);
+  const needFullscreen = proctorFlag(config, "require_fullscreen", true);
+  const needDisplay = proctorFlag(config, "require_single_display", true);
+  const minMbps = config?.min_bandwidth_mbps ?? 2;
+
+  const initialChecks = useMemo<SystemCheck[]>(() => {
+    const list: SystemCheck[] = [];
+    if (needCamera) {
+      list.push({
+        key: "camera",
+        label: "Camera & face detection",
+        detail: "Proctoring needs to see your face for the whole sitting.",
+        state: "idle",
+      });
+    }
+    if (needMic) {
+      list.push({
+        key: "microphone",
+        label: "Microphone",
+        detail: "Your microphone must be enabled before you can start.",
+        state: "idle",
+      });
+    }
+    list.push({
+      key: "speed",
+      label: "Internet speed",
+      detail: `Needs at least ${minMbps} Mbps so autosave and snapshots keep up.`,
       state: "idle",
-    },
-    {
-      key: "browser",
-      label: "Browser features",
-      detail: "Fullscreen and visibility tracking must be available.",
-      state: "idle",
-    },
-    {
-      key: "connection",
-      label: "Connection to the exam server",
-      detail: "Your answers autosave over this connection.",
-      state: "idle",
-    },
-  ]);
+    });
+    if (needFullscreen) {
+      list.push({
+        key: "fullscreen",
+        label: "Fullscreen",
+        detail: "The exam runs in fullscreen for its whole duration.",
+        state: "idle",
+      });
+    }
+    if (needDisplay) {
+      list.push({
+        key: "display",
+        label: "Single display only",
+        detail: "Only one monitor may be connected during the exam.",
+        state: "idle",
+      });
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [checks, setChecks] = useState<SystemCheck[]>(initialChecks);
   const [running, setRunning] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const update = useCallback((key: string, patch: Partial<SystemCheck>) => {
     setChecks((current) => current.map((c) => (c.key === key ? { ...c, ...patch } : c)));
   }, []);
 
-  const run = useCallback(async () => {
+  const runAuto = useCallback(async () => {
     setRunning(true);
-    setChecks((current) => current.map((c) => ({ ...c, state: "running", message: undefined })));
+    setChecks((current) =>
+      current.map((c) =>
+        c.key === "camera" || c.key === "microphone" || c.key === "speed"
+          ? { ...c, state: "running", message: undefined }
+          : c,
+      ),
+    );
 
-    // --- camera -----------------------------------------------------------
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      const label = stream.getVideoTracks()[0]?.label;
-      // Release it again immediately - the exam runner opens its own stream.
-      stream.getTracks().forEach((t) => t.stop());
-      update("camera", { state: "pass", message: label || "Camera available" });
-    } catch {
-      update("camera", {
-        state: "fail",
-        message: "No camera access. Allow camera permission in your browser, then re-run.",
-      });
+    // --- camera + face -----------------------------------------------------
+    if (needCamera) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          await waitForFrame(videoRef.current);
+        }
+        const { faceCount } = videoRef.current
+          ? await detectFaceOnce(videoRef.current)
+          : { faceCount: 0 };
+        if (faceCount === 1) {
+          update("camera", { state: "pass", message: "Face detected" });
+        } else if (faceCount === 0) {
+          update("camera", {
+            state: "fail",
+            message: "No face detected. Make sure you're visible and well lit, then re-run.",
+          });
+        } else {
+          update("camera", {
+            state: "fail",
+            message: `${faceCount} people detected. Only you may be in frame.`,
+          });
+        }
+      } catch {
+        cameraStreamRef.current = null;
+        update("camera", {
+          state: "fail",
+          message: "No camera access. Allow camera permission in your browser, then re-run.",
+        });
+      }
     }
 
-    // --- browser capabilities --------------------------------------------
-    const hasFullscreen = typeof document.documentElement.requestFullscreen === "function";
-    const hasVisibility = typeof document.hidden === "boolean";
-    update("browser", {
-      state: hasFullscreen && hasVisibility ? "pass" : "fail",
-      message:
-        hasFullscreen && hasVisibility
-          ? "Fullscreen and focus tracking supported"
-          : "This browser is missing features proctoring needs. Try Chrome, Edge or Firefox.",
-    });
+    // --- microphone ---------------------------------------------------------
+    if (needMic) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+        const track = stream.getAudioTracks()[0];
+        const live = track?.readyState === "live";
+        stream.getTracks().forEach((t) => t.stop());
+        update("microphone", {
+          state: live ? "pass" : "fail",
+          message: live ? "Microphone available" : "Microphone did not report as active.",
+        });
+      } catch {
+        update("microphone", {
+          state: "fail",
+          message: "No microphone access. Allow microphone permission in your browser, then re-run.",
+        });
+      }
+    }
 
-    // --- server -----------------------------------------------------------
+    // --- internet speed -------------------------------------------------
     try {
       const started = performance.now();
-      await api.get("/my/stats/summary");
-      const ms = Math.round(performance.now() - started);
-      update("connection", { state: "pass", message: `Reachable (${ms} ms)` });
+      const response = await fetch(`${API_BASE}/system/speed-test-payload`, {
+        headers: { Authorization: `Bearer ${tokens.access() ?? ""}` },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("bad response");
+      const buffer = await response.arrayBuffer();
+      const seconds = Math.max((performance.now() - started) / 1000, 0.001);
+      const mbps = (buffer.byteLength * 8) / 1_000_000 / seconds;
+      update("speed", {
+        state: mbps >= minMbps ? "pass" : "fail",
+        message:
+          mbps >= minMbps
+            ? `${mbps.toFixed(1)} Mbps`
+            : `Only ${mbps.toFixed(1)} Mbps measured — needs at least ${minMbps} Mbps.`,
+      });
     } catch {
-      update("connection", {
+      update("speed", {
         state: "fail",
         message: "Could not reach the exam server. Check your connection and re-run.",
       });
     }
 
     setRunning(false);
-  }, [update]);
+  }, [needCamera, needMic, minMbps, update]);
 
   useEffect(() => {
-    void run();
-  }, [run]);
+    void runAuto();
+    return () => {
+      cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
+      cameraStreamRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const allPassed = checks.every((c) => c.state === "pass");
-  const anyFailed = checks.some((c) => c.state === "fail");
+  // --- fullscreen: needs a user gesture, and tracks exits while this stage is open
+  useEffect(() => {
+    if (!needFullscreen) return;
+    const onChange = () => {
+      update(
+        "fullscreen",
+        document.fullscreenElement
+          ? { state: "pass", message: "Fullscreen active" }
+          : { state: "fail", message: "Not in fullscreen yet. Click Enable fullscreen." },
+      );
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [needFullscreen, update]);
+
+  async function enterFullscreen() {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      update("fullscreen", {
+        state: "fail",
+        message: "Fullscreen was blocked by the browser. Allow it and try again.",
+      });
+    }
+  }
+
+  // --- single display: detection itself also needs a user gesture
+  useEffect(() => {
+    if (!needDisplay) return;
+    if (typeof (window as WindowWithScreenDetails).getScreenDetails !== "function") {
+      update("display", {
+        state: "unsupported",
+        message: "This browser can't verify display count. Please confirm only one monitor is connected.",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needDisplay]);
+
+  async function checkDisplays() {
+    const getScreenDetails = (window as WindowWithScreenDetails).getScreenDetails;
+    if (!getScreenDetails) return;
+    update("display", { state: "running" });
+    try {
+      const details = await getScreenDetails();
+      const count = details.screens.length;
+      update("display", {
+        state: count === 1 ? "pass" : "fail",
+        message:
+          count === 1
+            ? "Single display detected"
+            : `${count} displays detected. Disconnect the extra monitor(s) and re-check.`,
+      });
+    } catch {
+      update("display", {
+        state: "fail",
+        message: "Display permission was blocked. Allow it and try again.",
+      });
+    }
+  }
+
+  const blocking = checks.filter((c) => c.state !== "pass" && c.state !== "unsupported");
+  const allClear = blocking.length === 0;
+
+  const ICONS: Record<string, typeof IconCamera> = {
+    camera: IconCamera,
+    microphone: IconMic,
+    speed: IconWifi,
+    fullscreen: IconMonitor,
+    display: IconMonitor,
+  };
 
   return (
     <Card>
       <SectionTitle
         title="System check"
-        hint="Confirming your machine can run a proctored exam before you start the clock."
+        hint="Every check below must pass before the exam can start."
       />
 
       <ul className="space-y-2.5">
-        {checks.map((check) => (
-          <li
-            key={check.key}
-            className={cx(
-              "flex items-start gap-3 rounded-[11px] border p-3.5",
-              check.state === "pass"
-                ? "border-mint/25 bg-mint-soft/50"
-                : check.state === "fail"
-                  ? "border-rose/25 bg-rose-soft/50"
-                  : "border-line",
-            )}
-          >
-            <span
+        {checks.map((check) => {
+          const Icon = ICONS[check.key] ?? IconShield;
+          return (
+            <li
+              key={check.key}
               className={cx(
-                "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]",
+                "flex items-start gap-3 rounded-[11px] border p-3.5",
                 check.state === "pass"
-                  ? "bg-mint-soft text-mint"
+                  ? "border-mint/25 bg-mint-soft/50"
                   : check.state === "fail"
-                    ? "bg-rose-soft text-rose"
-                    : "bg-sunken text-ink-muted",
+                    ? "border-rose/25 bg-rose-soft/50"
+                    : check.state === "unsupported"
+                      ? "border-line bg-sunken/50"
+                      : "border-line",
               )}
             >
-              {check.key === "camera" ? (
-                <IconCamera size={16} />
-              ) : check.key === "browser" ? (
-                <IconMonitor size={16} />
-              ) : (
-                <IconShield size={16} />
-              )}
-            </span>
+              <span
+                className={cx(
+                  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]",
+                  check.state === "pass"
+                    ? "bg-mint-soft text-mint"
+                    : check.state === "fail"
+                      ? "bg-rose-soft text-rose"
+                      : "bg-sunken text-ink-muted",
+                )}
+              >
+                <Icon size={16} />
+              </span>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="text-[13.5px] font-medium text-ink">{check.label}</p>
-                {check.state === "running" && <Badge>checking…</Badge>}
-                {check.state === "pass" && <Badge tone="mint">ready</Badge>}
-                {check.state === "fail" && <Badge tone="rose">problem</Badge>}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13.5px] font-medium text-ink">{check.label}</p>
+                  {check.state === "running" && <Badge>checking…</Badge>}
+                  {check.state === "pass" && <Badge tone="mint">ready</Badge>}
+                  {check.state === "fail" && <Badge tone="rose">problem</Badge>}
+                  {check.state === "unsupported" && <Badge tone="neutral">unverified</Badge>}
+                </div>
+                <p className="mt-0.5 text-[12.5px] text-ink-muted">
+                  {check.message ?? check.detail}
+                </p>
+
+                {check.key === "camera" && needCamera && (
+                  <video
+                    ref={videoRef}
+                    muted
+                    playsInline
+                    className={cx(
+                      "mt-2 h-[90px] w-[120px] rounded-[8px] border border-line bg-sunken object-cover",
+                      check.state === "running" || check.state === "pass" ? "" : "hidden",
+                    )}
+                  />
+                )}
+
+                {check.key === "fullscreen" && check.state !== "pass" && (
+                  <Button size="sm" variant="secondary" className="mt-2" onClick={() => void enterFullscreen()}>
+                    Enable fullscreen
+                  </Button>
+                )}
+
+                {check.key === "display" && check.state === "idle" && (
+                  <Button size="sm" variant="secondary" className="mt-2" onClick={() => void checkDisplays()}>
+                    Check displays
+                  </Button>
+                )}
+                {check.key === "display" && check.state === "fail" && (
+                  <Button size="sm" variant="secondary" className="mt-2" onClick={() => void checkDisplays()}>
+                    Re-check displays
+                  </Button>
+                )}
               </div>
-              <p className="mt-0.5 text-[12.5px] text-ink-muted">
-                {check.message ?? check.detail}
-              </p>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
-      {anyFailed && (
+      {!allClear && (
         <div className="mt-4">
           <Alert tone="amber" title="Fix these before you start">
-            You can still continue, but proctoring records a blocked camera as a critical
-            event and it will count against your session.
+            {blocking.map((c) => c.label).join(", ")} must pass before you can continue.
           </Alert>
         </div>
       )}
@@ -406,11 +617,11 @@ function SystemCheckStage({
           Back
         </Button>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => void run()} loading={running}>
+          <Button variant="secondary" onClick={() => void runAuto()} loading={running}>
             Re-run checks
           </Button>
-          <Button onClick={onContinue} disabled={running}>
-            {allPassed ? "Continue" : "Continue anyway"}
+          <Button onClick={onContinue} disabled={running || !allClear}>
+            Continue
             <IconArrowRight size={15} />
           </Button>
         </div>

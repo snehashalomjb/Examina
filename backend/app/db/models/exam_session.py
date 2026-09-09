@@ -21,7 +21,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.db.models.enums import GradeStatus, SessionStatus
+from app.db.models.enums import GradeStatus, IntegrityVerdict, SessionStatus
 
 if TYPE_CHECKING:
     from app.db.models.exam import Exam
@@ -84,7 +84,33 @@ class ExamSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_flagged: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
     termination_reason: Mapped[str | None] = mapped_column(Text)
 
+    # --- integrity review -----------------------------------------------------
+    #: The examiner's ruling on how this sitting was conducted. Kept apart from the
+    #: score: proctoring flags a sitting, a human decides whether it was malpractice.
+    #: A flagged sitting cannot have its result published while this is PENDING.
+    integrity_verdict: Mapped[IntegrityVerdict] = mapped_column(
+        Enum(
+            IntegrityVerdict,
+            name="integrity_verdict",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        default=IntegrityVerdict.PENDING,
+        server_default=IntegrityVerdict.PENDING.value,
+        nullable=False,
+        index=True,
+    )
+    #: Why the examiner ruled the way they did. Required for a malpractice verdict -
+    #: an unexplained malpractice ruling is not reviewable by anyone afterwards.
+    integrity_note: Mapped[str | None] = mapped_column(Text)
+    integrity_reviewed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    integrity_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     exam: Mapped[Exam] = relationship(back_populates="sessions")
+    integrity_reviewed_by: Mapped[User | None] = relationship(
+        foreign_keys=[integrity_reviewed_by_id]
+    )
     candidate: Mapped[User] = relationship(
         back_populates="exam_sessions", foreign_keys=[candidate_id]
     )

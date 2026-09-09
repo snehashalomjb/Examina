@@ -150,12 +150,14 @@ def make_question(
     category: QuestionCategory = QuestionCategory.ACADEMIC,
     topic: str | None = None,
     spec: dict | None = None,
+    created_by: User | None = None,
 ) -> Question:
     question = Question(
         subject_id=subject.id,
         question_type=qtype,
         category=category,
         topic=topic,
+        created_by_id=created_by.id if created_by else None,
         difficulty=difficulty,
         body=body or f"Question {uuid.uuid4().hex[:6]}?",
         marks=marks,

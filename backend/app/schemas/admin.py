@@ -49,6 +49,10 @@ class ExaminerStats(BaseModel):
     flagged_sessions: int
     pending_grading: int
     subjects: int
+    active_assessments: int
+    completed_assessments: int
+    published_results_count: int
+    total_candidates: int
 
 
 class CandidateStats(BaseModel):

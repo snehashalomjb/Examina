@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.db.models.enums import ExamStatus, ExamType
+from app.db.models.enums import Difficulty, ExamStatus, ExamType
 
 if TYPE_CHECKING:
     from app.db.models.enrollment import ExamEnrollment
@@ -40,10 +40,14 @@ DEFAULT_PROCTOR_CONFIG: dict[str, Any] = {
     "flag_on_score": 45.0,  # suspicion score that flags for review
     "snapshot_interval_seconds": 60,
     "require_fullscreen": True,
+    "require_microphone": True,
+    "require_single_display": True,
+    "min_bandwidth_mbps": 2.0,
     "block_copy_paste": True,
     "weights": {
         "face_missing": 6.0,
         "multiple_faces": 15.0,
+        "phone_detected": 20.0,
         "gaze_away": 3.0,
         "tab_switch": 10.0,
         "window_blur": 4.0,
@@ -101,6 +105,11 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     declared_total_marks: Mapped[float | None] = mapped_column(Float)
     #: Percentage at or above which a candidate passes / qualifies. Null = no verdict.
     passing_percentage: Mapped[float | None] = mapped_column(Float)
+    #: A descriptive top-level tag shown to candidates. Null means "mixed" - it never
+    #: constrains which per-rule difficulties the pool can draw from.
+    difficulty: Mapped[Difficulty | None] = mapped_column(
+        Enum(Difficulty, name="difficulty", values_callable=lambda e: [m.value for m in e])
+    )
 
     duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

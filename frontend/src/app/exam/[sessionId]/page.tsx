@@ -369,7 +369,7 @@ export default function ExamRunner() {
   if (finished && session) {
     return (
       <CentredNotice
-        title="Your paper is in"
+        title="Successfully submitted your exam"
         body={finished}
         detail="Objective questions were scored on submission. Written answers go to an examiner for review — your result appears once it is published."
         action={
@@ -1082,6 +1082,7 @@ function SaveIndicator({ state }: { state: SaveState }) {
 function ProctorPill({ status, enabled }: { status: ProctorStatus | null; enabled: boolean }) {
   if (!enabled) return <Badge>Proctoring off</Badge>;
   if (!status || !status.cameraReady) return <Badge tone="rose">Camera off</Badge>;
+  if (status.phoneDetected) return <Badge tone="rose">Phone detected</Badge>;
   if (status.faceCount > 1) return <Badge tone="rose">{status.faceCount} faces</Badge>;
   if (!status.facePresent) return <Badge tone="amber">Face not visible</Badge>;
   if (status.lookingAway) return <Badge tone="amber">Look at the screen</Badge>;

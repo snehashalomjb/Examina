@@ -154,17 +154,19 @@ export default function ExamsPage() {
       {/* Filter Tabs & Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
-          {[
-            { key: "all", label: `All (${exams.length})` },
-            { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
-            { key: "corporate", label: `💼 Corporate (${exams.filter((e) => e.exam_type === "corporate").length})` },
-            { key: "published", label: `Live (${exams.filter((e) => e.status === "published").length})` },
-            { key: "draft", label: `Drafts (${exams.filter((e) => e.status === "draft").length})` },
-          ].map((tab) => (
+          {(
+            [
+              { key: "all", label: `All (${exams.length})` },
+              { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
+              { key: "corporate", label: `💼 Corporate (${exams.filter((e) => e.exam_type === "corporate").length})` },
+              { key: "published", label: `Live (${exams.filter((e) => e.status === "published").length})` },
+              { key: "draft", label: `Drafts (${exams.filter((e) => e.status === "draft").length})` },
+            ] as { key: typeof filterTab; label: string }[]
+          ).map((tab) => (
             <button
               key={tab.key}
               type="button"
-              onClick={() => setFilterTab(tab.key as any)}
+              onClick={() => setFilterTab(tab.key)}
               className={cx(
                 "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
                 filterTab === tab.key
@@ -278,8 +280,8 @@ export default function ExamsPage() {
                   <div className="mt-3">
                     <Alert tone="amber" title="Cannot publish yet">
                       <ul className="list-disc pl-4">
-                        {check.problems.map((problem) => (
-                          <li key={problem}>{problem}</li>
+                        {check.problems.map((problem, index) => (
+                          <li key={index}>{problem}</li>
                         ))}
                       </ul>
                     </Alert>
@@ -647,7 +649,7 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
             {feasibility.length > 0 && (
               <div className="mt-3">
                 <Alert tone="amber" title="The pool cannot satisfy these rules">
-                  <ul className="list-disc pl-4">{feasibility.map((p) => <li key={p}>{p}</li>)}</ul>
+                  <ul className="list-disc pl-4">{feasibility.map((p, index) => <li key={index}>{p}</li>)}</ul>
                 </Alert>
               </div>
             )}
@@ -705,7 +707,7 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
             {feasibility.length > 0 && (
               <div className="mt-3">
                 <Alert tone="amber" title="Pool gap across sections">
-                  <ul className="list-disc pl-4">{feasibility.map((p) => <li key={p}>{p}</li>)}</ul>
+                  <ul className="list-disc pl-4">{feasibility.map((p, index) => <li key={index}>{p}</li>)}</ul>
                 </Alert>
               </div>
             )}

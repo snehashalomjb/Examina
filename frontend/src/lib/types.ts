@@ -143,6 +143,7 @@ export type GradeStatus =
 export type ProctorEventType =
   | "face_missing"
   | "multiple_faces"
+  | "phone_detected"
   | "gaze_away"
   | "tab_switch"
   | "window_blur"
@@ -494,6 +495,9 @@ export interface ProctorConfig {
   terminate_on_score: number;
   snapshot_interval_seconds: number;
   require_fullscreen: boolean;
+  require_microphone?: boolean;
+  require_single_display?: boolean;
+  min_bandwidth_mbps?: number;
   block_copy_paste: boolean;
   weights?: Record<string, number>;
 }
@@ -577,6 +581,7 @@ export interface CandidateExamCard {
   job_role?: string | null;
   sections_count?: number;
   has_coding?: boolean;
+  proctor_config?: ProctorConfig;
 }
 
 export interface HeartbeatOut {
@@ -621,9 +626,28 @@ export interface ProctorReview {
   tab_switch_count: number;
   is_flagged: boolean;
   termination_reason: string | null;
+  /** The examiner's ruling on how the sitting was conducted. Separate from the score. */
+  integrity_verdict: IntegrityVerdict;
+  integrity_note: string | null;
+  integrity_reviewed_by: string | null;
+  integrity_reviewed_at: string | null;
+  /** Flagged and still unruled — the queue an examiner clears before results go out. */
+  needs_integrity_review: boolean;
   breakdown: Record<string, number>;
   events: ProctorEvent[];
 }
+
+/**
+ * Proctoring flags a sitting; a named examiner decides what it was. A candidate can sit
+ * honestly and score badly, or cheat and score well — score and conduct are separate axes.
+ */
+export type IntegrityVerdict = "pending" | "cleared" | "malpractice";
+
+export const INTEGRITY_VERDICT_LABEL: Record<IntegrityVerdict, string> = {
+  pending: "Awaiting review",
+  cleared: "Genuine attempt",
+  malpractice: "Malpractice",
+};
 
 export interface AiEvaluation {
   provider: string;
@@ -632,6 +656,8 @@ export interface AiEvaluation {
   max_score: number;
   justification: string;
   confidence: number;
+  key_points_matched: string[];
+  key_points_missed: string[];
   created_at: string;
   error: string | null;
 }
@@ -756,6 +782,10 @@ export interface ExaminerStats {
   flagged_sessions: number;
   pending_grading: number;
   subjects: number;
+  active_assessments: number;
+  completed_assessments: number;
+  published_results_count: number;
+  total_candidates: number;
 }
 
 export interface CandidateStats {
@@ -792,6 +822,11 @@ export interface CandidateAttempt {
   result_id: string | null;
   suspicion_score: number;
   is_flagged: boolean;
+  integrity_verdict: IntegrityVerdict;
+  /** Flagged and unruled — publishing is blocked until an examiner decides. */
+  needs_integrity_review: boolean;
+  /** Answers still awaiting a human decision. Publishing is blocked while non-zero. */
+  pending_review_count: number;
 }
 
 export interface ExamResultRow {

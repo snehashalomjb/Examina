@@ -192,9 +192,19 @@ export default function GradingPage() {
                         </Badge>
                       </div>
                       <p className="mt-0.5 truncate text-[12px] text-ink-muted">{item.exam_title}</p>
-                      <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-soft">
-                        {item.question_body}
-                      </p>
+                      <div className="mt-1 flex items-start gap-2">
+                        {item.image_thumb_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.image_thumb_url}
+                            alt=""
+                            className="h-11 w-11 shrink-0 rounded-[6px] border border-line object-cover"
+                          />
+                        )}
+                        <p className="line-clamp-2 text-[12px] leading-snug text-ink-soft">
+                          {item.question_body}
+                        </p>
+                      </div>
                     </button>
                   </li>
                 ))}
@@ -353,6 +363,34 @@ function GradeCard({
             <Badge>confidence {Math.round(ai.confidence * 100)}%</Badge>
           </div>
           <p className="text-[13px] leading-relaxed text-ink-soft">{ai.justification}</p>
+          {(ai.key_points_matched.length > 0 || ai.key_points_missed.length > 0) && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {ai.key_points_matched.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-green">
+                    Key points matched
+                  </p>
+                  <ul className="mt-1 list-inside list-disc text-[12.5px] text-ink-soft">
+                    {ai.key_points_matched.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {ai.key_points_missed.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-rose">
+                    Key points missed
+                  </p>
+                  <ul className="mt-1 list-inside list-disc text-[12.5px] text-ink-soft">
+                    {ai.key_points_missed.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {ai.error && (
             <p className="mt-2 text-[12px] text-rose">Grader error: {ai.error}</p>
           )}

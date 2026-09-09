@@ -113,6 +113,37 @@ class TestStart:
         )
         assert response.status_code == 403
 
+    def _make_other_exam(self, db, scenario):
+        return make_exam(
+            db,
+            scenario["subject"],
+            scenario["examiner"],
+            questions=list(scenario["questions"].values()),
+            candidates=[scenario["candidate"]],
+            rules=[
+                {"question_type": "mcq", "difficulty": "easy", "count": 2},
+                {"question_type": "multi_select", "difficulty": None, "count": 1},
+                {"question_type": "short_answer", "difficulty": None, "count": 1},
+            ],
+        )
+
+    def test_cannot_start_a_second_exam_while_one_is_in_progress(self, client, db, scenario):
+        """One candidate, one webcam: at most one IN_PROGRESS session platform-wide."""
+        other_exam = self._make_other_exam(db, scenario)
+        _, headers, _ = _start(client, scenario)
+
+        response = client.post(f"/api/v1/exams/{other_exam.id}/start", headers=headers)
+        assert response.status_code == 409
+        assert scenario["exam"].title in response.json()["detail"]
+
+    def test_can_start_another_exam_once_the_first_is_submitted(self, client, db, scenario):
+        other_exam = self._make_other_exam(db, scenario)
+        paper, headers, exam_headers = _start(client, scenario)
+        client.post(f"/api/v1/sessions/{paper['session_id']}/submit", headers=exam_headers)
+
+        response = client.post(f"/api/v1/exams/{other_exam.id}/start", headers=headers)
+        assert response.status_code == 200, response.text
+
 
 class TestAnswering:
     def test_autosave_and_rehydrate(self, client, scenario):

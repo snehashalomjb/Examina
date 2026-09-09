@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -45,7 +45,8 @@ export default function CandidateWelcomePage() {
   }, [user, loginAccess, booting, router]);
 
   // Stable for the life of this visit, so it does not flicker between re-renders.
-  const quote = useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], []);
+  // A lazy useState initializer (unlike useMemo) is guaranteed to run exactly once.
+  const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)]);
 
   if (booting || !user) return <Splash />;
 

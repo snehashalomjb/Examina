@@ -26,7 +26,7 @@ from app.db.models import (
     Result,
     SessionStatus,
 )
-from app.db.models.enums import AUTO_SCORED_TYPES, CONTAINER_TYPES
+from app.db.models.enums import AUTO_SCORED_TYPES, CONTAINER_TYPES, IntegrityVerdict
 from app.services.auto_evaluator import score_answer
 from app.services.grading import get_grader
 from app.services.paper_generator import generate_paper
@@ -44,6 +44,25 @@ def seconds_remaining(session: ExamSession) -> int:
     if expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
     return max(0, int((expires - now()).total_seconds()))
+
+
+def needs_integrity_review(session: ExamSession) -> bool:
+    """True when a flagged sitting has not yet been ruled on by an examiner.
+
+    The gate that stops a suspicious paper being published on autopilot. Only *flagged*
+    sittings need a ruling - demanding one for every clean paper would turn a safeguard
+    into a rubber stamp, which is how safeguards stop being read.
+    """
+    return session.is_flagged and session.integrity_verdict is IntegrityVerdict.PENDING
+
+
+def withholds_result(session: ExamSession) -> bool:
+    """True when an examiner has ruled this sitting malpractice.
+
+    The score still exists and staff can still see it; it is simply never released to
+    the candidate as a grade.
+    """
+    return session.integrity_verdict is IntegrityVerdict.MALPRACTICE
 
 
 def load_session(db: Session, session_id: uuid.UUID) -> ExamSession | None:
@@ -289,6 +308,8 @@ def grade_pending_answers(db: Session, session_id: uuid.UUID) -> int:
                     max_score=result.max_score,
                     justification=result.justification,
                     confidence=result.confidence,
+                    key_points_matched=result.key_points_matched,
+                    key_points_missed=result.key_points_missed,
                 )
             )
             # The machine score is provisional: it pre-fills the examiner's field but the

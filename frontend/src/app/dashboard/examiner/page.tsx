@@ -69,8 +69,8 @@ export default function ExaminerDashboard() {
 
       {/* ─── Stats grid ────────────────────────────────────── */}
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-[12px] border border-line bg-surface p-5">
               <Skeleton className="mb-3 h-3 w-20" />
               <Skeleton className="h-8 w-16" />
@@ -78,30 +78,42 @@ export default function ExaminerDashboard() {
           ))}
         </div>
       ) : stats ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
-            label="My Exams"
+            label="Total Assessments"
             value={stats.my_exams}
             tone="accent"
             icon={<ExamIcon />}
           />
           <StatCard
-            label="Published"
-            value={stats.published_exams}
+            label="Active Assessments"
+            value={stats.active_assessments}
             tone="green"
-            icon={<UsersIcon />}
+            icon={<ExamIcon />}
           />
           <StatCard
-            label="Pending Grading"
+            label="Completed Assessments"
+            value={stats.completed_assessments}
+            tone="neutral"
+            icon={<GradingIcon />}
+          />
+          <StatCard
+            label="Pending Result Reviews"
             value={stats.pending_grading}
             tone={stats.pending_grading > 0 ? "amber" : "neutral"}
             icon={<GradingIcon />}
           />
           <StatCard
-            label="Access Requests"
-            value={loginRequests.length}
-            tone={loginRequests.length > 0 ? "rose" : "neutral"}
-            icon={<BellIcon />}
+            label="Published Results"
+            value={stats.published_results_count}
+            tone="green"
+            icon={<UsersIcon />}
+          />
+          <StatCard
+            label="Total Candidates"
+            value={stats.total_candidates}
+            tone="accent"
+            icon={<UsersIcon />}
           />
         </div>
       ) : null}

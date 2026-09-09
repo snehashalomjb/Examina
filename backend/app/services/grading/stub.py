@@ -94,12 +94,13 @@ class StubGrader:
         fraction = max(0.0, min(raw + jitter, 1.0))
 
         score = round(max_marks * fraction, 2)
-        matched = sorted(expected & given)[:6]
+        matched = sorted(expected & given)
+        missed = sorted(expected - given)
 
         justification = (
             f"[Provisional offline score - no model configured] "
-            f"Matched {len(expected & given)}/{len(expected)} key concepts"
-            + (f" ({', '.join(matched)})" if matched else "")
+            f"Matched {len(matched)}/{len(expected)} key concepts"
+            + (f" ({', '.join(matched[:6])})" if matched else "")
             + f". Answer length {len(given)} significant words against a target of "
             f"{target_words}. Examiner review required."
         )
@@ -109,6 +110,8 @@ class StubGrader:
             max_score=max_marks,
             justification=justification,
             confidence=round(0.35 + 0.3 * overlap, 2),
+            key_points_matched=matched,
+            key_points_missed=missed,
         ).clamped()
 
     def _grade_image(self, *, answer: Answer, max_marks: float) -> GradeResult:

@@ -83,6 +83,7 @@ def severity_for(event_type: ProctorEventType) -> ProctorSeverity:
         ProctorEventType.MULTIPLE_FACES,
         ProctorEventType.CAMERA_BLOCKED,
         ProctorEventType.DEVTOOLS_OPEN,
+        ProctorEventType.PHONE_DETECTED,
     }
     warning = {
         ProctorEventType.TAB_SWITCH,

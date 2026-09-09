@@ -198,3 +198,4 @@ class CandidateExamCard(BaseModel):
     job_role: str | None = None
     sections_count: int = 0
     has_coding: bool = False
+    proctor_config: dict = Field(default_factory=dict)

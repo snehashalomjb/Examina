@@ -16,6 +16,7 @@ import {
   Skeleton,
   cx,
   formatDate,
+  toast,
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
@@ -30,6 +31,7 @@ export default function CandidatesPage() {
   const [open, setOpen] = useState<CandidateRow | null>(null);
   const [attempts, setAttempts] = useState<CandidateAttempt[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [publishing, setPublishing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
@@ -49,7 +51,7 @@ export default function CandidatesPage() {
     return () => window.clearTimeout(timer);
   }, [user, load]);
 
-  async function openCandidate(candidate: CandidateRow) {
+  const openCandidate = useCallback(async (candidate: CandidateRow) => {
     setOpen(candidate);
     setAttemptsLoading(true);
     try {
@@ -58,6 +60,37 @@ export default function CandidatesPage() {
       setAttempts([]);
     } finally {
       setAttemptsLoading(false);
+    }
+  }, []);
+
+  /**
+   * The three conditions for releasing one candidate's marks, mirroring the server:
+   * they have finished sitting, every answer has had a human decision, and — if
+   * proctoring flagged the sitting — an examiner has ruled on it. The button is hidden
+   * rather than disabled once a result is out, since republishing is a no-op.
+   */
+  function canPublish(attempt: CandidateAttempt): boolean {
+    return (
+      attempt.status !== "in_progress" &&
+      !attempt.published &&
+      attempt.pending_review_count === 0 &&
+      !attempt.needs_integrity_review &&
+      attempt.integrity_verdict !== "malpractice"
+    );
+  }
+
+  async function publishOne(attempt: CandidateAttempt) {
+    setPublishing(attempt.session_id);
+    try {
+      const response = await api.post<{ detail: string }>(
+        `/sessions/${attempt.session_id}/result/publish`,
+      );
+      toast(response.detail, "mint");
+      if (open) await openCandidate(open);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not publish the result", "rose");
+    } finally {
+      setPublishing(null);
     }
   }
 
@@ -200,10 +233,27 @@ export default function CandidatesPage() {
                       )}
                       {attempt.is_flagged && <Badge tone="rose">flagged</Badge>}
 
+                      {attempt.integrity_verdict === "malpractice" ? (
+                        <Badge tone="rose">malpractice</Badge>
+                      ) : attempt.needs_integrity_review ? (
+                        <Badge tone="amber">needs ruling</Badge>
+                      ) : attempt.integrity_verdict === "cleared" ? (
+                        <Badge tone="mint">genuine</Badge>
+                      ) : null}
+
+                      {attempt.published ? (
+                        <Badge tone="mint">published</Badge>
+                      ) : attempt.pending_review_count > 0 ? (
+                        <Badge tone="amber">{attempt.pending_review_count} to grade</Badge>
+                      ) : null}
+
                       <div className="flex gap-1.5">
                         <Link href={`/dashboard/proctoring/${attempt.session_id}`}>
-                          <Button size="sm" variant="ghost">
-                            Proctoring
+                          <Button
+                            size="sm"
+                            variant={attempt.needs_integrity_review ? "primary" : "ghost"}
+                          >
+                            {attempt.needs_integrity_review ? "Review flags" : "Proctoring"}
                           </Button>
                         </Link>
                         {attempt.result_id && (
@@ -212,6 +262,16 @@ export default function CandidatesPage() {
                               Result
                             </Button>
                           </Link>
+                        )}
+                        {canPublish(attempt) && (
+                          <Button
+                            size="sm"
+                            loading={publishing === attempt.session_id}
+                            disabled={publishing !== null}
+                            onClick={() => void publishOne(attempt)}
+                          >
+                            Publish to candidate
+                          </Button>
                         )}
                       </div>
                     </li>

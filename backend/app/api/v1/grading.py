@@ -70,6 +70,8 @@ def _to_item(answer: Answer) -> GradingQueueItem:
                 max_score=evaluation.max_score,
                 justification=evaluation.justification,
                 confidence=evaluation.confidence,
+                key_points_matched=evaluation.key_points_matched,
+                key_points_missed=evaluation.key_points_missed,
                 created_at=evaluation.created_at,
                 error=evaluation.error,
             )
@@ -333,18 +335,115 @@ def publish_results(exam_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> M
         )
     )
 
+    unreviewed = [s for s in sessions if exam_engine.needs_integrity_review(s)]
+    if unreviewed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{len(unreviewed)} flagged sitting(s) still need an integrity ruling. "
+                "Review the proctoring evidence and clear or fail each one before "
+                "publishing."
+            ),
+        )
+
     published = 0
+    withheld = 0
     now = exam_engine.now()
     for session in sessions:
         result = exam_engine.compute_result(db, session)
+        if exam_engine.withholds_result(session):
+            # Ruled malpractice: the score stays computed and visible to staff, but it
+            # is never released to the candidate as a grade.
+            withheld += 1
+            continue
         result.published = True
         result.published_at = result.published_at or now
+        result.published_by_id = staff.id
         published += 1
 
     exam.results_published = True
     db.flush()
-    logger.info("%s published %d result(s) for exam %r", staff.email, published, exam.title)
-    return Message(detail=f"Published {published} result(s)")
+    logger.info(
+        "%s published %d result(s) for exam %r (%d withheld for malpractice)",
+        staff.email,
+        published,
+        exam.title,
+        withheld,
+    )
+    detail = f"Published {published} result(s)"
+    if withheld:
+        detail += f", withheld {withheld} ruled as malpractice"
+    return Message(detail=detail)
+
+
+@router.post("/sessions/{session_id}/result/publish", response_model=Message)
+def publish_one_result(
+    session_id: uuid.UUID, staff: CurrentStaff, db: DbSession
+) -> Message:
+    """Release one candidate's result to that candidate.
+
+    The per-candidate counterpart to publishing a whole exam. An examiner who has
+    finished reviewing one paper should not have to wait for every other candidate in
+    the cohort before that person can see their marks.
+
+    The same two gates apply as for the bulk route, because they are what make a
+    published score mean something: every answer must have been reviewed by a human,
+    and a flagged sitting must have an integrity ruling on it first.
+    """
+    session = exam_engine.load_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if session.status is SessionStatus.IN_PROGRESS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This candidate is still sitting the exam",
+        )
+
+    outstanding = sum(
+        1
+        for a in session.answers
+        if a.grade_status in {GradeStatus.PENDING_AI, GradeStatus.AI_SCORED}
+    )
+    if outstanding:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{outstanding} answer(s) still need examiner review before this "
+                "result can be published"
+            ),
+        )
+
+    if exam_engine.needs_integrity_review(session):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This sitting was flagged by proctoring. Review the evidence and rule it "
+                "cleared or malpractice before publishing the result."
+            ),
+        )
+
+    if exam_engine.withholds_result(session):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This sitting was ruled malpractice - its result is withheld. Clear the "
+                "sitting first if that ruling was wrong."
+            ),
+        )
+
+    result = exam_engine.compute_result(db, session)
+    result.published = True
+    result.published_at = result.published_at or exam_engine.now()
+    result.published_by_id = staff.id
+    db.flush()
+
+    logger.info(
+        "%s published the result for %s on %r",
+        staff.email,
+        session.candidate.email,
+        session.exam.title,
+    )
+    return Message(detail=f"Result published to {session.candidate.full_name}")
 
 
 @router.get("/grading/evaluations/{answer_id}", response_model=list[AiEvaluationOut])
@@ -365,6 +464,8 @@ def evaluation_history(
             max_score=e.max_score,
             justification=e.justification,
             confidence=e.confidence,
+            key_points_matched=e.key_points_matched,
+            key_points_missed=e.key_points_missed,
             created_at=e.created_at,
             error=e.error,
         )

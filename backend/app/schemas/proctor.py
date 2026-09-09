@@ -5,9 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from app.db.models.enums import ProctorEventType, ProctorSeverity
+from app.db.models.enums import IntegrityVerdict, ProctorEventType, ProctorSeverity
 
 
 class ProctorEventIn(BaseModel):
@@ -62,5 +62,32 @@ class ProctorReview(BaseModel):
     tab_switch_count: int
     is_flagged: bool
     termination_reason: str | None = None
+    #: The examiner's ruling on how the sitting was conducted. Separate from the score.
+    integrity_verdict: IntegrityVerdict = IntegrityVerdict.PENDING
+    integrity_note: str | None = None
+    integrity_reviewed_by: str | None = None
+    integrity_reviewed_at: datetime | None = None
+    #: True when this sitting is flagged and still unreviewed - the queue an examiner
+    #: has to clear before results for the exam can go out.
+    needs_integrity_review: bool = False
     breakdown: dict[str, float] = Field(default_factory=dict)
     events: list[ProctorEventOut] = Field(default_factory=list)
+
+
+class IntegrityDecision(BaseModel):
+    """An examiner's ruling on a sitting.
+
+    ``note`` is required for a malpractice verdict: a ruling that costs a candidate
+    their result must carry a reason someone can review afterwards.
+    """
+
+    verdict: IntegrityVerdict
+    note: str | None = Field(default=None, max_length=4000)
+
+    @model_validator(mode="after")
+    def _malpractice_needs_a_reason(self) -> IntegrityDecision:
+        if self.verdict is IntegrityVerdict.MALPRACTICE and not (self.note or "").strip():
+            raise ValueError("A malpractice verdict needs a note explaining the decision")
+        if self.verdict is IntegrityVerdict.PENDING:
+            raise ValueError("Cannot rule a sitting back to pending")
+        return self

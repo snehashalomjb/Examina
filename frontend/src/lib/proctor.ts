@@ -22,6 +22,11 @@ import type { ProctorBatchOut, ProctorConfig, ProctorEventType } from "@/lib/typ
 
 const WASM_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/models/face_landmarker.task";
+const OBJECT_MODEL_PATH = "/models/efficientdet_lite0.tflite";
+
+/** COCO label the EfficientDet-Lite0 model uses for a mobile phone. */
+const PHONE_CATEGORY = "cell phone";
+const PHONE_SCORE_THRESHOLD = 0.5;
 
 /** Must match WS_SUBPROTOCOL in backend/app/api/v1/proctor.py. */
 const WS_SUBPROTOCOL = "exam-proctor.v1";
@@ -35,6 +40,7 @@ const FACE_MISSING_SAMPLES = 8; // ~2s
 const MULTI_FACE_SAMPLES = 4; // ~1s
 const GAZE_AWAY_SAMPLES = 12; // ~3s
 const DARK_FRAME_SAMPLES = 12;
+const PHONE_SAMPLES = 4; // ~1s
 
 export type VisionMode = "landmarks" | "degraded" | "off";
 
@@ -44,6 +50,7 @@ export interface ProctorStatus {
   faceCount: number;
   facePresent: boolean;
   lookingAway: boolean;
+  phoneDetected: boolean;
   suspicionScore: number;
   tabSwitches: number;
   flagged: boolean;
@@ -71,6 +78,10 @@ interface LandmarkPoint {
   z: number;
 }
 
+interface ObjectDetection {
+  categories: { categoryName: string; score: number }[];
+}
+
 /** Face-mesh landmark indices used for the head-pose estimate. */
 const NOSE_TIP = 1;
 const EYE_OUTER_RIGHT = 33;
@@ -93,6 +104,10 @@ export class ProctorEngine {
     detectForVideo: (video: HTMLVideoElement, timestamp: number) => { faceLandmarks: LandmarkPoint[][] };
     close: () => void;
   } | null = null;
+  private objectDetector: {
+    detectForVideo: (video: HTMLVideoElement, timestamp: number) => { detections: ObjectDetection[] };
+    close: () => void;
+  } | null = null;
 
   private buffer: BufferedEvent[] = [];
   private sampleTimer: number | null = null;
@@ -111,6 +126,7 @@ export class ProctorEngine {
   private multiStreak = 0;
   private awayStreak = 0;
   private darkStreak = 0;
+  private phoneStreak = 0;
   private hiddenSince: number | null = null;
 
   private status: ProctorStatus = {
@@ -119,6 +135,7 @@ export class ProctorEngine {
     faceCount: 0,
     facePresent: false,
     lookingAway: false,
+    phoneDetected: false,
     suspicionScore: 0,
     tabSwitches: 0,
     flagged: false,
@@ -235,6 +252,19 @@ export class ProctorEngine {
       });
       this.landmarker = landmarker as unknown as ProctorEngine["landmarker"];
       this.update({ visionMode: "landmarks" });
+
+      // A missing/failed phone model must never take face detection down with it.
+      try {
+        const objectDetector = await vision.ObjectDetector.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: OBJECT_MODEL_PATH, delegate: "GPU" },
+          runningMode: "VIDEO",
+          scoreThreshold: PHONE_SCORE_THRESHOLD,
+          maxResults: 5,
+        });
+        this.objectDetector = objectDetector as unknown as ProctorEngine["objectDetector"];
+      } catch (error) {
+        console.warn("Phone/object detector unavailable, face detection continues without it", error);
+      }
     } catch (error) {
       console.warn("Face landmarker unavailable, degrading to luminance checks", error);
       this.update({
@@ -254,6 +284,37 @@ export class ProctorEngine {
     } else {
       this.sampleLuminance();
     }
+    if (this.objectDetector) {
+      this.sampleObjects();
+    }
+  }
+
+  /** Independent of the face-landmarker path - runs alongside it, on the same frame cadence. */
+  private sampleObjects() {
+    if (!this.video || !this.objectDetector) return;
+
+    let detections: ObjectDetection[] = [];
+    try {
+      detections = this.objectDetector.detectForVideo(this.video, performance.now()).detections ?? [];
+    } catch {
+      return; // a dropped frame is not evidence of anything
+    }
+
+    const phoneSeen = detections.some((d) =>
+      d.categories.some((c) => c.categoryName === PHONE_CATEGORY && c.score >= PHONE_SCORE_THRESHOLD),
+    );
+
+    if (phoneSeen) {
+      this.phoneStreak += 1;
+      if (this.phoneStreak === PHONE_SAMPLES) {
+        this.record("phone_detected", { samples: this.phoneStreak }, "critical");
+        void this.snapshot("phone_detected");
+      }
+    } else {
+      this.phoneStreak = 0;
+    }
+
+    this.update({ phoneDetected: this.phoneStreak >= PHONE_SAMPLES });
   }
 
   private sampleWithLandmarks() {
@@ -616,10 +677,41 @@ export class ProctorEngine {
     this.landmarker?.close();
     this.landmarker = null;
 
+    this.objectDetector?.close();
+    this.objectDetector = null;
+
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
 
     if (this.video) this.video.srcObject = null;
+  }
+}
+
+/**
+ * One-shot face check for the pre-exam gate: loads its own landmarker instance (kept
+ * separate from a live `ProctorEngine` so the check stage can run before any session
+ * exists), runs a single detection pass, and tears the model down immediately. Shares
+ * the same WASM/model assets as the live engine so there is exactly one place that knows
+ * how to load MediaPipe.
+ */
+export async function detectFaceOnce(
+  video: HTMLVideoElement,
+): Promise<{ faceDetected: boolean; faceCount: number }> {
+  const vision = await import("@mediapipe/tasks-vision");
+  const fileset = await vision.FilesetResolver.forVisionTasks(WASM_PATH);
+  const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
+    runningMode: "VIDEO",
+    numFaces: 3,
+    outputFaceBlendshapes: false,
+    outputFacialTransformationMatrixes: false,
+  });
+  try {
+    const result = landmarker.detectForVideo(video, performance.now());
+    const faceCount = result.faceLandmarks?.length ?? 0;
+    return { faceDetected: faceCount === 1, faceCount };
+  } finally {
+    landmarker.close();
   }
 }
 

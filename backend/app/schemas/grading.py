@@ -17,6 +17,8 @@ class AiEvaluationOut(BaseModel):
     max_score: float
     justification: str
     confidence: float
+    key_points_matched: list[str] = Field(default_factory=list)
+    key_points_missed: list[str] = Field(default_factory=list)
     created_at: datetime
     error: str | None = None
 

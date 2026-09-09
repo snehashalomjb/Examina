@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import UTC
 
@@ -10,6 +11,7 @@ from fastapi import (
     BackgroundTasks,
     File,
     HTTPException,
+    Response,
     UploadFile,
     status,
 )
@@ -302,9 +304,29 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
                 job_role=exam.job_role,
                 sections_count=len(exam.sections or []),
                 has_coding=has_coding,
+                proctor_config=exam.proctor_config,
             )
         )
     return cards
+
+
+# ---------------------------------------------------------- pre-exam system check
+_SPEED_TEST_PAYLOAD = os.urandom(1_500_000)  # ~1.5MB, fixed once per process
+
+
+@router.get("/system/speed-test-payload")
+def speed_test_payload(candidate: CurrentCandidate) -> Response:
+    """A fixed-size, uncacheable payload the client times to estimate real throughput.
+
+    The `connection` check this feeds only ever measured reachability latency, which says
+    nothing about whether a candidate's line can sustain autosave and snapshot uploads
+    for the whole sitting.
+    """
+    return Response(
+        content=_SPEED_TEST_PAYLOAD,
+        media_type="application/octet-stream",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 # ------------------------------------------------------------- session lifecycle
@@ -358,6 +380,34 @@ def start_exam(exam_id: uuid.UUID, candidate: CurrentCandidate, db: DbSession) -
             status_code=status.HTTP_409_CONFLICT,
             detail="You have already attempted this exam",
         )
+
+    # AI proctoring watches one candidate through one webcam at a time - a second live
+    # sitting on another exam would mean nobody is actually being monitored on one of
+    # them. So a candidate may have at most one IN_PROGRESS session platform-wide, not
+    # just one per exam. A stale session (time ran out but nothing ever hit its
+    # heartbeat) is auto-submitted here rather than left to block the candidate forever.
+    other_active = db.scalar(
+        select(ExamSession)
+        .where(
+            ExamSession.candidate_id == candidate.id,
+            ExamSession.exam_id != exam_id,
+            ExamSession.status == SessionStatus.IN_PROGRESS,
+        )
+        .options(
+            selectinload(ExamSession.answers).selectinload(Answer.question),
+            selectinload(ExamSession.exam),
+        )
+    )
+    if other_active is not None:
+        exam_engine.expire_if_due(db, other_active)
+        if other_active.status is SessionStatus.IN_PROGRESS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"You already have '{other_active.exam.title}' in progress. "
+                    "Submit or finish it before starting another exam."
+                ),
+            )
 
     try:
         session = exam_engine.start_session(db, exam=exam, candidate_id=candidate.id)

@@ -13,7 +13,14 @@ import pytest
 from starlette.websockets import WebSocketDisconnect
 
 from app.api.v1.proctor import WS_SUBPROTOCOL
-from app.db.models import AccessStatus, Difficulty, ProctorEventType, QuestionType, UserRole
+from app.db.models import (
+    AccessStatus,
+    Difficulty,
+    ExamSession,
+    ProctorEventType,
+    QuestionType,
+    UserRole,
+)
 from app.tests.conftest import (
     TEST_PASSWORD,
     make_exam,
@@ -187,6 +194,25 @@ class TestIngest:
 
         assert outcome["accepted"] == 0
         assert outcome["terminated"] is False
+
+    def test_a_heartbeat_batch_updates_last_heartbeat_at(self, client, scenario, db):
+        """The socket's own flush cadence must count as liveness, since a candidate on the
+        WebSocket transport never calls POST /heartbeat on their own."""
+        session_id, access, exam_token = _sit(client, scenario)
+        db.expire_all()
+        before = db.get(ExamSession, session_id).last_heartbeat_at
+
+        with client.websocket_connect(
+            f"/api/v1/ws/sessions/{session_id}/proctor",
+            subprotocols=[WS_SUBPROTOCOL, access, exam_token],
+        ) as socket:
+            socket.send_json({"events": []})
+            socket.receive_json()
+
+        db.expire_all()
+        after = db.get(ExamSession, session_id).last_heartbeat_at
+        assert after is not None
+        assert after > before
 
 
 class TestBothTransportsAgree:

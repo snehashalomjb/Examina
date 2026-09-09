@@ -10,10 +10,12 @@ from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentCandidate, CurrentStaff, CurrentUser, DbSession
 from app.core.storage import presigned_url
+from app.services import exam_engine
 from app.services.pdf_generator import generate_result_pdf
 from app.db.models import (
     Answer,
     Exam,
+    ExamEnrollment,
     ExamSession,
     ExamStatus,
     GradeStatus,
@@ -286,35 +288,74 @@ def exam_results(
 def examiner_stats(staff: CurrentStaff, db: DbSession) -> ExaminerStats:
     """Numbers for the examiner dashboard."""
     mine = staff.id if staff.role is UserRole.EXAMINER else None
+    now = exam_engine.now()
+
+    def scoped(stmt):
+        """Narrow a statement to the caller's own exams when they are an examiner.
+
+        Every count on this dashboard has to answer the same question - "how much of
+        *my* work is outstanding" - so an examiner must never see another examiner's
+        live sittings or grading backlog in their own totals. Admins pass through
+        unscoped, because platform-wide is exactly what an admin wants.
+        """
+        return stmt.where(Exam.created_by_id == mine) if mine else stmt
 
     question_stmt = select(func.count(Question.id)).where(Question.is_active)
-    exam_stmt = select(func.count(Exam.id))
     if mine:
         question_stmt = question_stmt.where(Question.created_by_id == mine)
-        exam_stmt = exam_stmt.where(Exam.created_by_id == mine)
+
+    exam_stmt = scoped(select(func.count(Exam.id)))
+    published_exams_stmt = scoped(
+        select(func.count(Exam.id)).where(Exam.status == ExamStatus.PUBLISHED)
+    )
+    active_stmt = scoped(
+        select(func.count(Exam.id)).where(Exam.status == ExamStatus.PUBLISHED, Exam.ends_at > now)
+    )
+    completed_stmt = scoped(
+        select(func.count(Exam.id)).where(
+            (Exam.status == ExamStatus.CLOSED)
+            | ((Exam.status == ExamStatus.PUBLISHED) & (Exam.ends_at <= now))
+        )
+    )
+
+    # Session- and answer-level counts reach Exam through a join so the same
+    # created_by_id filter applies to them too.
+    sessions_base = select(func.count(ExamSession.id)).join(
+        Exam, Exam.id == ExamSession.exam_id
+    )
+    live_stmt = scoped(sessions_base.where(ExamSession.status == SessionStatus.IN_PROGRESS))
+    flagged_stmt = scoped(sessions_base.where(ExamSession.is_flagged))
+    pending_grading_stmt = scoped(
+        select(func.count(Answer.id))
+        .join(ExamSession, ExamSession.id == Answer.session_id)
+        .join(Exam, Exam.id == ExamSession.exam_id)
+        .where(Answer.grade_status.in_([GradeStatus.PENDING_AI, GradeStatus.AI_SCORED]))
+    )
+    published_results_stmt = scoped(
+        select(func.count(Result.id))
+        .join(ExamSession, ExamSession.id == Result.session_id)
+        .join(Exam, Exam.id == ExamSession.exam_id)
+        .where(Result.published.is_(True))
+    )
+    candidates_stmt = scoped(
+        select(func.count(func.distinct(ExamEnrollment.candidate_id))).join(
+            Exam, Exam.id == ExamEnrollment.exam_id
+        )
+    )
 
     return ExaminerStats(
         my_questions=db.scalar(question_stmt) or 0,
         my_exams=db.scalar(exam_stmt) or 0,
-        published_exams=db.scalar(
-            select(func.count(Exam.id)).where(Exam.status == ExamStatus.PUBLISHED)
-        )
-        or 0,
-        live_sessions=db.scalar(
-            select(func.count(ExamSession.id)).where(
-                ExamSession.status == SessionStatus.IN_PROGRESS
-            )
-        )
-        or 0,
-        flagged_sessions=db.scalar(select(func.count(ExamSession.id)).where(ExamSession.is_flagged))
-        or 0,
-        pending_grading=db.scalar(
-            select(func.count(Answer.id)).where(
-                Answer.grade_status.in_([GradeStatus.PENDING_AI, GradeStatus.AI_SCORED])
-            )
-        )
-        or 0,
+        published_exams=db.scalar(published_exams_stmt) or 0,
+        live_sessions=db.scalar(live_stmt) or 0,
+        flagged_sessions=db.scalar(flagged_stmt) or 0,
+        pending_grading=db.scalar(pending_grading_stmt) or 0,
+        # Subjects are a shared taxonomy, not owned work - deliberately not scoped.
         subjects=db.scalar(select(func.count(Subject.id))) or 0,
+        active_assessments=db.scalar(active_stmt) or 0,
+        completed_assessments=db.scalar(completed_stmt) or 0,
+        published_results_count=db.scalar(published_results_stmt) or 0,
+        total_candidates=db.scalar(candidates_stmt) or 0,
     )
 
 
@@ -344,6 +385,10 @@ def candidate_attempts(candidate_id: uuid.UUID, staff: CurrentStaff, db: DbSessi
             "result_id": str(s.result.id) if s.result else None,
             "suspicion_score": s.suspicion_score,
             "is_flagged": s.is_flagged,
+            "integrity_verdict": s.integrity_verdict.value,
+            # Drives the "rule on this before you can publish" prompt in the roster.
+            "needs_integrity_review": exam_engine.needs_integrity_review(s),
+            "pending_review_count": s.result.pending_review_count if s.result else 0,
         }
         for s in sessions
     ]

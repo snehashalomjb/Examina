@@ -39,12 +39,14 @@ from app.core.storage import build_key, presigned_url, put_object
 from app.db.models import (
     Answer,
     ExamSession,
+    IntegrityVerdict,
     ProctorEvent,
     ProctorEventType,
     SessionStatus,
 )
 from app.db.session import get_db
 from app.schemas.proctor import (
+    IntegrityDecision,
     ProctorBatchIn,
     ProctorBatchOut,
     ProctorEventOut,
@@ -52,6 +54,7 @@ from app.schemas.proctor import (
     SnapshotOut,
 )
 from app.services import exam_engine, proctor_ingest
+from app.services.exam_engine import needs_integrity_review
 from app.services.suspicion import event_weight, score_events, severity_for
 
 router = APIRouter(tags=["proctoring"])
@@ -278,6 +281,7 @@ def review_session(session_id: uuid.UUID, staff: CurrentStaff, db: DbSession) ->
             selectinload(ExamSession.exam),
             selectinload(ExamSession.proctor_events),
             selectinload(ExamSession.answers).selectinload(Answer.question),
+            selectinload(ExamSession.integrity_reviewed_by),
         )
     )
     if session is None:
@@ -298,6 +302,13 @@ def review_session(session_id: uuid.UUID, staff: CurrentStaff, db: DbSession) ->
         tab_switch_count=session.tab_switch_count,
         is_flagged=session.is_flagged,
         termination_reason=session.termination_reason,
+        integrity_verdict=session.integrity_verdict,
+        integrity_note=session.integrity_note,
+        integrity_reviewed_by=(
+            session.integrity_reviewed_by.full_name if session.integrity_reviewed_by else None
+        ),
+        integrity_reviewed_at=session.integrity_reviewed_at,
+        needs_integrity_review=needs_integrity_review(session),
         breakdown=outcome.breakdown,
         events=[
             ProctorEventOut(
@@ -314,6 +325,53 @@ def review_session(session_id: uuid.UUID, staff: CurrentStaff, db: DbSession) ->
             for e in events
         ],
     )
+
+
+@router.post("/proctoring/sessions/{session_id}/integrity", response_model=ProctorReview)
+def rule_on_integrity(
+    session_id: uuid.UUID,
+    payload: IntegrityDecision,
+    staff: CurrentStaff,
+    db: DbSession,
+) -> ProctorReview:
+    """Record an examiner's ruling on how a sitting was conducted.
+
+    This is the human half of proctoring. The engine produces a suspicion score and a
+    timeline of events; neither is a verdict. An examiner reads them and decides whether
+    the sitting was genuine, and only then can the paper's result be released.
+
+    Ruling ``cleared`` says the flags were noise - the paper is graded and published like
+    any other. Ruling ``malpractice`` withholds the result instead: the score is still
+    computed and visible to staff, but it is never published to the candidate as a grade.
+    Nothing here changes a single mark; a verdict and a score are separate axes.
+    """
+    session = exam_engine.load_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    if session.status is SessionStatus.IN_PROGRESS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This sitting is still in progress - review it once the candidate submits",
+        )
+
+    session.integrity_verdict = payload.verdict
+    session.integrity_note = (payload.note or "").strip() or None
+    session.integrity_reviewed_by_id = staff.id
+    session.integrity_reviewed_at = exam_engine.now()
+
+    if payload.verdict is IntegrityVerdict.MALPRACTICE:
+        # Withhold rather than delete: an appeal needs the marks to still exist.
+        result = session.result
+        if result is not None and result.published:
+            result.published = False
+            result.published_at = None
+            result.published_by_id = None
+
+    db.flush()
+    logger.info(
+        "%s ruled session %s as %s", staff.email, session_id, payload.verdict.value
+    )
+    return review_session(session_id, staff, db)
 
 
 @router.post("/proctoring/sessions/{session_id}/terminate", response_model=ProctorReview)

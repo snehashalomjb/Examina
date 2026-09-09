@@ -136,6 +136,26 @@ class ShortlistStatus(str, enum.Enum):
     ON_HOLD = "on_hold"
 
 
+class IntegrityVerdict(str, enum.Enum):
+    """An examiner's ruling on how a sitting was conducted.
+
+    Proctoring produces signals, not verdicts. A suspicion score and a pile of events
+    say "look at this"; only a named examiner decides whether what happened was
+    malpractice. That decision is recorded here, separately from the score, because a
+    candidate can sit honestly and do badly, or cheat and do well - the two axes are
+    independent and conflating them is how an automated system wrongly fails someone.
+
+    ``PENDING`` is the default and means nobody has looked yet. A flagged sitting cannot
+    have its result published while it is still ``PENDING``.
+    """
+
+    PENDING = "pending"
+    #: Reviewed and judged a genuine attempt. The paper is graded and published normally.
+    CLEARED = "cleared"
+    #: Reviewed and judged malpractice. The result is withheld rather than published.
+    MALPRACTICE = "malpractice"
+
+
 class Difficulty(str, enum.Enum):
     EASY = "easy"
     MEDIUM = "medium"
@@ -166,6 +186,7 @@ class GradeStatus(str, enum.Enum):
 class ProctorEventType(str, enum.Enum):
     FACE_MISSING = "face_missing"
     MULTIPLE_FACES = "multiple_faces"
+    PHONE_DETECTED = "phone_detected"
     GAZE_AWAY = "gaze_away"
     TAB_SWITCH = "tab_switch"
     WINDOW_BLUR = "window_blur"

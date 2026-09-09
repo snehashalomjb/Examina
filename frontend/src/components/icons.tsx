@@ -209,6 +209,28 @@ export function IconMonitor(props: IconProps) {
   );
 }
 
+export function IconMic(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 18v3" />
+      <path d="M9 21h6" />
+    </Svg>
+  );
+}
+
+export function IconWifi(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 9a12.5 12.5 0 0 1 17 0" />
+      <path d="M6.5 12.8a8 8 0 0 1 11 0" />
+      <path d="M9.7 16.5a3.5 3.5 0 0 1 4.6 0" />
+      <circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none" />
+    </Svg>
+  );
+}
+
 export function IconList(props: IconProps) {
   return (
     <Svg {...props}>

@@ -56,6 +56,12 @@ def ingest_batch(
     received = exam_engine.now()
     config = session.exam.proctor_config
 
+    # Any flush - including an empty one - proves the candidate's channel is alive, so it
+    # counts as a heartbeat exactly like the dedicated endpoint. Without this, a candidate
+    # who never calls /heartbeat (the WebSocket transport pushes every ~10s on its own)
+    # would look stale to anything that reads last_heartbeat_at.
+    session.last_heartbeat_at = received
+
     for item in events:
         occurred = item.occurred_at
         if occurred.tzinfo is None:

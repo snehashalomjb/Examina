@@ -22,6 +22,14 @@ class GradeResult(BaseModel):
     confidence: float = Field(
         default=0.0, ge=0.0, le=1.0, description="How sure the grader is, 0..1"
     )
+    key_points_matched: list[str] = Field(
+        default_factory=list,
+        description="Model-answer key points the candidate's answer covered",
+    )
+    key_points_missed: list[str] = Field(
+        default_factory=list,
+        description="Model-answer key points the candidate's answer did not cover",
+    )
 
     def clamped(self) -> GradeResult:
         """Never let a grader award more than the question is worth, or less than zero."""

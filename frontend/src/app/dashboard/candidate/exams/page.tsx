@@ -89,15 +89,17 @@ export default function MyExamsPage() {
       {/* Category Filter Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
-          {[
-            { key: "all", label: `All Exams (${exams.length})` },
-            { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
-            { key: "corporate", label: `💼 Corporate Hiring (${exams.filter((e) => e.exam_type === "corporate").length})` },
-          ].map((tab) => (
+          {(
+            [
+              { key: "all", label: `All Exams (${exams.length})` },
+              { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
+              { key: "corporate", label: `💼 Corporate Hiring (${exams.filter((e) => e.exam_type === "corporate").length})` },
+            ] as { key: typeof filterMode; label: string }[]
+          ).map((tab) => (
             <button
               key={tab.key}
               type="button"
-              onClick={() => setFilterMode(tab.key as any)}
+              onClick={() => setFilterMode(tab.key)}
               className={cx(
                 "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all",
                 filterMode === tab.key

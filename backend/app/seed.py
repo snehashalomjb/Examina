@@ -293,6 +293,215 @@ def _seed_questions(db: Session, subjects: dict[str, Subject], examiner: User) -
         qs.append(_make_q(subject=sub_se, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Software Engineering", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
 
     # --------------------------------------------------------------------------
+    # 4a. ACADEMIC - CS202: Operating Systems
+    # --------------------------------------------------------------------------
+    sub_os = subjects["CS202"]
+    os_mcqs = [
+        ("What is the primary purpose of a Process Control Block (PCB)?", ["Store all state information needed to manage a process", "Cache disk blocks for faster I/O", "Translate virtual addresses to physical addresses", "Schedule interrupts between CPU cores"], 0, Difficulty.EASY, "The PCB holds process state, registers, scheduling info, and memory pointers."),
+        ("Which page replacement algorithm suffers from Belady's Anomaly?", ["FIFO", "LRU", "Optimal", "Second-Chance"], 0, Difficulty.MEDIUM, "FIFO can increase page faults when frame count increases, unlike stack-based algorithms."),
+        ("A binary semaphore is functionally equivalent to which construct?", ["Mutex lock", "Monitor", "Spinlock with busy-waiting only", "Readers-writers lock"], 0, Difficulty.EASY, "A binary semaphore (0/1) enforces mutual exclusion just like a mutex."),
+        ("In virtual memory systems, what does 'thrashing' refer to?", ["Excessive paging activity causing low CPU utilization", "A CPU cache miss on every instruction fetch", "Two processes writing to the same file simultaneously", "A deadlock between two kernel threads"], 0, Difficulty.MEDIUM, "Thrashing occurs when processes spend more time paging than executing."),
+        ("Which scheduling algorithm minimizes average waiting time for a known, fixed set of jobs?", ["Shortest Job First (SJF)", "First Come First Served (FCFS)", "Round Robin", "Priority Scheduling with aging"], 0, Difficulty.MEDIUM, "SJF is provably optimal for minimizing average waiting time given known burst times."),
+        ("What condition is necessary (but not sufficient) for a race condition to occur?", ["Shared mutable state accessed by concurrent threads without synchronization", "Use of a single-threaded event loop", "Static allocation of all variables", "Compilation with optimization flags disabled"], 0, Difficulty.HARD, "Race conditions require shared state and concurrent unsynchronized access."),
+        ("What is the main difference between a process and a thread?", ["Threads share the address space of their parent process; processes have separate address spaces", "Processes are faster to create than threads", "Threads cannot be scheduled independently", "Processes share memory by default"], 0, Difficulty.EASY, "Threads within a process share code, data, and heap segments but have their own stack and registers."),
+        ("Which of the following best describes a deadlock?", ["A set of processes are each waiting for a resource held by another in the set", "A process is terminated by the OS due to a segmentation fault", "Two threads execute the same instruction simultaneously", "A process exceeds its allocated CPU time quantum"], 0, Difficulty.MEDIUM, "Deadlock is a circular wait where no process can proceed."),
+        ("What is the purpose of the 'dirty bit' in a page table entry?", ["Indicate whether a page has been modified since it was loaded", "Indicate whether a page is present in memory", "Indicate the protection level of the page", "Indicate the page's reference count"], 0, Difficulty.MEDIUM, "A dirty page must be written back to disk before it is evicted; a clean page can simply be discarded."),
+        ("Which IPC mechanism allows unrelated processes to communicate via a name registered in the filesystem namespace?", ["Named pipe (FIFO)", "Anonymous pipe", "Shared global variable", "Register file"], 0, Difficulty.MEDIUM, "Named pipes exist as filesystem entries, so unrelated processes can open them by name."),
+        ("In the Banker's Algorithm, what is checked before granting a resource request?", ["Whether granting the request leaves the system in a safe state", "Whether the requesting process has the highest priority", "Whether the resource has ever been allocated before", "Whether the request exceeds the total system memory"], 0, Difficulty.HARD, "The Banker's Algorithm simulates allocation and checks for at least one safe sequence."),
+        ("What is the primary difference between internal and external fragmentation?", ["Internal fragmentation wastes space within an allocated block; external wastes space between blocks", "Internal fragmentation only occurs in paging; external only in segmentation", "External fragmentation is fixed by increasing page size", "Internal fragmentation cannot occur in fixed-size partitioning"], 0, Difficulty.MEDIUM, "Internal fragmentation is unused space inside a fixed-size allocation; external is scattered free space between allocations."),
+        ("Which scheduling algorithm is preemptive and assigns each process a fixed time slice in cyclic order?", ["Round Robin", "First Come First Served", "Shortest Job First (non-preemptive)", "Priority Scheduling (non-preemptive)"], 0, Difficulty.EASY, "Round Robin cycles through the ready queue, preempting each process after its quantum expires."),
+        ("What does the 'C' in the CPU's fetch-decode-execute cycle NOT refer to?", ["Cache invalidation", "Control unit signal generation", "Clock synchronization", "Instruction cycle continuation"], 0, Difficulty.HARD, "The fetch-decode-execute cycle involves the control unit and clock, not cache invalidation as a defining step."),
+        ("Which of the following is true about a Monitor (in concurrent programming)?", ["It encapsulates shared data and provides mutually exclusive access via built-in condition variables", "It requires manual semaphore management by the programmer", "It can only be used for inter-process, not inter-thread, communication", "It guarantees deadlock-free execution automatically"], 0, Difficulty.MEDIUM, "A monitor bundles shared data, procedures, and condition variables so only one thread executes inside it at a time."),
+        ("What happens during a context switch?", ["The OS saves the state of the current process/thread and loads the state of the next one to run", "The CPU clock speed is temporarily increased", "The page table is deleted and rebuilt", "All open file descriptors are closed"], 0, Difficulty.EASY, "A context switch saves/restores register state, program counter, and other process control block data."),
+        ("Which file allocation method suffers most from external fragmentation on disk?", ["Contiguous allocation", "Linked allocation", "Indexed allocation", "None of the above"], 0, Difficulty.MEDIUM, "Contiguous allocation requires a single unbroken run of blocks, leading to fragmentation as files are created/deleted."),
+        ("What is a 'zombie process' in Unix-like systems?", ["A terminated process whose exit status has not yet been read by its parent", "A process stuck in an infinite loop", "A process running with root privileges", "A process that has forked but not yet executed"], 0, Difficulty.MEDIUM, "A zombie retains its PCB entry until the parent calls wait() to collect the exit status."),
+        ("Which of these is a necessary condition for priority inversion to occur?", ["A lower-priority task holds a resource needed by a higher-priority task", "Two tasks have the exact same priority", "The scheduler uses Round Robin", "The system has only one CPU core"], 0, Difficulty.HARD, "Priority inversion happens when a high-priority task is blocked waiting on a lock held by a lower-priority task."),
+        ("What is the main advantage of demand paging over loading an entire process into memory at once?", ["Only pages actually needed are loaded, reducing memory usage and startup time", "It eliminates the need for a page table", "It guarantees zero page faults", "It removes the need for virtual memory"], 0, Difficulty.EASY, "Demand paging loads pages lazily on first access, improving memory utilization."),
+    ]
+    for body, opts, corr, diff, exp in os_mcqs:
+        qs.append(_make_q(subject=sub_os, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Operating Systems", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
+    # 4b. ACADEMIC - CS203: Computer Networks
+    # --------------------------------------------------------------------------
+    sub_cn = subjects["CS203"]
+    cn_mcqs = [
+        ("Which transport-layer protocol provides reliable, ordered, connection-oriented delivery?", ["TCP", "UDP", "ICMP", "IP"], 0, Difficulty.EASY, "TCP uses sequence numbers, acknowledgements, and retransmission for reliability."),
+        ("What is the purpose of the three-way handshake in TCP connection establishment?", ["Synchronize sequence numbers between client and server", "Encrypt the payload before transmission", "Assign a dynamic IP address to the client", "Compress the packet headers"], 0, Difficulty.MEDIUM, "SYN, SYN-ACK, ACK synchronizes initial sequence numbers on both ends."),
+        ("Which DNS record type maps a domain name directly to an IPv4 address?", ["A record", "CNAME record", "MX record", "TXT record"], 0, Difficulty.EASY, "An A record resolves a hostname to an IPv4 address."),
+        ("In CSMA/CD, what action is taken when a collision is detected?", ["Transmission stops and a random backoff timer is used before retry", "The frame is immediately re-sent without delay", "The sender switches to a different protocol", "The receiver requests a checksum recalculation"], 0, Difficulty.MEDIUM, "CSMA/CD aborts transmission on collision and retries after exponential backoff."),
+        ("Which subnet mask corresponds to a /26 CIDR block?", ["255.255.255.192", "255.255.255.224", "255.255.255.240", "255.255.255.128"], 0, Difficulty.MEDIUM, "/26 leaves 6 host bits, giving mask 11000000 in the last octet = 192."),
+        ("What is the main advantage of using a Link State routing protocol (e.g., OSPF) over Distance Vector (e.g., RIP)?", ["Faster convergence and no count-to-infinity problem", "Lower memory usage on routers", "No need for periodic updates", "Simpler configuration with fewer messages"], 0, Difficulty.HARD, "Link state protocols flood full topology, enabling faster, loop-free convergence."),
+        ("Which layer of the OSI model is responsible for end-to-end error recovery and flow control?", ["Transport Layer", "Network Layer", "Data Link Layer", "Session Layer"], 0, Difficulty.EASY, "The Transport layer (e.g., TCP) provides reliable end-to-end delivery with flow and error control."),
+        ("What is the purpose of NAT (Network Address Translation)?", ["Allow multiple devices on a private network to share a single public IP address", "Encrypt traffic between two hosts", "Resolve domain names to IP addresses", "Assign MAC addresses to network interfaces"], 0, Difficulty.EASY, "NAT translates private IP addresses to a public one at the network boundary."),
+        ("Which protocol is used to automatically assign IP addresses to hosts on a network?", ["DHCP", "ARP", "DNS", "ICMP"], 0, Difficulty.EASY, "DHCP dynamically leases IP addresses and network configuration to clients."),
+        ("In HTTPS, which protocol provides the encryption layer beneath HTTP?", ["TLS", "SSH", "IPSec", "SNMP"], 0, Difficulty.EASY, "TLS (successor to SSL) encrypts the HTTP payload for HTTPS connections."),
+        ("What does the TTL (Time To Live) field in an IP header prevent?", ["Packets looping indefinitely in the network", "Packets exceeding the MTU size", "Duplicate ACKs during congestion", "Fragmentation of large packets"], 0, Difficulty.MEDIUM, "Each hop decrements TTL; the packet is discarded when it reaches zero, preventing infinite loops."),
+        ("Which of the following best describes UDP compared to TCP?", ["Connectionless, no guaranteed delivery, lower overhead", "Connection-oriented with guaranteed in-order delivery", "Requires a three-way handshake before data transfer", "Provides built-in congestion control"], 0, Difficulty.EASY, "UDP is a lightweight, connectionless protocol with no delivery or ordering guarantees."),
+        ("What is the purpose of the Spanning Tree Protocol (STP) in switched networks?", ["Prevent broadcast storms by eliminating loops in the network topology", "Encrypt Layer 2 frames", "Assign VLAN tags to frames", "Translate MAC addresses to IP addresses"], 0, Difficulty.MEDIUM, "STP blocks redundant paths to build a loop-free logical topology."),
+        ("Which port number is conventionally used by HTTPS?", ["443", "80", "21", "25"], 0, Difficulty.EASY, "Port 443 is the well-known port for HTTPS traffic."),
+        ("What is 'subnetting' primarily used for?", ["Dividing a large network into smaller, manageable sub-networks", "Encrypting packets between subnets", "Increasing the MTU of a network", "Assigning static MAC addresses"], 0, Difficulty.EASY, "Subnetting partitions an IP address space to improve routing efficiency and isolate traffic."),
+        ("Which congestion control mechanism does TCP use to gradually increase its sending rate after a slow start?", ["Congestion avoidance (additive increase, multiplicative decrease)", "Fixed-size sliding window with no adjustment", "Random early detection only", "Static bandwidth allocation"], 0, Difficulty.HARD, "TCP congestion avoidance increases the window additively and halves it multiplicatively on loss (AIMD)."),
+        ("What does an ARP spoofing attack primarily exploit?", ["The lack of authentication in ARP replies, allowing MAC address impersonation", "A buffer overflow in the DNS resolver", "Weak TLS cipher suites", "Misconfigured firewall NAT rules"], 0, Difficulty.HARD, "ARP has no authentication, so a host can send forged ARP replies to redirect traffic."),
+        ("Which topology connects every node to a central hub or switch?", ["Star topology", "Bus topology", "Ring topology", "Mesh topology"], 0, Difficulty.EASY, "In a star topology, all nodes connect individually to a central device."),
+        ("What is the function of the SYN-ACK flag combination during TCP handshake?", ["Server acknowledges the client's SYN and sends its own synchronization request", "Client terminates the connection gracefully", "Server rejects the connection request", "Client requests retransmission of lost segments"], 0, Difficulty.MEDIUM, "SYN-ACK is step two of the three-way handshake, both acknowledging and synchronizing."),
+        ("Which class of IPv4 address range is reserved for multicast traffic?", ["Class D (224.0.0.0 - 239.255.255.255)", "Class A (1.0.0.0 - 126.255.255.255)", "Class B (128.0.0.0 - 191.255.255.255)", "Class C (192.0.0.0 - 223.255.255.255)"], 0, Difficulty.MEDIUM, "Class D addresses are reserved for multicast group communication."),
+    ]
+    for body, opts, corr, diff, exp in cn_mcqs:
+        qs.append(_make_q(subject=sub_cn, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Computer Networks", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
+    # 4c. ACADEMIC - MATH101: Engineering Mathematics
+    # --------------------------------------------------------------------------
+    sub_math = subjects["MATH101"]
+    math_mcqs = [
+        ("What is the derivative of f(x) = 3x^2 + 5x - 7?", ["6x + 5", "3x + 5", "6x - 7", "x^2 + 5"], 0, Difficulty.EASY, "d/dx(3x^2) = 6x, d/dx(5x) = 5, derivative of a constant is 0."),
+        ("What is the determinant of a 2x2 matrix [[a, b], [c, d]]?", ["ad - bc", "ac - bd", "ab - cd", "ad + bc"], 0, Difficulty.EASY, "The determinant of a 2x2 matrix is the product of the main diagonal minus the product of the anti-diagonal."),
+        ("Which method is used to solve a system of linear equations by row-reducing an augmented matrix?", ["Gaussian elimination", "Newton-Raphson method", "Simpson's rule", "Lagrange interpolation"], 0, Difficulty.MEDIUM, "Gaussian elimination reduces the augmented matrix to row-echelon form to solve for unknowns."),
+        ("What is the value of the integral of sin(x) dx?", ["-cos(x) + C", "cos(x) + C", "-sin(x) + C", "tan(x) + C"], 0, Difficulty.EASY, "The antiderivative of sin(x) is -cos(x), plus constant of integration."),
+        ("A matrix A has eigenvalues 2 and 3. What is the determinant of A (assuming A is 2x2)?", ["6", "5", "1", "0"], 0, Difficulty.MEDIUM, "The determinant of a matrix equals the product of its eigenvalues."),
+        ("Which probability distribution is characterized by a bell-shaped, symmetric curve defined by mean and variance?", ["Normal (Gaussian) distribution", "Poisson distribution", "Binomial distribution", "Exponential distribution"], 0, Difficulty.EASY, "The Normal distribution is fully described by its mean and variance, forming a symmetric bell curve."),
+    ]
+    for body, opts, corr, diff, exp in math_mcqs:
+        qs.append(_make_q(subject=sub_math, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Engineering Mathematics", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
+    # 4d. ACADEMIC - ML101: Machine Learning
+    # --------------------------------------------------------------------------
+    sub_ml = subjects["ML101"]
+    ml_mcqs = [
+        ("Which algorithm finds a hyperplane that maximizes the margin between two classes?", ["Support Vector Machine (SVM)", "K-Means Clustering", "Linear Regression", "Principal Component Analysis"], 0, Difficulty.MEDIUM, "SVM maximizes the margin between the separating hyperplane and the nearest points of each class."),
+        ("What does 'overfitting' mean in machine learning?", ["The model fits training data (including noise) so closely that it generalizes poorly to new data", "The model is too simple to capture patterns in the data", "The model trains faster than expected", "The model uses too few features"], 0, Difficulty.EASY, "Overfitting occurs when a model memorizes training noise instead of learning generalizable patterns."),
+        ("Which metric is most appropriate for evaluating a classifier on a highly imbalanced dataset?", ["F1-score", "Raw accuracy", "Mean squared error", "R-squared"], 0, Difficulty.MEDIUM, "F1-score balances precision and recall, unlike accuracy which is misleading when one class dominates."),
+        ("What is the primary purpose of a validation set?", ["Tune hyperparameters and estimate generalization without touching the test set", "Replace the need for a training set", "Store the final model weights", "Increase the size of the training set"], 0, Difficulty.EASY, "The validation set guides model/hyperparameter selection, keeping the test set unbiased for final evaluation."),
+        ("Which activation function outputs a value strictly between 0 and 1, commonly used for binary classification output?", ["Sigmoid", "ReLU", "Softmax", "Tanh"], 0, Difficulty.EASY, "Sigmoid squashes any real input into the (0, 1) range, interpretable as a probability."),
+        ("What is the 'vanishing gradient' problem?", ["Gradients shrink exponentially through many layers, slowing or halting learning in early layers", "Gradients grow uncontrollably, causing numerical overflow", "The loss function has no gradient at all", "The learning rate is set to zero"], 0, Difficulty.HARD, "Repeated multiplication of small derivatives (e.g., sigmoid) through deep networks shrinks gradients toward zero."),
+        ("Which technique reduces dimensionality by projecting data onto directions of maximum variance?", ["Principal Component Analysis (PCA)", "K-Means Clustering", "Gradient Boosting", "One-Hot Encoding"], 0, Difficulty.MEDIUM, "PCA finds orthogonal components ordered by the variance they explain."),
+        ("What does the 'bias-variance tradeoff' describe?", ["The balance between a model being too simple (high bias) and too sensitive to training data (high variance)", "The tradeoff between training time and inference time", "The choice between supervised and unsupervised learning", "The tradeoff between CPU and GPU usage"], 0, Difficulty.MEDIUM, "Bias-variance tradeoff balances underfitting (bias) against overfitting (variance)."),
+        ("Which regularization technique adds the sum of absolute weight values to the loss, encouraging sparse weights?", ["L1 regularization (Lasso)", "L2 regularization (Ridge)", "Dropout", "Batch normalization"], 0, Difficulty.MEDIUM, "L1 regularization's absolute-value penalty drives many weights exactly to zero, producing sparsity."),
+        ("What is the purpose of k-fold cross-validation?", ["Estimate model performance robustly by averaging results across multiple train/test splits", "Reduce the number of features in the dataset", "Increase the learning rate automatically", "Convert categorical features into numerical ones"], 0, Difficulty.MEDIUM, "K-fold cross-validation trains and evaluates k times on different folds, reducing variance in the performance estimate."),
+        ("Which unsupervised algorithm groups data points into k clusters based on distance to the nearest centroid?", ["K-Means", "Logistic Regression", "Random Forest", "Support Vector Machine"], 0, Difficulty.EASY, "K-Means iteratively assigns points to the nearest centroid and recomputes centroids until convergence."),
+        ("What does a confusion matrix visualize for a classifier?", ["True positives, false positives, true negatives, and false negatives", "The learning rate schedule over training epochs", "The correlation between input features", "The distribution of the target variable"], 0, Difficulty.EASY, "A confusion matrix tabulates predicted vs actual classes, exposing all four outcome categories."),
+        ("What does the learning rate control in gradient descent?", ["The size of each step taken when updating model weights", "The number of layers in the neural network", "The number of training examples used per epoch", "The choice of loss function"], 0, Difficulty.EASY, "A larger learning rate takes bigger steps toward (or past) the minimum; too large can diverge, too small can be slow."),
+        ("Which ensemble method trains many decision trees on bootstrapped samples and averages/votes their predictions?", ["Random Forest (Bagging)", "Gradient Descent", "Principal Component Analysis", "K-Nearest Neighbors"], 0, Difficulty.MEDIUM, "Random Forest bags multiple decision trees on bootstrapped subsets and aggregates their predictions to reduce variance."),
+        ("What does one-hot encoding do to a categorical feature?", ["Converts each category into a separate binary indicator column", "Scales the feature to a 0-1 range", "Removes the feature entirely", "Converts the feature into its rank order"], 0, Difficulty.EASY, "One-hot encoding creates a binary column per category so models don't infer a false ordinal relationship."),
+        ("In gradient boosting, how are successive trees trained?", ["Each new tree is trained to correct the residual errors of the previous ensemble", "Each tree is trained independently on a random feature subset", "All trees are trained in parallel on the same target", "Trees are trained only once and then cloned"], 0, Difficulty.HARD, "Gradient boosting fits each new weak learner to the negative gradient (residual error) of the current ensemble's loss."),
+    ]
+    for body, opts, corr, diff, exp in ml_mcqs:
+        qs.append(_make_q(subject=sub_ml, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Machine Learning", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    ml_tf = [
+        ("Increasing model complexity always reduces both bias and variance simultaneously.", ["True", "False"], 1, Difficulty.MEDIUM, "More complexity typically reduces bias but increases variance - they trade off, not both improve together."),
+        ("In supervised learning, the training data must include labeled output values.", ["True", "False"], 0, Difficulty.EASY, "Supervised learning is defined by learning a mapping from inputs to known, labeled outputs."),
+        ("K-Means clustering requires labeled training data to run.", ["True", "False"], 1, Difficulty.EASY, "K-Means is unsupervised - it groups data using only feature similarity, no labels required."),
+        ("Dropout is a regularization technique used to prevent overfitting in neural networks.", ["True", "False"], 0, Difficulty.EASY, "Dropout randomly disables neurons during training, preventing co-adaptation and reducing overfitting."),
+        ("The ReLU activation function outputs negative values for negative inputs.", ["True", "False"], 1, Difficulty.EASY, "ReLU is defined as max(0, x), so it outputs exactly 0 for any negative input."),
+        ("Precision and recall always increase together as a classification threshold changes.", ["True", "False"], 1, Difficulty.MEDIUM, "Precision and recall typically trade off - raising the threshold usually increases precision but decreases recall."),
+        ("Feature scaling (normalization) is generally important for gradient-descent-based algorithms to converge efficiently.", ["True", "False"], 0, Difficulty.MEDIUM, "Unscaled features with very different ranges distort the loss surface, slowing or destabilizing gradient descent."),
+        ("A very high R-squared value on training data guarantees good performance on unseen test data.", ["True", "False"], 1, Difficulty.MEDIUM, "A high training R-squared can simply reflect overfitting, with no guarantee of generalization to new data."),
+    ]
+    for body, opts, corr, diff, exp in ml_tf:
+        qs.append(_make_q(subject=sub_ml, creator=examiner, qtype=QuestionType.TRUE_FALSE, category=cat, topic="Machine Learning Concepts", body=body, difficulty=diff, marks=1.0, negative=0.25, options=opts, correct=[corr], explanation=exp))
+
+    ml_img = [
+        ("Derive the gradient descent weight-update rule for linear regression using the Mean Squared Error loss function. Handwrite your complete derivation, photograph it, and upload the image.", "Expected: correct partial derivative of MSE w.r.t. weights, arriving at w := w - alpha * (2/n) * X^T(Xw - y).", Difficulty.MEDIUM, 8.0),
+        ("Draw and label a fully-connected feedforward neural network with 1 input layer (3 nodes), 1 hidden layer (4 nodes), and 1 output layer (2 nodes). Upload a clear photo or diagram.", "Expected: correctly labeled nodes and layers, all connections drawn between adjacent layers, and arrows showing forward propagation direction.", Difficulty.EASY, 6.0),
+        ("Sketch the ROC curve for a binary classifier and shade the Area Under the Curve (AUC) region. Label both axes correctly. Upload your diagram.", "Expected: X-axis labeled False Positive Rate, Y-axis labeled True Positive Rate, a diagonal random-guess reference line, and the AUC region shaded.", Difficulty.MEDIUM, 8.0),
+        ("Derive the gradient of the softmax function with respect to its input logits, for use in a multi-class cross-entropy loss. Handwrite the full derivation and upload a photo.", "Expected: derivation using the Kronecker delta for softmax's own partial derivatives, simplifying the combined cross-entropy gradient to (predicted_probability - true_label).", Difficulty.HARD, 10.0),
+        ("Draw a decision tree of depth 3 that classifies whether a loan applicant is approved, based on income, credit score, and existing debt. Upload a clear photograph or diagram.", "Expected: root node splitting on the most informative feature (e.g., credit score), branching logically down to leaf decisions, with edges clearly labeled True/False or threshold conditions.", Difficulty.MEDIUM, 8.0),
+        ("Illustrate the bias-variance tradeoff with a diagram plotting model complexity on the x-axis against error on the y-axis, showing separate bias, variance, and total error curves. Upload your diagram.", "Expected: bias curve decreasing monotonically, variance curve increasing monotonically, and a U-shaped total error curve with the optimal complexity point marked.", Difficulty.MEDIUM, 8.0),
+    ]
+    for body, model_ans, diff, marks in ml_img:
+        qs.append(_make_q(subject=sub_ml, creator=examiner, qtype=QuestionType.IMAGE_UPLOAD, category=cat, topic="ML Diagrams & Derivations", body=body, difficulty=diff, marks=marks, model_answer=model_ans))
+
+    # --------------------------------------------------------------------------
+    # 4e. ACADEMIC - NLP101: Natural Language Processing
+    # --------------------------------------------------------------------------
+    sub_nlp = subjects["NLP101"]
+    nlp_mcqs = [
+        ("What does 'tokenization' refer to in NLP?", ["Splitting text into smaller units such as words or subwords", "Translating text from one language to another", "Compressing text to reduce storage size", "Encrypting text for secure transmission"], 0, Difficulty.EASY, "Tokenization breaks raw text into tokens (words, subwords, or characters) for downstream processing."),
+        ("Which technique represents words as dense vectors that capture semantic similarity?", ["Word embeddings (e.g., Word2Vec)", "One-hot encoding", "Bag-of-Words counting", "Regular expression matching"], 0, Difficulty.MEDIUM, "Word embeddings map words into a continuous vector space where similar words are close together."),
+        ("What is the purpose of 'stemming' in text preprocessing?", ["Reduce words to a root or base form by stripping suffixes", "Translate words into another language", "Count word frequency across documents", "Detect the sentiment polarity of a sentence"], 0, Difficulty.EASY, "Stemming crudely chops word endings (e.g., 'running' -> 'run') to normalize word forms."),
+        ("Which architecture introduced the self-attention mechanism underlying most modern NLP models?", ["Transformer", "Convolutional Neural Network (CNN)", "Hidden Markov Model (HMM)", "Decision Tree"], 0, Difficulty.MEDIUM, "The Transformer architecture ('Attention Is All You Need') replaced recurrence with self-attention."),
+        ("What does TF-IDF measure?", ["How important a word is to a document relative to a whole corpus", "The total number of documents in a corpus", "The grammatical category of a word", "The sentiment score of a sentence"], 0, Difficulty.MEDIUM, "TF-IDF combines term frequency in a document with inverse document frequency across the corpus to weight distinctive words higher."),
+        ("Which NLP task assigns grammatical categories (noun, verb, adjective, etc.) to each word in a sentence?", ["Part-of-Speech (POS) tagging", "Named Entity Recognition", "Text summarization", "Machine translation"], 0, Difficulty.EASY, "POS tagging labels each token with its grammatical role in the sentence."),
+        ("What does Named Entity Recognition (NER) do?", ["Identifies and classifies named entities such as people, organizations, and locations in text", "Removes stop words from a sentence", "Converts text to lowercase", "Splits a document into sentences"], 0, Difficulty.EASY, "NER locates spans of text representing entities and labels their type (PERSON, ORG, LOC, etc.)."),
+        ("Which pretrained language model uses bidirectional context via masked language modeling?", ["BERT", "GPT-2 (original, left-to-right)", "N-gram model", "TF-IDF vectorizer"], 0, Difficulty.MEDIUM, "BERT is trained to predict masked tokens using context from both directions simultaneously."),
+        ("What is 'stop word removal' in text preprocessing?", ["Removing common, low-information words such as 'the', 'is', and 'at' before further processing", "Removing all punctuation from text", "Removing duplicate documents from a corpus", "Removing numeric characters from text"], 0, Difficulty.EASY, "Stop words carry little discriminative meaning for many tasks, so they are often filtered out early."),
+        ("What does 'perplexity' measure for a language model?", ["How well the model predicts a sample, with lower values indicating better predictions", "The total vocabulary size of the model", "The number of layers in the model", "The training time required to converge"], 0, Difficulty.HARD, "Perplexity is the exponentiated average negative log-likelihood; lower perplexity means the model is less 'surprised' by the text."),
+    ]
+    for body, opts, corr, diff, exp in nlp_mcqs:
+        qs.append(_make_q(subject=sub_nlp, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Natural Language Processing", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    nlp_tf = [
+        ("Stemming always produces a valid dictionary word.", ["True", "False"], 1, Difficulty.MEDIUM, "Stemming can produce non-words (e.g., 'studies' -> 'studi'); lemmatization is what guarantees valid dictionary forms."),
+        ("A Bag-of-Words representation captures the order of words in a document.", ["True", "False"], 1, Difficulty.EASY, "Bag-of-Words only counts word occurrences and discards word order entirely."),
+        ("Transformer models rely on recurrence (RNNs) to process sequences.", ["True", "False"], 1, Difficulty.MEDIUM, "Transformers process sequences using self-attention in parallel, with no recurrent connections."),
+        ("Word2Vec is an example of a word embedding technique.", ["True", "False"], 0, Difficulty.EASY, "Word2Vec learns dense vector representations of words from their surrounding context."),
+        ("N-grams are contiguous sequences of n items, such as words, extracted from text.", ["True", "False"], 0, Difficulty.EASY, "An n-gram is any contiguous sequence of n tokens, commonly used as features in text models."),
+    ]
+    for body, opts, corr, diff, exp in nlp_tf:
+        qs.append(_make_q(subject=sub_nlp, creator=examiner, qtype=QuestionType.TRUE_FALSE, category=cat, topic="NLP Concepts", body=body, difficulty=diff, marks=1.0, negative=0.25, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
+    # 4f. ACADEMIC - AI101: Artificial Intelligence
+    # --------------------------------------------------------------------------
+    sub_ai = subjects["AI101"]
+    ai_mcqs = [
+        ("What is the Turing Test designed to evaluate?", ["A machine's ability to exhibit intelligent behavior indistinguishable from a human", "The processing speed of a computer", "The memory capacity of a neural network", "The accuracy of a search algorithm"], 0, Difficulty.EASY, "Turing proposed judging machine intelligence by whether a human evaluator can distinguish it from a human in conversation."),
+        ("Which search algorithm guarantees the shortest path in an unweighted graph?", ["Breadth-First Search (BFS)", "Depth-First Search (DFS)", "Greedy Best-First Search", "Hill Climbing"], 0, Difficulty.EASY, "BFS explores nodes level by level, guaranteeing the fewest edges to reach any node."),
+        ("What is a 'heuristic' in AI search?", ["A function that estimates the cost to reach the goal from a given state", "A guaranteed exact cost to the goal", "A random number used to break ties", "A rule that always finds the optimal path"], 0, Difficulty.EASY, "Heuristics guide search by estimating remaining cost, trading guaranteed optimality for speed unless admissible."),
+        ("Which algorithm is a heuristic-based extension of Dijkstra's algorithm for pathfinding?", ["A* Search", "Breadth-First Search", "Depth-First Search", "Minimax"], 0, Difficulty.MEDIUM, "A* combines Dijkstra's cost-so-far with a heuristic estimate of remaining cost."),
+        ("What does 'knowledge representation' refer to in AI?", ["Encoding facts and rules about the world so a system can reason over them", "Compressing training data for storage", "Visualizing a neural network's architecture", "Measuring an agent's response latency"], 0, Difficulty.EASY, "Knowledge representation formalizes facts/rules (e.g., logic, semantic networks) for automated reasoning."),
+        ("In propositional logic, what does 'resolution' allow you to do?", ["Derive new clauses by combining complementary literals to prove or refute a statement", "Convert a sentence into natural language", "Rank clauses by their probability", "Compress multiple clauses into a single variable"], 0, Difficulty.HARD, "Resolution is a inference rule that combines two clauses containing complementary literals into a new clause."),
+        ("What is a rational agent in AI?", ["An agent that acts to maximize its expected performance measure given its knowledge", "An agent that always acts randomly to explore its environment", "An agent that never updates its beliefs", "An agent that only follows hard-coded rules"], 0, Difficulty.MEDIUM, "Rationality means choosing actions expected to maximize performance given percepts and knowledge, not guaranteed omniscience."),
+        ("Which AI paradigm relies on hand-crafted if-then rules encoded by domain experts?", ["Expert systems (symbolic AI)", "Convolutional neural networks", "Reinforcement learning", "Genetic algorithms"], 0, Difficulty.EASY, "Expert systems encode expert knowledge as explicit rules for a rule engine to apply."),
+        ("What is the 'frame problem' in AI?", ["The difficulty of representing which facts remain unchanged after an action", "The problem of choosing a neural network's frame rate for video processing", "The challenge of framing a search problem as a graph", "The issue of picture-frame image classification"], 0, Difficulty.HARD, "The frame problem concerns efficiently specifying what does NOT change when an action is performed."),
+        ("Which planning technique searches backward from the goal state toward the initial state?", ["Regression planning", "Forward state-space search", "Breadth-first search", "Hill climbing"], 0, Difficulty.MEDIUM, "Regression planning works backward from the goal, finding actions whose effects satisfy it."),
+    ]
+    for body, opts, corr, diff, exp in ai_mcqs:
+        qs.append(_make_q(subject=sub_ai, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Artificial Intelligence", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    ai_tf = [
+        ("The minimax algorithm is used to make decisions in adversarial, two-player games.", ["True", "False"], 0, Difficulty.EASY, "Minimax assumes an opponent playing optimally and chooses moves minimizing the opponent's best outcome."),
+        ("A greedy best-first search always finds the optimal solution.", ["True", "False"], 1, Difficulty.MEDIUM, "Greedy best-first search follows the heuristic estimate only and can miss the optimal path."),
+        ("In a Constraint Satisfaction Problem (CSP), arc consistency guarantees a solution exists.", ["True", "False"], 1, Difficulty.HARD, "Arc consistency prunes inconsistent values but is necessary, not sufficient, for guaranteeing a solution."),
+        ("Classical AI theory generally assumes a rational agent is also omniscient.", ["True", "False"], 1, Difficulty.MEDIUM, "Rational agents act optimally given their available knowledge, not assumed to know everything."),
+        ("Propositional logic can natively express quantified statements like 'for all x'.", ["True", "False"], 1, Difficulty.MEDIUM, "Quantifiers require first-order logic; propositional logic only handles fixed, unquantified statements."),
+    ]
+    for body, opts, corr, diff, exp in ai_tf:
+        qs.append(_make_q(subject=sub_ai, creator=examiner, qtype=QuestionType.TRUE_FALSE, category=cat, topic="AI Concepts", body=body, difficulty=diff, marks=1.0, negative=0.25, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
+    # 4g. ACADEMIC - DL101: Deep Learning
+    # --------------------------------------------------------------------------
+    sub_dl = subjects["DL101"]
+    dl_mcqs = [
+        ("What is the primary building block of a CNN used to extract spatial features?", ["Convolutional layer (kernel/filter)", "Fully connected layer", "Dropout layer", "Embedding layer"], 0, Difficulty.EASY, "Convolutional layers slide learnable filters over the input to detect local spatial patterns."),
+        ("Which activation function helps mitigate the vanishing gradient problem compared to sigmoid/tanh?", ["ReLU", "Sigmoid", "Tanh", "Step function"], 0, Difficulty.EASY, "ReLU's gradient is 1 for positive inputs, avoiding the saturation that shrinks sigmoid/tanh gradients."),
+        ("What is 'backpropagation' used for?", ["Computing gradients of the loss with respect to network weights via the chain rule", "Initializing network weights randomly", "Selecting the best hyperparameters automatically", "Compressing a trained model for deployment"], 0, Difficulty.EASY, "Backpropagation propagates the loss gradient backward through layers using the chain rule."),
+        ("Which architecture is specifically designed to handle sequential data with memory of previous inputs?", ["Recurrent Neural Network (RNN)", "Convolutional Neural Network", "Autoencoder", "Support Vector Machine"], 0, Difficulty.EASY, "RNNs maintain a hidden state that carries information across time steps in a sequence."),
+        ("What problem do LSTM networks primarily solve compared to vanilla RNNs?", ["Vanishing/exploding gradients over long sequences", "Overfitting on small image datasets", "High inference latency on CPUs", "Lack of labeled training data"], 0, Difficulty.MEDIUM, "LSTM gating mechanisms preserve gradient flow across long sequences, unlike vanilla RNNs."),
+        ("What is 'dropout' used for in deep learning?", ["Randomly disabling neurons during training to prevent overfitting", "Removing outlier samples from the training set", "Reducing the learning rate over time", "Compressing the model's weight matrices"], 0, Difficulty.EASY, "Dropout randomly zeroes activations during training, preventing co-adaptation and reducing overfitting."),
+        ("What does a 'pooling layer' do in a CNN?", ["Downsamples feature maps, reducing spatial dimensions and computation", "Increases the number of channels in a feature map", "Normalizes pixel values to zero mean and unit variance", "Applies a nonlinear activation function"], 0, Difficulty.EASY, "Pooling (e.g., max pooling) reduces the spatial size of feature maps while retaining key information."),
+        ("Which loss function is standard for multi-class classification with a softmax output?", ["Categorical cross-entropy", "Mean squared error", "Hinge loss", "Huber loss"], 0, Difficulty.MEDIUM, "Categorical cross-entropy measures the divergence between the predicted softmax distribution and the true class."),
+        ("What is 'batch normalization' used for?", ["Normalizing layer inputs per mini-batch to stabilize and speed up training", "Splitting training data into batches", "Balancing class distribution in a dataset", "Reducing the number of layers in a network"], 0, Difficulty.MEDIUM, "Batch normalization rescales layer activations per mini-batch, reducing internal covariate shift."),
+        ("What is a Generative Adversarial Network (GAN) composed of?", ["A generator and a discriminator trained adversarially", "Two encoders sharing the same weights", "A single autoencoder with skip connections", "An ensemble of decision trees"], 0, Difficulty.MEDIUM, "A GAN pits a generator (creating fake samples) against a discriminator (detecting fakes) in a minimax game."),
+    ]
+    for body, opts, corr, diff, exp in dl_mcqs:
+        qs.append(_make_q(subject=sub_dl, creator=examiner, qtype=QuestionType.MCQ, category=cat, topic="Deep Learning", body=body, difficulty=diff, marks=2.0, negative=0.5, options=opts, correct=[corr], explanation=exp))
+
+    dl_tf = [
+        ("CNNs share weights across spatial locations via convolutional filters.", ["True", "False"], 0, Difficulty.EASY, "The same filter weights slide across the whole input, giving CNNs translation-invariant feature detection."),
+        ("Increasing network depth always improves accuracy with no downsides.", ["True", "False"], 1, Difficulty.MEDIUM, "Deeper networks can suffer vanishing gradients, overfitting, and diminishing or negative returns without care."),
+        ("The Adam optimizer combines momentum and adaptive per-parameter learning rates.", ["True", "False"], 0, Difficulty.MEDIUM, "Adam maintains running estimates of both the gradient mean (momentum) and variance (adaptive scaling)."),
+        ("Transformers process sequences using recurrence, similar to RNNs.", ["True", "False"], 1, Difficulty.MEDIUM, "Transformers use self-attention in parallel across the sequence, with no recurrent connections."),
+        ("Transfer learning reuses a pretrained model's learned weights for a new, related task.", ["True", "False"], 0, Difficulty.EASY, "Transfer learning starts from weights learned on one task/dataset and fine-tunes them for another."),
+    ]
+    for body, opts, corr, diff, exp in dl_tf:
+        qs.append(_make_q(subject=sub_dl, creator=examiner, qtype=QuestionType.TRUE_FALSE, category=cat, topic="Deep Learning Concepts", body=body, difficulty=diff, marks=1.0, negative=0.25, options=opts, correct=[corr], explanation=exp))
+
+    # --------------------------------------------------------------------------
     # 5. CORPORATE - APT101: Quantitative Aptitude
     # --------------------------------------------------------------------------
     sub_apt = subjects["APT101"]
@@ -918,6 +1127,161 @@ def _seed_exams(
         e12.exam_questions.append(ExamQuestion(question_id=q.id, order_index=idx))
     created_exams.append(e12)
 
+    # --------------------------------------------------------------------------
+    # ACADEMIC EXAM 13: ML101 Machine Learning Fundamentals Examination
+    # --------------------------------------------------------------------------
+    e13 = Exam(
+        exam_type=ExamType.ACADEMIC,
+        subject_id=subjects["ML101"].id,
+        title="Machine Learning Fundamentals Examination",
+        description="Semester assessment covering supervised/unsupervised learning, model evaluation, regularization, and neural network basics.",
+        instructions="Ensure webcam is centered. No mobile devices, headphones, or tab switching permitted. Save answers frequently.",
+        course="B.Tech / M.Tech Computer Science & Engineering",
+        department="Computer Science & Engineering",
+        semester="Semester VI",
+        duration_minutes=75,
+        starts_at=now - timedelta(hours=1),
+        ends_at=now + timedelta(days=30),
+        declared_total_marks=100.0,
+        passing_percentage=40.0,
+        selection_rules={
+            "rules": [
+                {"question_type": "mcq", "difficulty": None, "count": 12},
+                {"question_type": "true_false", "difficulty": None, "count": 4},
+                {"question_type": "image_upload", "difficulty": None, "count": 2},
+            ]
+        },
+        randomize=True,
+        shuffle_options=True,
+        negative_marking=True,
+        paper_salt=generate_salt(),
+        proctor_config={**DEFAULT_PROCTOR_CONFIG},
+        grading_config={**DEFAULT_GRADING_CONFIG},
+        status=ExamStatus.PUBLISHED,
+        created_by_id=examiner.id,
+    )
+    for idx, q in enumerate(
+        pick("ML101", {QuestionType.MCQ}, limit=12)
+        + pick("ML101", {QuestionType.TRUE_FALSE}, limit=4)
+        + pick("ML101", {QuestionType.IMAGE_UPLOAD}, limit=2)
+    ):
+        e13.exam_questions.append(ExamQuestion(question_id=q.id, order_index=idx))
+    created_exams.append(e13)
+
+    # --------------------------------------------------------------------------
+    # ACADEMIC EXAM 14: AI101 Artificial Intelligence Fundamentals Examination
+    # --------------------------------------------------------------------------
+    e14 = Exam(
+        exam_type=ExamType.ACADEMIC,
+        subject_id=subjects["AI101"].id,
+        title="Artificial Intelligence Fundamentals Examination",
+        description="Semester assessment covering search algorithms, knowledge representation, logic, rational agents, and planning.",
+        instructions="Ensure webcam is centered. No mobile devices, headphones, or tab switching permitted. Save answers frequently.",
+        course="B.Tech Computer Science & Engineering",
+        department="Computer Science & Engineering",
+        semester="Semester V",
+        duration_minutes=60,
+        starts_at=now - timedelta(hours=1),
+        ends_at=now + timedelta(days=30),
+        declared_total_marks=100.0,
+        passing_percentage=40.0,
+        selection_rules={
+            "rules": [
+                {"question_type": "mcq", "difficulty": None, "count": 10},
+                {"question_type": "true_false", "difficulty": None, "count": 5},
+            ]
+        },
+        randomize=True,
+        shuffle_options=True,
+        negative_marking=True,
+        paper_salt=generate_salt(),
+        proctor_config={**DEFAULT_PROCTOR_CONFIG},
+        grading_config={**DEFAULT_GRADING_CONFIG},
+        status=ExamStatus.PUBLISHED,
+        created_by_id=examiner.id,
+    )
+    for idx, q in enumerate(
+        pick("AI101", {QuestionType.MCQ}, limit=10) + pick("AI101", {QuestionType.TRUE_FALSE}, limit=5)
+    ):
+        e14.exam_questions.append(ExamQuestion(question_id=q.id, order_index=idx))
+    created_exams.append(e14)
+
+    # --------------------------------------------------------------------------
+    # ACADEMIC EXAM 15: NLP101 Natural Language Processing Fundamentals Examination
+    # --------------------------------------------------------------------------
+    e15 = Exam(
+        exam_type=ExamType.ACADEMIC,
+        subject_id=subjects["NLP101"].id,
+        title="Natural Language Processing Fundamentals Examination",
+        description="Semester assessment covering tokenization, embeddings, language models, and text classification.",
+        instructions="Ensure webcam is centered. No mobile devices, headphones, or tab switching permitted. Save answers frequently.",
+        course="B.Tech / M.Tech Computer Science & Engineering",
+        department="Computer Science & Engineering",
+        semester="Semester VII",
+        duration_minutes=60,
+        starts_at=now - timedelta(hours=1),
+        ends_at=now + timedelta(days=30),
+        declared_total_marks=100.0,
+        passing_percentage=40.0,
+        selection_rules={
+            "rules": [
+                {"question_type": "mcq", "difficulty": None, "count": 10},
+                {"question_type": "true_false", "difficulty": None, "count": 5},
+            ]
+        },
+        randomize=True,
+        shuffle_options=True,
+        negative_marking=True,
+        paper_salt=generate_salt(),
+        proctor_config={**DEFAULT_PROCTOR_CONFIG},
+        grading_config={**DEFAULT_GRADING_CONFIG},
+        status=ExamStatus.PUBLISHED,
+        created_by_id=examiner.id,
+    )
+    for idx, q in enumerate(
+        pick("NLP101", {QuestionType.MCQ}, limit=10) + pick("NLP101", {QuestionType.TRUE_FALSE}, limit=5)
+    ):
+        e15.exam_questions.append(ExamQuestion(question_id=q.id, order_index=idx))
+    created_exams.append(e15)
+
+    # --------------------------------------------------------------------------
+    # ACADEMIC EXAM 16: DL101 Deep Learning Fundamentals Examination
+    # --------------------------------------------------------------------------
+    e16 = Exam(
+        exam_type=ExamType.ACADEMIC,
+        subject_id=subjects["DL101"].id,
+        title="Deep Learning Fundamentals Examination",
+        description="Semester assessment covering CNNs, RNNs/LSTMs, backpropagation, optimizers, and GANs.",
+        instructions="Ensure webcam is centered. No mobile devices, headphones, or tab switching permitted. Save answers frequently.",
+        course="M.Tech Computer Science & Engineering",
+        department="Computer Science & Engineering",
+        semester="Semester II",
+        duration_minutes=60,
+        starts_at=now - timedelta(hours=1),
+        ends_at=now + timedelta(days=30),
+        declared_total_marks=100.0,
+        passing_percentage=40.0,
+        selection_rules={
+            "rules": [
+                {"question_type": "mcq", "difficulty": None, "count": 10},
+                {"question_type": "true_false", "difficulty": None, "count": 5},
+            ]
+        },
+        randomize=True,
+        shuffle_options=True,
+        negative_marking=True,
+        paper_salt=generate_salt(),
+        proctor_config={**DEFAULT_PROCTOR_CONFIG},
+        grading_config={**DEFAULT_GRADING_CONFIG},
+        status=ExamStatus.PUBLISHED,
+        created_by_id=examiner.id,
+    )
+    for idx, q in enumerate(
+        pick("DL101", {QuestionType.MCQ}, limit=10) + pick("DL101", {QuestionType.TRUE_FALSE}, limit=5)
+    ):
+        e16.exam_questions.append(ExamQuestion(question_id=q.id, order_index=idx))
+    created_exams.append(e16)
+
     db.add_all(created_exams)
     db.flush()
 
@@ -934,7 +1298,7 @@ def _seed_exams(
                 )
             )
     db.flush()
-    logger.info("Successfully seeded 12 real Exams (6 Academic + 6 Corporate) and %d enrolments", len(created_exams) * len(candidates))
+    logger.info("Successfully seeded 16 real Exams (10 Academic + 6 Corporate) and %d enrolments", len(created_exams) * len(candidates))
 
 
 def seed(db: Session) -> None:
@@ -985,6 +1349,13 @@ def seed(db: Session) -> None:
         "CS102": _subject(db, "CS102", "Data Structures & Algorithms", "Linear & non-linear structures, graphs, complexity"),
         "CS201": _subject(db, "CS201", "Database Management Systems", "Relational SQL, ACID, Indexes, Normalization"),
         "CS301": _subject(db, "CS301", "Web & Software Engineering", "Design patterns, REST, Architecture, CI/CD"),
+        "CS202": _subject(db, "CS202", "Operating Systems", "Processes, scheduling, memory management, synchronization"),
+        "CS203": _subject(db, "CS203", "Computer Networks", "TCP/IP, routing, DNS, subnetting, network protocols"),
+        "MATH101": _subject(db, "MATH101", "Engineering Mathematics", "Calculus, linear algebra, probability, discrete math"),
+        "ML101": _subject(db, "ML101", "Machine Learning", "Supervised/unsupervised learning, neural networks, model evaluation"),
+        "NLP101": _subject(db, "NLP101", "Natural Language Processing", "Tokenization, embeddings, language models, text classification"),
+        "AI101": _subject(db, "AI101", "Artificial Intelligence", "Search, knowledge representation, logic, agents, planning"),
+        "DL101": _subject(db, "DL101", "Deep Learning", "CNNs, RNNs, backpropagation, optimizers, GANs, transformers"),
         "APT101": _subject(db, "APT101", "Quantitative Aptitude", "Mathematical problem solving, arithmetic, statistics"),
         "LOG101": _subject(db, "LOG101", "Logical Reasoning", "Analytical thinking, puzzles, series, deductions"),
         "VRB101": _subject(db, "VRB101", "Verbal Ability & English", "Grammar, vocabulary, reading comprehension"),
@@ -1003,10 +1374,10 @@ def main() -> None:
         seed(db)
         db.commit()
         print("\nSeed complete! Ready-to-use dataset populated:")
-        print("  - 9 Subjects across Academic & Corporate hiring domains")
+        print("  - 16 Subjects across Academic & Corporate hiring domains")
         print("  - 240+ Questions in the Question Bank (MCQ, Multi-select, T/F, Fill-blank, Numerical, Short/Long, Image, Coding)")
-        print("  - 12 Real ready-to-use Exams created with pools & sections:")
-        print("      * 6 Academic Exams (Semester Final, Mid-Term DSA, Speed Quiz, Practical Viva, Essay, Scholarship)")
+        print("  - 16 Real ready-to-use Exams created with pools & sections:")
+        print("      * 10 Academic Exams (Semester Final, Mid-Term DSA, Speed Quiz, Practical Viva, Essay, Scholarship, ML, AI, NLP, Deep Learning)")
         print("      * 6 Corporate Hiring Exams (Full-Stack SDE-1, Consulting Aptitude, Data Analyst, Frontend, Backend, Freshers)")
         print(f"\n  Admin login:     {settings.FIRST_ADMIN_EMAIL} / {settings.FIRST_ADMIN_PASSWORD}")
         print(f"  Examiner login:  examiner@exam.edu / {DEMO_PASSWORD}")

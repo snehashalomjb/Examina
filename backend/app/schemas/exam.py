@@ -34,6 +34,9 @@ class ProctorConfig(BaseModel):
     terminate_on_score: float = Field(100.0, gt=0)
     snapshot_interval_seconds: int = Field(60, ge=10, le=600)
     require_fullscreen: bool = True
+    require_microphone: bool = True
+    require_single_display: bool = True
+    min_bandwidth_mbps: float = Field(2.0, ge=0)
     block_copy_paste: bool = True
     weights: dict[str, float] | None = None
 
@@ -114,6 +117,11 @@ class ExamCreate(BaseModel):
     # --- passing threshold (both modes) ---
     passing_percentage: float | None = Field(default=None, ge=0, le=100)
     declared_total_marks: float | None = Field(default=None, gt=0)
+    #: How many sittings one candidate may take.
+    max_attempts: int = Field(default=1, ge=1, le=10)
+    #: A descriptive top-level tag shown to candidates. Null means "mixed" and never
+    #: constrains which per-rule difficulties the pool can draw from.
+    difficulty: Difficulty | None = None
 
     # --- academic mode ---
     course: str | None = Field(default=None, max_length=150)
@@ -158,6 +166,8 @@ class ExamUpdate(BaseModel):
 
     passing_percentage: float | None = Field(default=None, ge=0, le=100)
     declared_total_marks: float | None = Field(default=None, gt=0)
+    max_attempts: int | None = Field(default=None, ge=1, le=10)
+    difficulty: Difficulty | None = None
     course: str | None = Field(default=None, max_length=150)
     department: str | None = Field(default=None, max_length=150)
     semester: str | None = Field(default=None, max_length=40)
@@ -191,6 +201,8 @@ class ExamOut(ORMModel):
     # Mode-specific
     passing_percentage: float | None = None
     declared_total_marks: float | None = None
+    max_attempts: int = 1
+    difficulty: Difficulty | None = None
     # Academic
     course: str | None = None
     department: str | None = None

@@ -165,6 +165,21 @@ class TestStubGrader:
         result = StubGrader().grade(question=question, answer=answer, max_marks=5)
         assert 0 <= result.score <= 5
 
+    def test_key_points_matched_and_missed_are_reported(self, db):
+        from app.db.models import Answer
+
+        subject = make_subject(db)
+        question = make_question(db, subject, qtype=QuestionType.SHORT_ANSWER, marks=5)
+        question.model_answer = "Normalisation reduces redundancy and improves integrity."
+
+        answer = Answer(session_id=uuid.uuid4(), question_id=question.id, max_marks=5)
+        answer.text_answer = "Normalisation reduces redundancy."
+
+        result = StubGrader().grade(question=question, answer=answer, max_marks=5)
+        assert "redundancy" in result.key_points_matched
+        assert "integrity" in result.key_points_missed
+        assert not set(result.key_points_matched) & set(result.key_points_missed)
+
     def test_image_answers_are_deferred_to_the_examiner(self, db):
         from app.db.models import Answer
 

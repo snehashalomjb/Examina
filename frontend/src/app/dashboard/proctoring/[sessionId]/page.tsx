@@ -20,11 +20,13 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import type { ProctorEvent, ProctorReview } from "@/lib/types";
+import type { IntegrityVerdict, ProctorEvent, ProctorReview } from "@/lib/types";
+import { INTEGRITY_VERDICT_LABEL } from "@/lib/types";
 
 const EVENT_LABEL: Record<string, string> = {
   face_missing: "Face not visible",
   multiple_faces: "Multiple people detected",
+  phone_detected: "Phone detected in frame",
   gaze_away: "Looking away from screen",
   tab_switch: "Left the exam tab",
   window_blur: "Window lost focus",
@@ -158,6 +160,8 @@ export default function ProctorReviewPage() {
               {review.termination_reason}
             </Alert>
           )}
+
+          <IntegrityPanel review={review} onRuled={load} />
 
           <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
             {/* -------------------------------------------------- timeline */}
@@ -308,5 +312,146 @@ export default function ProctorReviewPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The human half of proctoring.
+ *
+ * Everything above this panel is evidence: a suspicion score, a timeline, snapshots.
+ * None of it is a verdict. This is where a named examiner reads that evidence and says
+ * whether the sitting was genuine — and until they do, a flagged candidate's result
+ * cannot be released. Clearing a sitting sends the paper through grading like any other;
+ * ruling malpractice keeps the marks on file but never shows the candidate a grade.
+ */
+function IntegrityPanel({
+  review,
+  onRuled,
+}: {
+  review: ProctorReview;
+  onRuled: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState<IntegrityVerdict | null>(null);
+
+  const ruled = review.integrity_verdict !== "pending";
+  const live = review.status === "in_progress";
+
+  async function rule(verdict: IntegrityVerdict) {
+    if (verdict === "malpractice" && !note.trim()) {
+      toast("A malpractice ruling needs a reason", "amber");
+      return;
+    }
+    setBusy(verdict);
+    try {
+      await api.post(`/proctoring/sessions/${review.session_id}/integrity`, {
+        verdict,
+        note: note.trim() || null,
+      });
+      toast(
+        verdict === "cleared"
+          ? "Marked a genuine attempt — the result can now be published"
+          : "Ruled malpractice — the result is withheld",
+        verdict === "cleared" ? "mint" : "rose",
+      );
+      setNote("");
+      onRuled();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not record the ruling", "rose");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card
+      className={cx(
+        review.needs_integrity_review && "border-amber/50 bg-amber/[0.04]",
+        review.integrity_verdict === "malpractice" && "border-rose/50 bg-rose/[0.04]",
+      )}
+    >
+      <SectionTitle
+        title="Integrity ruling"
+        hint="Proctoring flags a sitting; you decide what it was. A flagged paper's result stays withheld until this is answered."
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge
+          tone={
+            review.integrity_verdict === "cleared"
+              ? "mint"
+              : review.integrity_verdict === "malpractice"
+                ? "rose"
+                : review.needs_integrity_review
+                  ? "amber"
+                  : "neutral"
+          }
+        >
+          {INTEGRITY_VERDICT_LABEL[review.integrity_verdict]}
+        </Badge>
+        {review.needs_integrity_review && (
+          <span className="text-[13px] text-amber">
+            Flagged and unreviewed — this result cannot be published yet.
+          </span>
+        )}
+        {!review.is_flagged && review.integrity_verdict === "pending" && (
+          <span className="text-[13px] text-ink-muted">
+            Not flagged, so no ruling is required — record one anyway if you want it on file.
+          </span>
+        )}
+      </div>
+
+      {ruled && (
+        <div className="mt-3 rounded-[10px] border border-line bg-surface-sunk px-3 py-2.5 text-[13px]">
+          <p className="text-ink-soft">
+            {review.integrity_note || <span className="italic text-ink-muted">No note given</span>}
+          </p>
+          <p className="mt-1 text-[12px] text-ink-muted">
+            {review.integrity_reviewed_by ?? "Unknown examiner"}
+            {review.integrity_reviewed_at ? ` · ${formatDate(review.integrity_reviewed_at)}` : ""}
+          </p>
+        </div>
+      )}
+
+      {live ? (
+        <p className="mt-3 text-[13px] text-ink-muted">
+          This candidate is still sitting the exam. Review it once they submit.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={2}
+            maxLength={4000}
+            placeholder={
+              ruled
+                ? "Reason for changing the ruling"
+                : "What did the evidence show? (required to rule malpractice)"
+            }
+            className="w-full rounded-[10px] border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none placeholder:text-ink-muted focus:border-accent"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => void rule("cleared")}
+              disabled={busy !== null}
+              loading={busy === "cleared"}
+            >
+              Genuine attempt — allow result
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => void rule("malpractice")}
+              disabled={busy !== null}
+              loading={busy === "malpractice"}
+            >
+              Malpractice — withhold result
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
