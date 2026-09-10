@@ -11,6 +11,7 @@ import {
   EmptyState,
   Field,
   Input,
+  Modal,
   SectionTitle,
   Select,
   Skeleton,
@@ -18,6 +19,8 @@ import {
   cx,
   toast,
 } from "@/components/ui";
+import { QuestionEditor } from "@/components/QuestionEditor";
+import { QuestionImporter } from "@/components/QuestionImporter";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type {
@@ -26,13 +29,12 @@ import type {
   PdfImportResult,
   Question,
   QuestionCategory,
-  QuestionImage,
+  QuestionStatus,
   QuestionType,
   Subject,
 } from "@/lib/types";
 import {
   CATEGORY_LABEL,
-  CONTAINER_TYPES,
   OPTION_BEARING_TYPES,
   QUESTION_TYPE_LABEL as TYPE_LABEL,
 } from "@/lib/types";
@@ -53,6 +55,18 @@ const LANGUAGE_LABEL: Record<CodingLanguage, string> = {
   javascript: "JavaScript",
 };
 
+/** The shelves the spec asks for, expressed as filter presets over one bank. */
+type Shelf = "all" | "mine" | "shared" | "ai" | "imported" | "archived";
+
+const SHELVES: { key: Shelf; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "mine", label: "My questions" },
+  { key: "shared", label: "Shared" },
+  { key: "ai", label: "AI generated" },
+  { key: "imported", label: "Imported" },
+  { key: "archived", label: "Archived" },
+];
+
 export default function QuestionBankPage() {
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -63,11 +77,19 @@ export default function QuestionBankPage() {
   const [subjectFilter, setSubjectFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<QuestionType | "">("");
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "">("");
+  const [categoryFilter, setCategoryFilter] = useState<QuestionCategory | "">("");
+  const [topicFilter, setTopicFilter] = useState("");
+  const [marksFilter, setMarksFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
+  /** The shelves the bank is organised into. Filter presets, not separate stores. */
+  const [shelf, setShelf] = useState<Shelf>("all");
 
   const [composing, setComposing] = useState(false);
+  const [editing, setEditing] = useState<Question | null>(null);
   const [addingSubject, setAddingSubject] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
+  const [importingFile, setImportingFile] = useState(false);
 
   const loadSubjects = useCallback(async () => {
     try {
@@ -82,20 +104,62 @@ export default function QuestionBankPage() {
     if (subjectFilter) query.set("subject_id", subjectFilter);
     if (typeFilter) query.set("question_type", typeFilter);
     if (difficultyFilter) query.set("difficulty", difficultyFilter);
+    if (categoryFilter) query.set("category", categoryFilter);
+    if (topicFilter) query.set("topic", topicFilter);
+    if (marksFilter) query.set("marks", marksFilter);
     if (search.trim()) query.set("search", search.trim());
+
+    if (shelf === "mine") query.set("mine", "true");
+    if (shelf === "ai") query.set("source", "ai_generated");
+    if (shelf === "imported") query.set("source", "imported");
+    if (shelf === "archived") {
+      query.set("status", "archived");
+      query.set("include_inactive", "true");
+    }
+
     try {
-      setQuestions(await api.get<Question[]>(`/questions?${query.toString()}`));
+      const data = await api.get<Question[]>(`/questions?${query.toString()}`);
+      // "Shared" is everything somebody else wrote. There is no sharing flag - an
+      // examiner looking for reusable material means "things I did not write".
+      setQuestions(
+        shelf === "shared" && user
+          ? data.filter((q) => q.created_by_id && q.created_by_id !== user.id)
+          : data,
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load questions.");
     } finally {
       setLoading(false);
     }
-  }, [subjectFilter, typeFilter, difficultyFilter, search]);
+  }, [
+    subjectFilter,
+    typeFilter,
+    difficultyFilter,
+    categoryFilter,
+    topicFilter,
+    marksFilter,
+    search,
+    shelf,
+    user,
+  ]);
+
+  const loadTopics = useCallback(async () => {
+    try {
+      const params = subjectFilter ? `?subject_id=${subjectFilter}` : "";
+      setTopics(await api.get<string[]>(`/questions/topics${params}`));
+    } catch {
+      setTopics([]); // a missing topic list is a degraded filter, not a failure
+    }
+  }, [subjectFilter]);
 
   useEffect(() => {
     if (user) void loadSubjects();
   }, [user, loadSubjects]);
+
+  useEffect(() => {
+    if (user) void loadTopics();
+  }, [user, loadTopics]);
 
   useEffect(() => {
     if (!user) return;
@@ -111,6 +175,42 @@ export default function QuestionBankPage() {
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not delete", "rose");
     }
+  }
+
+  async function duplicate(question: Question) {
+    try {
+      await api.post(`/questions/${question.id}/duplicate`, {});
+      toast("Copied into your own questions", "mint");
+      void loadQuestions();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not duplicate", "rose");
+    }
+  }
+
+  /**
+   * Archive rather than delete.
+   *
+   * A question that has been sat cannot be removed without orphaning results, and one
+   * that has not been sat is still somebody's work. Archiving takes it out of the way
+   * and leaves it recoverable from the Archived shelf.
+   */
+  async function setStatus(question: Question, status: QuestionStatus) {
+    try {
+      await api.patch(`/questions/${question.id}`, { status });
+      toast(status === "archived" ? "Archived" : "Restored to the bank", "neutral");
+      void loadQuestions();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not update", "rose");
+    }
+  }
+
+  /** An examiner owns what they wrote; an admin may edit anything. */
+  function mayEdit(question: Question) {
+    return (
+      user?.role === "admin" ||
+      !question.created_by_id ||
+      question.created_by_id === user?.id
+    );
   }
 
   if (!user) return null;
@@ -135,8 +235,11 @@ export default function QuestionBankPage() {
               ✨ AI Generate
             </Button>
           </Link>
+          <Button size="sm" variant="secondary" onClick={() => setImportingFile((v) => !v)}>
+            {importingFile ? "Close Import" : "📥 Import File"}
+          </Button>
           <Button size="sm" variant="secondary" onClick={() => setImportingPdf((v) => !v)}>
-            {importingPdf ? "Close PDF Import" : "📄 Import PDF"}
+            {importingPdf ? "Close PDF Import" : "📄 PDF → AI"}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setAddingSubject((v) => !v)}>
             New Subject
@@ -148,6 +251,10 @@ export default function QuestionBankPage() {
       </div>
 
       {error && <Alert tone="rose">{error}</Alert>}
+
+      {importingFile && (
+        <QuestionImporter subjects={subjects} onImported={() => void loadQuestions()} />
+      )}
 
       {importingPdf && <PdfImportSection subjects={subjects} />}
 
@@ -161,17 +268,59 @@ export default function QuestionBankPage() {
       )}
 
       {composing && (
-        <QuestionComposer
-          subjects={subjects}
-          onDone={() => {
-            setComposing(false);
-            void loadQuestions();
-            void loadSubjects();
-          }}
-        />
+        <Card>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="text-[15px] font-semibold tracking-tight text-ink">
+              Create question
+            </h2>
+            <Badge tone="neutral">saved to your bank</Badge>
+          </div>
+          <QuestionEditor
+            subjects={subjects}
+            stayOpen
+            onCancel={() => setComposing(false)}
+            onSaved={() => {
+              void loadQuestions();
+              void loadTopics();
+            }}
+          />
+        </Card>
+      )}
+
+      {editing && (
+        <Modal open onClose={() => setEditing(null)} title="Edit question" size="xl">
+          <QuestionEditor
+            subjects={subjects}
+            question={editing}
+            onCancel={() => setEditing(null)}
+            onSaved={() => {
+              setEditing(null);
+              void loadQuestions();
+            }}
+          />
+        </Modal>
       )}
 
       <Card>
+        {/* ─── Shelves ────────────────────────────────────────── */}
+        <div className="mb-4 flex flex-wrap gap-1 rounded-xl border border-line bg-sunken/40 p-1">
+          {SHELVES.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setShelf(tab.key)}
+              className={cx(
+                "rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition-all",
+                shelf === tab.key
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-ink-muted hover:bg-surface hover:text-ink",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* ─── Filter bar ─────────────────────────────────────── */}
         {/* One column on a phone, then two, then the full row - the controls used to be
             fixed-width and pushed the card into a horizontal scroll below ~700px. */}
@@ -207,10 +356,51 @@ export default function QuestionBankPage() {
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </Select>
+          <Select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value as QuestionCategory | "")}
+          >
+            <option value="">All categories</option>
+            {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
+              <option key={value} value={value}>
+                {CATEGORY_LABEL[value]}
+              </option>
+            ))}
+          </Select>
+          <Select value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
+            <option value="">Any topic</option>
+            {topics.map((topic) => (
+              <option key={topic} value={topic}>
+                {topic}
+              </option>
+            ))}
+          </Select>
+          <Input
+            type="number"
+            min="0"
+            step="0.5"
+            value={marksFilter}
+            onChange={(e) => setMarksFilter(e.target.value)}
+            placeholder="Marks"
+          />
           {/* Active filter indicator */}
-          {(subjectFilter || typeFilter || difficultyFilter || search) && (
+          {(subjectFilter ||
+            typeFilter ||
+            difficultyFilter ||
+            categoryFilter ||
+            topicFilter ||
+            marksFilter ||
+            search) && (
             <button
-              onClick={() => { setSubjectFilter(""); setTypeFilter(""); setDifficultyFilter(""); setSearch(""); }}
+              onClick={() => {
+                setSubjectFilter("");
+                setTypeFilter("");
+                setDifficultyFilter("");
+                setCategoryFilter("");
+                setTopicFilter("");
+                setMarksFilter("");
+                setSearch("");
+              }}
               className="justify-self-start rounded-[8px] px-3 py-2 text-[12.5px] font-medium text-rose transition hover:bg-rose-soft"
             >
               ✕ Clear filters
@@ -270,6 +460,21 @@ export default function QuestionBankPage() {
                         <Badge tone="rose" size="xs">−{question.negative_marks}</Badge>
                       )}
                       {!question.is_active && <Badge tone="amber" size="xs">retired</Badge>}
+                      {question.status === "archived" && (
+                        <Badge tone="neutral" size="xs">archived</Badge>
+                      )}
+                      {question.source === "ai_generated" && (
+                        <Badge tone="purple" size="xs">AI generated</Badge>
+                      )}
+                      {question.source === "imported" && (
+                        <Badge tone="amber" size="xs">imported</Badge>
+                      )}
+                      {question.topic && <Badge tone="neutral" size="xs">{question.topic}</Badge>}
+                      {question.created_by_name && (
+                        <span className="text-[11px] text-ink-muted">
+                          by {question.created_by_name}
+                        </span>
+                      )}
                     </div>
 
                     {/* Question body */}
@@ -308,14 +513,51 @@ export default function QuestionBankPage() {
                     )}
                   </div>
 
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="opacity-0 group-hover:opacity-100 transition text-rose hover:bg-rose-soft hover:text-rose-ink"
-                    onClick={() => remove(question)}
-                  >
-                    Delete
-                  </Button>
+                  <div className="flex shrink-0 flex-wrap items-center gap-1 transition sm:opacity-0 sm:group-hover:opacity-100">
+                    {mayEdit(question) ? (
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(question)}>
+                        Edit
+                      </Button>
+                    ) : (
+                      <span
+                        className="px-2 text-[11.5px] text-ink-muted"
+                        title="Another examiner wrote this. Duplicate it to make your own copy."
+                      >
+                        read-only
+                      </span>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => void duplicate(question)}>
+                      Duplicate
+                    </Button>
+                    {mayEdit(question) &&
+                      (question.status === "archived" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void setStatus(question, "published")}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void setStatus(question, "archived")}
+                        >
+                          Archive
+                        </Button>
+                      ))}
+                    {mayEdit(question) && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-rose hover:bg-rose-soft hover:text-rose-ink"
+                        onClick={() => remove(question)}
+                      >
+                        Delete
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
@@ -676,598 +918,4 @@ function SubjectComposer({ onDone }: { onDone: () => void }) {
 interface DraftOption {
   text: string;
   is_correct: boolean;
-}
-
-function QuestionComposer({ subjects, onDone }: { subjects: Subject[]; onDone: () => void }) {
-  // Empty means "whichever subject is first" - derived at use, so no effect is needed
-  // to keep this in sync when the subject list loads.
-  const [chosenSubjectId, setChosenSubjectId] = useState("");
-  const subjectId = chosenSubjectId || subjects[0]?.id || "";
-  const [type, setType] = useState<QuestionType>("mcq");
-  const [category, setCategory] = useState<QuestionCategory>("academic");
-  const [topic, setTopic] = useState("");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
-  const [body, setBody] = useState("");
-  const [modelAnswer, setModelAnswer] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [marks, setMarks] = useState("2");
-  const [negative, setNegative] = useState("0");
-  const [minWords, setMinWords] = useState("");
-  const [maxWords, setMaxWords] = useState("");
-  const [image, setImage] = useState<QuestionImage | null>(null);
-  const [options, setOptions] = useState<DraftOption[]>([
-    { text: "", is_correct: true },
-    { text: "", is_correct: false },
-    { text: "", is_correct: false },
-    { text: "", is_correct: false },
-  ]);
-
-  // --- per-type spec fields. Only the block for the active type is rendered,
-  //     and only its values are sent, so switching type cannot smuggle stale
-  //     configuration from a previous one into the payload.
-  const [numericAnswer, setNumericAnswer] = useState("");
-  const [tolerance, setTolerance] = useState("0");
-  const [unit, setUnit] = useState("");
-  const [acceptedAnswers, setAcceptedAnswers] = useState("");
-  const [caseSensitive, setCaseSensitive] = useState(false);
-  const [languages, setLanguages] = useState<CodingLanguage[]>(["python"]);
-  const [inputFormat, setInputFormat] = useState("");
-  const [outputFormat, setOutputFormat] = useState("");
-  const [constraints, setConstraints] = useState("");
-  const [sampleInput, setSampleInput] = useState("");
-  const [sampleOutput, setSampleOutput] = useState("");
-  const [passageText, setPassageText] = useState("");
-
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const objective = OBJECTIVE.includes(type);
-  const isContainer = CONTAINER_TYPES.includes(type);
-  const needsModelAnswer = type === "short_answer" || type === "long_answer";
-  const singleAnswer = type === "mcq" || type === "true_false";
-
-  // A true/false question is two fixed options. Swapping to it replaces whatever the
-  // examiner had typed, because "Option C" has no meaning here.
-  function changeType(next: QuestionType) {
-    setType(next);
-    if (next === "true_false") {
-      setOptions([
-        { text: "True", is_correct: true },
-        { text: "False", is_correct: false },
-      ]);
-    } else if (OBJECTIVE.includes(next) && options.length < 4) {
-      setOptions([
-        { text: "", is_correct: true },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
-      ]);
-    }
-    if (CONTAINER_TYPES.includes(next)) {
-      setMarks("0"); // a passage carries no marks - the server refuses otherwise
-    } else if (marks === "0") {
-      setMarks("2");
-    }
-  }
-
-  function toggleCorrect(index: number) {
-    setOptions((current) =>
-      current.map((option, i) =>
-        singleAnswer
-          ? { ...option, is_correct: i === index } // exactly one, enforced in the UI too
-          : i === index
-            ? { ...option, is_correct: !option.is_correct }
-            : option,
-      ),
-    );
-  }
-
-  function toggleLanguage(language: CodingLanguage) {
-    setLanguages((current) =>
-      current.includes(language)
-        ? current.filter((l) => l !== language)
-        : [...current, language],
-    );
-  }
-
-  async function uploadImage(file: File) {
-    const form = new FormData();
-    form.append("file", file);
-    try {
-      setImage(await api.upload<QuestionImage>("/questions/images", form));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not upload that image.");
-    }
-  }
-
-  /** Build the spec for the active type, or null when the type takes none. */
-  function buildSpec(): Record<string, unknown> | null {
-    switch (type) {
-      case "numerical":
-        return {
-          answer: Number(numericAnswer),
-          tolerance: Number(tolerance) || 0,
-          unit: unit.trim() || null,
-        };
-      case "fill_blank":
-        return {
-          accepted_answers: acceptedAnswers
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean),
-          case_sensitive: caseSensitive,
-        };
-      case "coding":
-        return {
-          languages,
-          input_format: inputFormat.trim(),
-          output_format: outputFormat.trim(),
-          constraints: constraints.trim(),
-          sample_cases: [{ input: sampleInput, output: sampleOutput }],
-        };
-      case "passage":
-        return { passage_text: passageText.trim() || null, sticky: true };
-      default:
-        return null;
-    }
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-
-    const payload = {
-      subject_id: subjectId,
-      question_type: type,
-      category,
-      topic: topic.trim() || null,
-      difficulty,
-      body: body.trim(),
-      marks: Number(marks),
-      negative_marks: Number(negative),
-      model_answer: needsModelAnswer || type === "image_upload" ? modelAnswer.trim() || null : null,
-      explanation: explanation.trim() || null,
-      image_key: image?.image_key ?? null,
-      // Only the active type's configuration is sent; every other type's fields are
-      // ignored, so switching type cannot carry stale values into the payload.
-      spec: buildSpec(),
-      // Only written answers take word bounds - the API rejects them anywhere else.
-      min_words: needsModelAnswer && minWords ? Number(minWords) : null,
-      max_words: needsModelAnswer && maxWords ? Number(maxWords) : null,
-      options: objective
-        ? options
-            .filter((option) => option.text.trim())
-            .map((option, index) => ({
-              text: option.text.trim(),
-              is_correct: option.is_correct,
-              order_index: index,
-            }))
-        : [],
-    };
-
-    try {
-      await api.post("/questions", payload);
-      toast("Question added to the bank", "mint");
-      setBody("");
-      setModelAnswer("");
-      setExplanation("");
-      setMinWords("");
-      setMaxWords("");
-      setImage(null);
-      setNumericAnswer("");
-      setTolerance("0");
-      setUnit("");
-      setAcceptedAnswers("");
-      setInputFormat("");
-      setOutputFormat("");
-      setConstraints("");
-      setSampleInput("");
-      setSampleOutput("");
-      setPassageText("");
-      setOptions([
-        { text: "", is_correct: true },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
-      ]);
-      onDone();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the question.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (subjects.length === 0) {
-    return (
-      <Card>
-        <Alert tone="amber" title="Create a subject first">
-          Every question belongs to a subject. Add one before composing questions.
-        </Alert>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <SectionTitle
-        title="New question"
-        hint="Validation mirrors the server: an MCQ needs exactly one correct option, written questions need a model answer."
-      />
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Field label="Subject">
-            <Select
-              value={subjectId}
-              onChange={(e) => setChosenSubjectId(e.target.value)}
-              required
-            >
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.code}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Type">
-            <Select value={type} onChange={(e) => changeType(e.target.value as QuestionType)}>
-              {Object.entries(TYPE_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Difficulty">
-            <Select
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-            >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </Select>
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Marks">
-              <Input
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={marks}
-                onChange={(e) => setMarks(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Negative">
-              <Input
-                type="number"
-                min="0"
-                step="0.25"
-                value={negative}
-                onChange={(e) => setNegative(e.target.value)}
-              />
-            </Field>
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Category" hint="The bank shelf. Corporate sections select on this.">
-            <Select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as QuestionCategory)}
-            >
-              {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Topic" hint="Optional. e.g. OOP, Percentages, Blood Relations.">
-            <Input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Free text"
-              maxLength={120}
-            />
-          </Field>
-        </div>
-
-        <Field
-          label={isContainer ? "Passage introduction" : "Question"}
-          hint={image ? "Optional when a figure carries the question." : undefined}
-        >
-          <Textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={isContainer ? 5 : 3}
-            placeholder={
-              isContainer
-                ? "A heading for the passage. The passage text itself goes below."
-                : "Write the question exactly as the candidate should read it."
-            }
-            required={!image}
-          />
-        </Field>
-
-        <Field label="Figure" hint="Optional. Shown above the question during the exam.">
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void uploadImage(file);
-              }}
-              className="text-[13px] text-ink-soft file:mr-3 file:rounded-lg file:border file:border-line file:bg-surface-sunk file:px-3 file:py-1.5 file:text-[13px] file:text-ink"
-            />
-            {image?.thumbnail_url && (
-              <span className="flex items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={image.thumbnail_url}
-                  alt="Uploaded figure preview"
-                  className="h-14 w-auto rounded-lg border border-line object-contain"
-                />
-                <Button type="button" variant="ghost" onClick={() => setImage(null)}>
-                  Remove
-                </Button>
-              </span>
-            )}
-          </div>
-        </Field>
-
-        {type === "numerical" && (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Expected answer" hint="Required.">
-              <Input
-                type="number"
-                step="any"
-                value={numericAnswer}
-                onChange={(e) => setNumericAnswer(e.target.value)}
-                placeholder="9.81"
-                required
-              />
-            </Field>
-            <Field label="Tolerance" hint="Plus or minus. An answer this far out still scores.">
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={tolerance}
-                onChange={(e) => setTolerance(e.target.value)}
-              />
-            </Field>
-            <Field label="Unit" hint="Optional. Shown, never marked.">
-              <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m/s^2" />
-            </Field>
-          </div>
-        )}
-
-        {type === "fill_blank" && (
-          <div className="space-y-4">
-            <Field label="Accepted answers" hint="One per line. Any of them earns full marks.">
-              <Textarea
-                value={acceptedAnswers}
-                onChange={(e) => setAcceptedAnswers(e.target.value)}
-                rows={3}
-                placeholder={"water\nH2O"}
-                required
-              />
-            </Field>
-            <label className="flex items-center gap-2 text-[13px] text-ink-soft">
-              <input
-                type="checkbox"
-                checked={caseSensitive}
-                onChange={(e) => setCaseSensitive(e.target.checked)}
-                className="h-4 w-4 rounded border-line"
-              />
-              Match capitalisation exactly
-            </label>
-          </div>
-        )}
-
-        {type === "coding" && (
-          <div className="space-y-4">
-            <Field label="Languages" hint="What the candidate may answer in.">
-              <div className="flex flex-wrap gap-3">
-                {CODING_LANGUAGES.map((language) => (
-                  <label
-                    key={language}
-                    className="flex items-center gap-2 text-[13px] text-ink-soft"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={languages.includes(language)}
-                      onChange={() => toggleLanguage(language)}
-                      className="h-4 w-4 rounded border-line"
-                    />
-                    {LANGUAGE_LABEL[language]}
-                  </label>
-                ))}
-              </div>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Input format">
-                <Textarea
-                  value={inputFormat}
-                  onChange={(e) => setInputFormat(e.target.value)}
-                  rows={2}
-                  placeholder="A single integer n."
-                  required
-                />
-              </Field>
-              <Field label="Output format">
-                <Textarea
-                  value={outputFormat}
-                  onChange={(e) => setOutputFormat(e.target.value)}
-                  rows={2}
-                  placeholder="The nth Fibonacci number."
-                  required
-                />
-              </Field>
-            </div>
-            <Field label="Constraints">
-              <Input
-                value={constraints}
-                onChange={(e) => setConstraints(e.target.value)}
-                placeholder="1 &lt;= n &lt;= 40"
-                required
-              />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Sample input">
-                <Textarea
-                  value={sampleInput}
-                  onChange={(e) => setSampleInput(e.target.value)}
-                  rows={2}
-                  placeholder="5"
-                />
-              </Field>
-              <Field label="Sample output">
-                <Textarea
-                  value={sampleOutput}
-                  onChange={(e) => setSampleOutput(e.target.value)}
-                  rows={2}
-                  placeholder="5"
-                />
-              </Field>
-            </div>
-          </div>
-        )}
-
-        {isContainer && (
-          <Field
-            label="Passage text"
-            hint="Shown above every question attached to this passage."
-          >
-            <Textarea
-              value={passageText}
-              onChange={(e) => setPassageText(e.target.value)}
-              rows={8}
-              placeholder="The full extract or case study."
-            />
-          </Field>
-        )}
-
-        {objective && (
-          <div>
-            <p className="mb-2 text-[13px] font-medium text-ink-soft">
-              Options{" "}
-              <span className="font-normal text-ink-muted">
-                — {type === "mcq" ? "mark exactly one as correct" : "mark every correct option"}
-              </span>
-            </p>
-            <div className="space-y-2">
-              {options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleCorrect(index)}
-                    className={cx(
-                      "flex h-9 w-9 shrink-0 items-center justify-center border text-[12px] font-semibold transition",
-                      type === "mcq" ? "rounded-full" : "rounded-[8px]",
-                      option.is_correct
-                        ? "border-mint bg-mint-soft text-mint"
-                        : "border-line-strong text-ink-muted hover:bg-sunken",
-                    )}
-                    title={option.is_correct ? "Correct answer" : "Mark as correct"}
-                  >
-                    {String.fromCharCode(65 + index)}
-                  </button>
-                  <Input
-                    value={option.text}
-                    onChange={(e) =>
-                      setOptions((current) =>
-                        current.map((o, i) => (i === index ? { ...o, text: e.target.value } : o)),
-                      )
-                    }
-                    placeholder={`Option ${String.fromCharCode(65 + index)}`}
-                  />
-                  {options.length > 2 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setOptions((c) => c.filter((_, i) => i !== index))}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {options.length < 6 && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="mt-2"
-                onClick={() => setOptions((c) => [...c, { text: "", is_correct: false }])}
-              >
-                Add option
-              </Button>
-            )}
-          </div>
-        )}
-
-        {(needsModelAnswer || type === "image_upload") && (
-          <Field
-            label={type === "image_upload" ? "Expected answer (for the examiner)" : "Model answer"}
-            hint={
-              needsModelAnswer
-                ? "Required. The grader scores against this and the examiner sees it while reviewing."
-                : "Optional guidance shown to the examiner when reviewing the scan."
-            }
-          >
-            <Textarea
-              value={modelAnswer}
-              onChange={(e) => setModelAnswer(e.target.value)}
-              rows={4}
-              required={needsModelAnswer}
-              placeholder="Describe what a full-mark answer contains."
-            />
-          </Field>
-        )}
-
-        {needsModelAnswer && (
-          <div className="grid grid-cols-2 gap-2">
-            <Field
-              label="Minimum words"
-              hint="Optional. Shown to the candidate; never blocks a save."
-            >
-              <Input
-                type="number"
-                min="0"
-                step="10"
-                value={minWords}
-                onChange={(e) => setMinWords(e.target.value)}
-                placeholder="No minimum"
-              />
-            </Field>
-            <Field label="Maximum words" hint="Optional. Enforced — a longer answer is refused.">
-              <Input
-                type="number"
-                min="1"
-                step="10"
-                value={maxWords}
-                onChange={(e) => setMaxWords(e.target.value)}
-                placeholder="No limit"
-              />
-            </Field>
-          </div>
-        )}
-
-        {error && <Alert tone="rose">{error}</Alert>}
-
-        <div className="flex justify-end gap-2">
-          <Button type="submit" loading={busy}>
-            Add to bank
-          </Button>
-        </div>
-      </form>
-    </Card>
-  );
 }

@@ -29,9 +29,7 @@ import { useRequireAuth } from "@/lib/auth";
 import type {
   Difficulty,
   ExamPool,
-  ExamType,
   Question,
-  QuestionCategory,
   QuestionType,
   SelectionRule,
   Subject,
@@ -496,7 +494,6 @@ export default function CreateExamWizard() {
   const [poolTab, setPoolTab] = useState<"create" | "bank" | "ai" | "import">("bank");
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
 
   // Step 6: Proctoring. AI detects and flags; the examiner rules on it afterwards.
   // Nothing configured here fails a candidate on its own.
@@ -515,7 +512,6 @@ export default function CreateExamWizard() {
   // Current wizard step: 1..6
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(true);
 
   // Default dates
   useEffect(() => {
@@ -526,17 +522,11 @@ export default function CreateExamWizard() {
 
     async function loadData() {
       try {
-        const [subList, qList] = await Promise.all([
-          api.get<Subject[]>("/subjects"),
-          api.get<Question[]>("/questions"),
-        ]);
-        setSubjects(subList);
-        if (subList.length > 0) setSubjectId(subList[0].id);
-        setAllQuestions(qList);
-      } catch (err) {
-        toast("Failed to load subjects or questions", "rose");
-      } finally {
-        setLoadingInitial(false);
+        const subjectList = await api.get<Subject[]>("/subjects");
+        setSubjects(subjectList);
+        if (subjectList.length > 0) setSubjectId(subjectList[0].id);
+      } catch {
+        toast("Failed to load subjects", "rose");
       }
     }
     void loadData();
