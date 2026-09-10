@@ -19,7 +19,7 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import type { CandidateStats, Result } from "@/lib/types";
+import type { CandidateStats, PerformanceAnalysis, Result } from "@/lib/types";
 
 /**
  * Performance — what the published results say, read back to the candidate.
@@ -32,6 +32,14 @@ export default function PerformancePage() {
   const { user } = useRequireAuth(["candidate"]);
   const [results, setResults] = useState<Result[]>([]);
   const [stats, setStats] = useState<CandidateStats | null>(null);
+  /**
+   * Topic-level analysis, computed server-side.
+   *
+   * The client cannot work this out: topics live on the questions, and a published
+   * result only carries totals. It is built from released marks only, so nothing here
+   * hints at a paper the examiner has not published yet.
+   */
+  const [topics, setTopics] = useState<PerformanceAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,13 +48,15 @@ export default function PerformancePage() {
     (async () => {
       if (!user) return;
       try {
-        const [resultData, statsData] = await Promise.all([
+        const [resultData, statsData, topicData] = await Promise.all([
           api.get<Result[]>("/my/results"),
           api.get<CandidateStats>("/my/stats/summary"),
+          api.get<PerformanceAnalysis>("/my/performance-analysis"),
         ]);
         if (cancelled) return;
         setResults(resultData);
         setStats(statsData);
+        setTopics(topicData);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.message : "Could not load your performance.");
@@ -215,6 +225,66 @@ export default function PerformancePage() {
               </p>
             </Card>
           </div>
+
+          {/* ---------------------------------------------------- by topic */}
+          {topics && topics.topic_scores.length > 0 && (
+            <Card>
+              <SectionTitle
+                title="By topic"
+                hint="Where your marks came from, across every published paper."
+              />
+              <ul className="space-y-3">
+                {topics.topic_scores.map((score) => (
+                  <li key={score.topic}>
+                    <div className="mb-1 flex items-baseline justify-between gap-3">
+                      <span className="truncate text-[13px] font-medium text-ink">
+                        {score.topic}
+                      </span>
+                      <span className="shrink-0 text-[12.5px] text-ink-soft">
+                        {Math.round(score.percentage)}%
+                        <span className="ml-1.5 text-[11.5px] text-ink-muted">
+                          over {score.answers} answer{score.answers === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-sunken">
+                      <div
+                        className={cx(
+                          "h-full rounded-full",
+                          score.percentage >= 70
+                            ? "bg-mint"
+                            : score.percentage >= 50
+                              ? "bg-amber"
+                              : "bg-rose",
+                        )}
+                        style={{ width: `${Math.min(Math.max(score.percentage, 0), 100)}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {topics.recommendations.length > 0 && (
+                <div className="mt-5 rounded-[10px] border border-line bg-sunken/50 p-3.5">
+                  <p className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
+                    Where to put your time
+                  </p>
+                  <ul className="space-y-1">
+                    {topics.recommendations.map((line) => (
+                      <li key={line} className="text-[13px] text-ink-soft">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="mt-3 text-[11.5px] leading-relaxed text-ink-muted">
+                A topic appears once it has at least two marked answers — one question
+                is not a pattern.
+              </p>
+            </Card>
+          )}
         </div>
       )}
     </div>

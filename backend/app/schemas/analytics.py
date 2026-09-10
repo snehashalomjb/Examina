@@ -55,8 +55,21 @@ class ExamAnalytics(BaseModel):
     score_distribution: list[float] = Field(default_factory=list)
 
 
+class TopicScoreOut(BaseModel):
+    """One topic's average, with the sample size behind it.
+
+    The count is shown because "40% in Normalisation" means something different over
+    two answers than over twenty, and a candidate reading their own analysis deserves
+    to know which they are looking at.
+    """
+
+    topic: str
+    percentage: float
+    answers: int
+
+
 class PerformanceAnalysis(BaseModel):
-    """AI-generated narrative performance analysis for one candidate."""
+    """Narrative performance analysis for one candidate."""
 
     candidate_id: uuid.UUID
     candidate_name: str
@@ -66,4 +79,6 @@ class PerformanceAnalysis(BaseModel):
     recommendations: list[str] = Field(default_factory=list)
     summary: str
     section_notes: list[str] = Field(default_factory=list)
+    #: Per-topic breakdown behind the narrative, so the summary can be checked.
+    topic_scores: list[TopicScoreOut] = Field(default_factory=list)
     generated_at: datetime

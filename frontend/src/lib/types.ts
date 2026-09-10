@@ -609,6 +609,13 @@ export interface ExamAnalytics {
   score_distribution: number[];
 }
 
+export interface TopicScore {
+  topic: string;
+  percentage: number;
+  /** Sample size. "40% in Normalisation" reads differently over 2 answers than 20. */
+  answers: number;
+}
+
 export interface PerformanceAnalysis {
   candidate_id: string;
   candidate_name: string;
@@ -618,6 +625,8 @@ export interface PerformanceAnalysis {
   recommendations: string[];
   summary: string;
   section_notes: string[];
+  /** Per-topic breakdown behind the narrative, so the summary can be checked. */
+  topic_scores: TopicScore[];
   generated_at: string;
 }
 

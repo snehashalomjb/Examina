@@ -17,7 +17,8 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
-import type { Exam, ExaminerStats, GradingSummary, LoginRequestRow } from "@/lib/types";
+import type {
+  ProctorReview, Exam, ExaminerStats, GradingSummary, LoginRequestRow } from "@/lib/types";
 
 
 
@@ -27,6 +28,14 @@ export default function ExaminerDashboard() {
   const [summaries, setSummaries] = useState<GradingSummary[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [loginRequests, setLoginRequests] = useState<LoginRequestRow[]>([]);
+  /**
+   * Sittings the proctoring engine flagged.
+   *
+   * This is not decoration: a flagged sitting with no ruling *blocks* publishing for
+   * that exam, so an examiner who cannot see the queue cannot work out why their
+   * results will not go out.
+   */
+  const [flagged, setFlagged] = useState<ProctorReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,17 +46,19 @@ export default function ExaminerDashboard() {
     (async () => {
       if (!user || !approved) { if (!cancelled) setLoading(false); return; }
       try {
-        const [statsData, summaryData, examData, requestData] = await Promise.all([
+        const [statsData, summaryData, examData, requestData, flaggedData] = await Promise.all([
           api.get<ExaminerStats>("/examiner/stats"),
           api.get<GradingSummary[]>("/grading/summary"),
           api.get<Exam[]>("/exams?limit=6"),
           api.get<LoginRequestRow[]>("/login-requests?status=pending"),
+          api.get<ProctorReview[]>("/proctoring/sessions?flagged_only=true&limit=50"),
         ]);
         if (cancelled) return;
         setStats(statsData);
         setSummaries(summaryData);
         setExams(examData);
         setLoginRequests(requestData);
+        setFlagged(flaggedData);
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load the dashboard.");
       } finally {
@@ -56,6 +67,9 @@ export default function ExaminerDashboard() {
     })();
     return () => { cancelled = true; };
   }, [user, approved]);
+
+  /* Flagged *and* unruled: the ones actually holding results back. */
+  const needsRuling = flagged.filter((session) => session.needs_integrity_review);
 
   if (!user) return null;
   if (!approved) {
@@ -194,6 +208,98 @@ export default function ExaminerDashboard() {
                     </Card>
                   </Link>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Flagged sittings — the queue that gates publishing */}
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-ink">Flagged Sessions</h2>
+              <Link
+                href="/dashboard/proctoring"
+                className="text-[12.5px] font-medium text-accent hover:underline"
+              >
+                Review →
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(2)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 rounded-[10px]" />
+                ))}
+              </div>
+            ) : flagged.length === 0 ? (
+              <Card className="text-center py-8">
+                <p className="text-[13px] text-ink-muted">Nothing flagged ✓</p>
+                <p className="mt-0.5 text-[12px] text-ink-muted">
+                  No sitting needs an integrity ruling
+                </p>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {needsRuling.length > 0 && (
+                  <Alert tone="amber">
+                    {needsRuling.length} sitting{needsRuling.length === 1 ? "" : "s"} awaiting
+                    your ruling. Results for those exams cannot be published until each one is
+                    ruled a genuine attempt or malpractice.
+                  </Alert>
+                )}
+                {flagged.slice(0, 4).map((session) => (
+                  <Link
+                    key={session.session_id}
+                    href={`/dashboard/proctoring/${session.session_id}`}
+                  >
+                    <Card hover className="!p-3.5 transition">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-ink">
+                            {session.candidate_name}
+                          </p>
+                          <p className="truncate text-[12px] text-ink-muted">
+                            {session.exam_title}
+                          </p>
+                        </div>
+                        <Badge
+                          tone={
+                            session.integrity_verdict === "malpractice"
+                              ? "rose"
+                              : session.integrity_verdict === "cleared"
+                                ? "mint"
+                                : "amber"
+                          }
+                          size="xs"
+                        >
+                          {session.integrity_verdict === "pending"
+                            ? "needs ruling"
+                            : session.integrity_verdict}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <Badge tone="neutral" size="xs">
+                          suspicion {Math.round(session.suspicion_score)}
+                        </Badge>
+                        {session.focus_violation_count > 0 && (
+                          <Badge tone="rose" size="xs">
+                            left exam {session.focus_violation_count}×
+                          </Badge>
+                        )}
+                        {session.status === "auto_submitted" && (
+                          <Badge tone="amber" size="xs">auto-submitted</Badge>
+                        )}
+                      </div>
+                    </Card>
+                  </Link>
+                ))}
+                {flagged.length > 4 && (
+                  <Link
+                    href="/dashboard/proctoring"
+                    className="block text-center text-[12.5px] font-medium text-accent hover:underline"
+                  >
+                    {flagged.length - 4} more flagged
+                  </Link>
+                )}
               </div>
             )}
           </div>

@@ -55,6 +55,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/dashboard/questions/ai-generate", label: "AI Tools",   roles: ["admin", "examiner"],  icon: SparkleIcon,  needsApproval: true, badge: "AI" },
       { href: "/dashboard/grading",            label: "Grading",       roles: ["admin", "examiner"],   icon: IconGrading,  needsApproval: true },
       { href: "/dashboard/proctoring",         label: "Proctoring",    roles: ["admin", "examiner"],   icon: IconShield,   needsApproval: true },
+      { href: "/dashboard/live",               label: "Live Console",  roles: ["admin", "examiner"],   icon: IconDashboard, needsApproval: true, badge: "LIVE" },
     ],
   },
   {

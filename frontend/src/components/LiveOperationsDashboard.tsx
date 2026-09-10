@@ -7,6 +7,22 @@ import { Alert, cx } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { LiveDashboardData } from "@/lib/types";
 
+/**
+ * Honest emptiness.
+ *
+ * Every list on this console can legitimately be empty - a quiet Tuesday afternoon has
+ * no live sittings and no alerts. The endpoint behind this used to pad those lists with
+ * invented candidates so the screen looked busy; it no longer does, so the panels have
+ * to be able to say "nothing" without looking broken.
+ */
+function Nothing({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-1 py-8 text-center">
+      <p className="text-[12.5px] text-slate-400">{children}</p>
+    </div>
+  );
+}
+
 interface LiveOperationsDashboardProps {
   role: "admin" | "examiner";
   userFullName: string;
@@ -331,6 +347,13 @@ export function LiveOperationsDashboard({ role, userFullName }: LiveOperationsDa
               </Link>
             </div>
 
+            {d.live_sessions.length === 0 && (
+              <Nothing>
+                Nobody is sitting an exam right now. Sittings appear here the moment a
+                candidate starts.
+              </Nothing>
+            )}
+
             <div className="mt-3 divide-y divide-slate-800/60">
               {d.live_sessions.slice(0, 5).map((s) => (
                 <div key={s.session_id} className="flex items-center justify-between py-2.5 gap-3">
@@ -379,6 +402,10 @@ export function LiveOperationsDashboard({ role, userFullName }: LiveOperationsDa
               </div>
               <span className="text-[11.5px] text-slate-400">real-time feed</span>
             </div>
+
+            {d.proctoring_alerts.length === 0 && (
+              <Nothing>No proctoring alerts in the last 24 hours.</Nothing>
+            )}
 
             <div className="mt-3 space-y-2.5">
               {d.proctoring_alerts.map((alert) => (
@@ -490,6 +517,10 @@ export function LiveOperationsDashboard({ role, userFullName }: LiveOperationsDa
               </Link>
             </div>
 
+            {d.ai_grading_queue.length === 0 && (
+              <Nothing>Nothing waiting to be graded.</Nothing>
+            )}
+
             <div className="mt-3 space-y-2">
               {d.ai_grading_queue.map((item) => (
                 <div
@@ -551,6 +582,9 @@ export function LiveOperationsDashboard({ role, userFullName }: LiveOperationsDa
             <span>📅</span> upcoming exams
           </p>
           <div className="space-y-2 text-[12px]">
+            {d.upcoming_exams.length === 0 && (
+              <Nothing>No exams scheduled ahead.</Nothing>
+            )}
             {d.upcoming_exams.map((ex) => (
               <div key={ex.id} className="flex items-center justify-between py-1.5 border-b border-slate-800/60 last:border-0">
                 <span className="truncate text-slate-300">{ex.title}</span>
@@ -566,6 +600,9 @@ export function LiveOperationsDashboard({ role, userFullName }: LiveOperationsDa
             <span>⚡</span> recent activity
           </p>
           <div className="space-y-2 text-[12px]">
+            {d.recent_activity.length === 0 && (
+              <Nothing>Nothing has happened in the last 24 hours.</Nothing>
+            )}
             {d.recent_activity.map((act, i) => (
               <div key={i} className="flex items-center justify-between py-1.5 border-b border-slate-800/60 last:border-0">
                 <span className="truncate text-slate-300">{act.message}</span>
