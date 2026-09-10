@@ -35,6 +35,7 @@ from app.schemas.exam import (
     PoolMarks,
     PoolReorder,
     PoolStats,
+    PreviewOption,
     SectionOut,
 )
 from app.services.paper_generator import check_pool_satisfies_rules, generate_paper
@@ -562,6 +563,17 @@ def preview_paper(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     by_id = {eq.question_id: eq.question for eq in exam.exam_questions}
+
+    def _options(entry) -> list[PreviewOption]:
+        """The question's options in this candidate's shuffled order, key omitted."""
+        question = by_id[entry.question_id]
+        options = {option.id: option for option in question.options}
+        ordered = [options[oid] for oid in entry.option_order if oid in options]
+        # A question whose options were not shuffled still has options to show.
+        if not ordered:
+            ordered = sorted(question.options, key=lambda o: o.order_index)
+        return [PreviewOption(id=option.id, text=option.text) for option in ordered]
+
     return PaperPreview(
         seed=seed,
         candidate_id=target,
@@ -573,7 +585,10 @@ def preview_paper(
                 question_type=by_id[e.question_id].question_type,
                 difficulty=by_id[e.question_id].difficulty,
                 marks=e.marks,
+                negative_marks=by_id[e.question_id].negative_marks,
+                topic=by_id[e.question_id].topic,
                 option_order=e.option_order,
+                options=_options(e),
             )
             for e in entries
         ],

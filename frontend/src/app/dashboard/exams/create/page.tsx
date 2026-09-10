@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { AIGenerator } from "@/components/AIGenerator";
+import { CandidateSelector } from "@/components/CandidateSelector";
 import { ExamCategoryCard, ExamCategoryType } from "@/components/ExamCategoryCard";
 import { Hero } from "@/components/Hero";
+import { PaperPreview } from "@/components/PaperPreview";
 import { QuestionBankSelector } from "@/components/QuestionBankSelector";
 import { QuestionEditor } from "@/components/QuestionEditor";
 import { QuestionImporter } from "@/components/QuestionImporter";
@@ -494,6 +496,9 @@ export default function CreateExamWizard() {
   const [poolTab, setPoolTab] = useState<"create" | "bank" | "ai" | "import">("bank");
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [assignedCount, setAssignedCount] = useState(0);
+  /** Review tab: the summary and checklist, or the candidate's-eye paper. */
+  const [reviewTab, setReviewTab] = useState<"summary" | "paper">("summary");
 
   // Step 6: Proctoring. AI detects and flags; the examiner rules on it afterwards.
   // Nothing configured here fails a candidate on its own.
@@ -806,7 +811,8 @@ export default function CreateExamWizard() {
           { num: 3, label: "Details" },
           { num: 4, label: "Sections" },
           { num: 5, label: "Question Pool" },
-          { num: 6, label: "Review & Proctor" },
+          { num: 6, label: "Candidates" },
+          { num: 7, label: "Review & Publish" },
         ].map((s) => (
           <button
             key={s.num}
@@ -1608,13 +1614,35 @@ export default function CreateExamWizard() {
             <Button variant="secondary" onClick={() => setStep(4)}>
               ← Back to Sections
             </Button>
-            <Button onClick={() => setStep(6)}>Next: Review & Publish →</Button>
+            <Button onClick={() => setStep(6)}>Next: Assign Candidates →</Button>
           </div>
         </div>
       )}
 
-      {/* STEP 6: RANDOMISATION, PROCTORING, VALIDATION, PUBLISH */}
+      {/* STEP 6: CANDIDATES */}
       {step === 6 && (
+        <div className="space-y-6 animate-fade-in">
+          <div>
+            <h2 className="text-xl font-bold text-ink">Assign Candidates</h2>
+            <p className="text-sm text-ink-muted mt-0.5">
+              Only assigned candidates ever see this exam. Assigning somebody whose login
+              access is still pending is allowed — the exam waits for them.
+            </p>
+          </div>
+
+          <CandidateSelector examId={examId} onChange={setAssignedCount} />
+
+          <div className="flex justify-between pt-4 border-t border-line">
+            <Button variant="secondary" onClick={() => setStep(5)}>
+              ← Back to the Question Pool
+            </Button>
+            <Button onClick={() => setStep(7)}>Next: Review &amp; Publish →</Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 7: RANDOMISATION, PROCTORING, VALIDATION, PUBLISH */}
+      {step === 7 && (
         <div className="space-y-6 animate-fade-in">
           {/* ------------------------------------------------------ randomisation */}
           <Card className="space-y-4">
@@ -1764,7 +1792,44 @@ export default function CreateExamWizard() {
           </Card>
 
           {/* ------------------------------------------------- review & validation */}
-          <Card className="space-y-4 border-accent/40 bg-accent-soft/5">
+          <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
+            {(
+              [
+                { key: "summary", label: "Summary & validation" },
+                { key: "paper", label: "Preview the candidate's paper" },
+              ] as { key: typeof reviewTab; label: string }[]
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setReviewTab(tab.key)}
+                className={cx(
+                  "flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold transition-all",
+                  reviewTab === tab.key
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-ink-muted hover:bg-sunken hover:text-ink"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {reviewTab === "paper" && (
+            <PaperPreview
+              examId={examId}
+              examTitle={title}
+              durationMinutes={durationMinutes}
+              instructions={instructions}
+            />
+          )}
+
+          <Card
+            className={cx(
+              "space-y-4 border-accent/40 bg-accent-soft/5",
+              reviewTab === "paper" && "hidden"
+            )}
+          >
             <h2 className="text-base font-bold text-ink">Review before publishing</h2>
             <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
               <Summary label="Mode" value={category === "academic" ? "Academic" : "Corporate"} />
@@ -1789,6 +1854,10 @@ export default function CreateExamWizard() {
               <Summary
                 label="Target"
                 value={category === "academic" ? course || "Not set" : companyName || "Not set"}
+              />
+              <Summary
+                label="Candidates"
+                value={assignedCount ? `${assignedCount} assigned` : "None assigned"}
               />
               <Summary label="Status" value={examId ? "Draft saved" : "Not saved yet"} />
             </dl>
@@ -1818,13 +1887,21 @@ export default function CreateExamWizard() {
                   ok: terminateOnScore > flagOnScore,
                   detail: "The score that ends a sitting must be above the one that flags it.",
                 },
+                {
+                  // A warning, not a blocker: an exam can legitimately be published
+                  // before its cohort is known, and candidates can be added later.
+                  label: "Candidates assigned",
+                  ok: assignedCount > 0,
+                  detail:
+                    "Nobody is assigned yet, so nobody will see this exam. You can assign them after publishing.",
+                },
               ]}
             />
           </Card>
 
           <div className="flex flex-wrap justify-between gap-3 pt-4">
-            <Button variant="secondary" onClick={() => setStep(5)}>
-              ← Back to the Question Pool
+            <Button variant="secondary" onClick={() => setStep(6)}>
+              ← Back to Candidates
             </Button>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" loading={savingDraft} onClick={() => void saveDraft()}>

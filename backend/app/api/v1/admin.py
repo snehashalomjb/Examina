@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentAdmin, CurrentStaff, DbSession
 from app.core.logging_config import get_logger
@@ -278,6 +279,7 @@ def list_candidates(
     stmt = (
         select(User)
         .where(User.role == UserRole.CANDIDATE)
+        .options(selectinload(User.login_access_request))
         .order_by(User.created_at.desc())
         .limit(limit)
     )
@@ -332,6 +334,9 @@ def list_candidates(
             email=c.email,
             access_status=c.access_status,
             is_active=c.is_active,
+            login_access=(
+                c.login_access_request.status if c.login_access_request else None
+            ),
             created_at=c.created_at,
             last_login_at=c.last_login_at,
             attempts=attempts.get(c.id, 0),

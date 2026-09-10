@@ -222,13 +222,30 @@ class ExamPoolCheck(BaseModel):
     required_count: int
 
 
+class PreviewOption(BaseModel):
+    """An option as the candidate will see it.
+
+    Note what is absent: ``is_correct``. This is the examiner previewing the candidate's
+    view, and the candidate's view has never carried the key - so neither does this,
+    even though the caller is staff and could have been trusted with it. A preview that
+    quietly showed more than the real paper would be worth nothing as a check.
+    """
+
+    id: uuid.UUID
+    text: str
+
+
 class PaperPreviewEntry(BaseModel):
     question_id: uuid.UUID
     body: str
     question_type: QuestionType
     difficulty: Difficulty
     marks: float
+    negative_marks: float = 0.0
+    topic: str | None = None
     option_order: list[uuid.UUID] = Field(default_factory=list)
+    #: The options in the order this candidate would see them.
+    options: list[PreviewOption] = Field(default_factory=list)
 
 
 class PaperPreview(BaseModel):

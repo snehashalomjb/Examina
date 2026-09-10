@@ -278,6 +278,35 @@ export interface Question {
   options: Option[];
 }
 
+// ------------------------------------------------------------- paper preview
+//
+// What one candidate would sit. Note the absent field: options carry no is_correct,
+// because this comes from the candidate-shaped projection and always has.
+
+export interface PreviewOption {
+  id: string;
+  text: string;
+}
+
+export interface PaperPreviewEntry {
+  question_id: string;
+  body: string;
+  question_type: QuestionType;
+  difficulty: Difficulty;
+  marks: number;
+  negative_marks: number;
+  topic: string | null;
+  option_order: string[];
+  options: PreviewOption[];
+}
+
+export interface PaperPreviewResult {
+  seed: string;
+  candidate_id: string;
+  total_marks: number;
+  entries: PaperPreviewEntry[];
+}
+
 // ------------------------------------------------------- the exam question pool
 //
 // "Pool" and "paper" stay different words on purpose. The pool is everything an exam
@@ -920,6 +949,8 @@ export interface CandidateRow {
   email: string;
   access_status: AccessStatus;
   is_active: boolean;
+  /** Permission to sign in, which is not the same as the account existing. */
+  login_access: LoginAccessStatus | null;
   created_at: string;
   last_login_at: string | null;
   attempts: number;

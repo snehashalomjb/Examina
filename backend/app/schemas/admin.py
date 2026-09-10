@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.db.models.enums import AccessStatus, UserRole
+from app.db.models.enums import AccessStatus, LoginAccessStatus, UserRole
 from app.schemas.auth import UserOut
 
 
@@ -73,6 +73,9 @@ class CandidateAdminRow(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None = None
+    #: Permission to *use* the platform, separate from whether the account exists.
+    #: An exam may only be assigned to a candidate who can actually sign in and sit it.
+    login_access: LoginAccessStatus | None = None
     attempts: int = 0
     completed: int = 0
     flagged_sessions: int = 0
