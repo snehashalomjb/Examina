@@ -125,9 +125,21 @@ export default function ProctorReviewPage() {
               </p>
             </Card>
             <Card>
-              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Tab switches</p>
-              <p className="mt-1.5 text-[26px] font-semibold leading-none text-ink">
-                {review.tab_switch_count}
+              {/* The count the exam-window rule acts on: tab switches plus fullscreen
+                  exits. Shown ahead of the raw tab count because this is the number
+                  that closed the sitting, if anything did. */}
+              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Left the exam</p>
+              <p
+                className={cx(
+                  "mt-1.5 text-[26px] font-semibold leading-none",
+                  review.focus_violation_count > 0 ? "text-rose" : "text-ink",
+                )}
+              >
+                {review.focus_violation_count}
+              </p>
+              <p className="mt-1 text-[11.5px] text-ink-muted">
+                {review.tab_switch_count} tab switch
+                {review.tab_switch_count === 1 ? "" : "es"}
               </p>
             </Card>
             <Card>

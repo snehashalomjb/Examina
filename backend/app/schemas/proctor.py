@@ -28,8 +28,16 @@ class ProctorBatchOut(BaseModel):
     accepted: int
     suspicion_score: float
     tab_switch_count: int
+    #: Times the candidate left the exam window - tab switch or fullscreen exit.
+    focus_violation_count: int = 0
+    #: How many more are allowed before the paper is submitted for them. -1 when the
+    #: exam has the ladder switched off, which is not the same as 0.
+    focus_violations_left: int = -1
     is_flagged: bool
     terminated: bool
+    #: The focus ladder ran out: the paper was submitted and will be marked normally.
+    #: Distinct from ``terminated``, which is the suspicion score ending a sitting.
+    auto_submitted: bool = False
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -60,6 +68,8 @@ class ProctorReview(BaseModel):
     submitted_at: datetime | None
     suspicion_score: float
     tab_switch_count: int
+    #: Tab switches plus fullscreen exits. What the exam-window rule actually counts.
+    focus_violation_count: int = 0
     is_flagged: bool
     termination_reason: str | None = None
     #: The examiner's ruling on how the sitting was conducted. Separate from the score.

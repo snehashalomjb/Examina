@@ -53,8 +53,16 @@ export interface ProctorStatus {
   phoneDetected: boolean;
   suspicionScore: number;
   tabSwitches: number;
+  /** Times the candidate left the exam window - tab switch or fullscreen exit. */
+  focusViolations: number;
+  /** How many more are allowed before the paper is submitted. -1 = ladder is off. */
+  focusViolationsLeft: number;
+  /** Live: is the document in fullscreen right now? Drives the blocking overlay. */
+  inFullscreen: boolean;
   flagged: boolean;
   terminated: boolean;
+  /** The exam was submitted for them because the ladder ran out. */
+  autoSubmitted: boolean;
   lastError: string | null;
 }
 
@@ -70,6 +78,17 @@ export interface ProctorCallbacks {
   onStatus: (status: ProctorStatus) => void;
   onWarnings: (warnings: string[]) => void;
   onTerminated: (reason: string) => void;
+  /**
+   * The candidate just left the exam window.
+   *
+   * Fired *before* the event reaches the server, so the runner can persist any
+   * debounced answer edits first. That ordering is the whole guarantee behind "answers
+   * are saved before automatic submission": by the time the server can decide to
+   * submit, the writes are already in flight.
+   */
+  onFocusViolation?: () => Promise<void> | void;
+  /** The paper was submitted for them. Distinct from a termination. */
+  onAutoSubmitted?: (reason: string) => void;
 }
 
 interface LandmarkPoint {
@@ -138,6 +157,10 @@ export class ProctorEngine {
     phoneDetected: false,
     suspicionScore: 0,
     tabSwitches: 0,
+    focusViolations: 0,
+    focusViolationsLeft: -1,
+    inFullscreen: false,
+    autoSubmitted: false,
     flagged: false,
     terminated: false,
     lastError: null,
@@ -482,12 +505,18 @@ export class ProctorEngine {
     const onVisibility = () => {
       if (document.hidden) {
         this.hiddenSince = Date.now();
+        // Recorded on the way out, not on the way back. A candidate who switches away
+        // and never returns still has the violation on the record, and the flush that
+        // follows means the server hears about it while the page can still talk.
+        void this.reportFocusViolation("tab_switch", { left_at: new Date().toISOString() });
       } else if (this.hiddenSince) {
         const away = Date.now() - this.hiddenSince;
         this.hiddenSince = null;
         this.status.tabSwitches += 1;
-        this.record("tab_switch", { away_ms: away }, "warning", away);
         this.update({ tabSwitches: this.status.tabSwitches });
+        // The return trip carries how long they were away, as evidence, but must not
+        // count as a second violation for the same departure.
+        this.record("window_blur", { away_ms: away }, "info", away);
         void this.flush();
       }
     };
@@ -499,9 +528,10 @@ export class ProctorEngine {
     };
 
     const onFullscreen = () => {
-      if (this.config.require_fullscreen && !document.fullscreenElement) {
-        this.record("fullscreen_exit", undefined, "warning");
-        void this.flush();
+      const inside = Boolean(document.fullscreenElement);
+      this.update({ inFullscreen: inside });
+      if (this.config.require_fullscreen && !inside) {
+        void this.reportFocusViolation("fullscreen_exit");
       }
     };
 
@@ -543,6 +573,43 @@ export class ProctorEngine {
       () => document.removeEventListener("copy", onCopy),
       () => window.removeEventListener("pagehide", onUnload),
     ];
+  }
+
+  /**
+   * Record one "left the exam" event and get it to the server promptly.
+   *
+   * Answers first, then the event. The runner's answer writes are debounced, so a
+   * candidate who types and immediately alt-tabs could otherwise have their paper
+   * submitted with the last edit still sitting in a timer. Awaiting the runner's flush
+   * before the event goes out closes that window; if the flush throws, the violation is
+   * still reported, because losing the evidence is the worse failure.
+   */
+  private async reportFocusViolation(
+    type: "tab_switch" | "fullscreen_exit",
+    metadata?: Record<string, unknown>,
+  ) {
+    this.status.focusViolations += 1;
+    this.update({ focusViolations: this.status.focusViolations });
+
+    try {
+      await this.callbacks.onFocusViolation?.();
+    } catch {
+      /* an answer that would not save must not swallow the violation */
+    }
+    this.record(type, metadata, "warning");
+    await this.flush();
+  }
+
+  /** Ask the browser for fullscreen. Only a user gesture can grant it. */
+  async enterFullscreen(): Promise<boolean> {
+    try {
+      await document.documentElement.requestFullscreen?.();
+      const inside = Boolean(document.fullscreenElement);
+      this.update({ inFullscreen: inside });
+      return inside;
+    } catch {
+      return false;
+    }
   }
 
   // ----------------------------------------------------------------- socket
@@ -612,14 +679,30 @@ export class ProctorEngine {
   }
 
   private applyOutcome(outcome: ProctorBatchOut) {
+    // The server's counts win over the ones counted here. The client's are for
+    // immediate feedback; the server's are computed from the stored events and survive
+    // a reload, which is what stops a refresh from buying a fresh set of warnings.
     this.update({
       suspicionScore: outcome.suspicion_score,
       tabSwitches: outcome.tab_switch_count,
+      focusViolations: outcome.focus_violation_count ?? this.status.focusViolations,
+      focusViolationsLeft: outcome.focus_violations_left ?? -1,
       flagged: outcome.is_flagged,
       terminated: outcome.terminated,
+      autoSubmitted: Boolean(outcome.auto_submitted),
     });
+    this.status.focusViolations = outcome.focus_violation_count ?? this.status.focusViolations;
 
     if (outcome.warnings.length) this.callbacks.onWarnings(outcome.warnings);
+
+    if (outcome.auto_submitted) {
+      this.callbacks.onAutoSubmitted?.(
+        outcome.warnings.at(-1) ??
+          "You left the exam too many times. Your answers have been submitted.",
+      );
+      this.stop();
+      return;
+    }
     if (outcome.terminated) {
       this.callbacks.onTerminated(
         outcome.warnings.at(-1) ?? "Your session was terminated by the proctoring system.",

@@ -628,6 +628,11 @@ export interface ProctorConfig {
   gaze_tracking_enabled: boolean;
   gaze_sensitivity: number;
   max_tab_switches: number;
+  /**
+   * Times the candidate may leave the exam window (tab switch or fullscreen exit)
+   * before their answers are submitted for them. 0 switches the ladder off.
+   */
+  max_focus_violations?: number;
   flag_on_score: number;
   terminate_on_score: number;
   snapshot_interval_seconds: number;
@@ -734,6 +739,8 @@ export interface HeartbeatOut {
   seconds_remaining: number;
   status: SessionStatus;
   suspicion_score: number;
+  focus_violation_count: number;
+  focus_violations_left: number;
   warnings: string[];
   exam_token: string | null;
 }
@@ -742,8 +749,14 @@ export interface ProctorBatchOut {
   accepted: number;
   suspicion_score: number;
   tab_switch_count: number;
+  /** Times the candidate left the exam window - tab switch or fullscreen exit. */
+  focus_violation_count: number;
+  /** How many more are allowed before the paper is submitted. -1 = ladder off. */
+  focus_violations_left: number;
   is_flagged: boolean;
   terminated: boolean;
+  /** The ladder ran out: the paper was submitted and will be marked normally. */
+  auto_submitted: boolean;
   warnings: string[];
 }
 
@@ -769,6 +782,8 @@ export interface ProctorReview {
   submitted_at: string | null;
   suspicion_score: number;
   tab_switch_count: number;
+  /** Tab switches plus fullscreen exits — what the exam-window rule counts. */
+  focus_violation_count: number;
   is_flagged: boolean;
   termination_reason: string | null;
   /** The examiner's ruling on how the sitting was conducted. Separate from the score. */

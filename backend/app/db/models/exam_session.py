@@ -81,6 +81,12 @@ class ExamSession(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     suspicion_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     tab_switch_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: Times the candidate left the exam window - tab switch, minimise, or fullscreen
+    #: exit. Recomputed from the stored events on every flush, never trusted from the
+    #: client, because the client is the thing being invigilated.
+    focus_violation_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     is_flagged: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
     termination_reason: Mapped[str | None] = mapped_column(Text)
 

@@ -57,7 +57,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
     try {
       const [roster, enrolled] = await Promise.all([
         api.get<CandidateRow[]>(
-          `/candidates${search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""}`,
+          `/admin/candidates${search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""}`,
         ),
         examId
           ? api.get<EnrollmentRow[]>(`/exams/${examId}/enrollments`)

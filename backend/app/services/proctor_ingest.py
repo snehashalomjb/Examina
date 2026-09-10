@@ -21,28 +21,42 @@ from app.core.logging_config import get_logger
 from app.db.models import ExamSession, ProctorEvent, ProctorEventType, SessionStatus
 from app.schemas.proctor import ProctorBatchOut, ProctorEventIn
 from app.services import exam_engine
-from app.services.suspicion import event_weight, score_events, severity_for
+from app.services.suspicion import (
+    FOCUS_VIOLATION_TYPES,
+    SuspicionOutcome,
+    event_weight,
+    score_events,
+    severity_for,
+)
 
 logger = get_logger("proctor")
 
 
-def recompute(db: Session, session: ExamSession) -> tuple[float, bool, bool]:
-    """Rescore the session from every persisted event. Returns (score, flagged, terminate)."""
+def recompute(db: Session, session: ExamSession) -> SuspicionOutcome:
+    """Rescore the session from every persisted event.
+
+    The counts on the session row are a cache of what the events say, refreshed here on
+    every flush. That is what makes a tampered client harmless: it can withhold events
+    (which the snapshot trail exposes) but it cannot talk the server out of the ones it
+    has already delivered.
+    """
     events = list(db.scalars(select(ProctorEvent).where(ProctorEvent.session_id == session.id)))
     outcome = score_events(events, session.exam.proctor_config)
 
     session.suspicion_score = outcome.score
     session.tab_switch_count = outcome.tab_switch_count
+    session.focus_violation_count = outcome.focus_violation_count
     if outcome.should_flag and not session.is_flagged:
         session.is_flagged = True
         logger.warning(
-            "Session %s flagged: score=%.1f tab_switches=%d",
+            "Session %s flagged: score=%.1f tab_switches=%d left_exam=%d",
             session.id,
             outcome.score,
             outcome.tab_switch_count,
+            outcome.focus_violation_count,
         )
     db.flush()
-    return outcome.score, session.is_flagged, outcome.should_terminate
+    return outcome
 
 
 def ingest_batch(
@@ -83,47 +97,97 @@ def ingest_batch(
         )
     db.flush()
 
-    score, flagged, should_terminate = recompute(db, session)
-    warnings = _warnings(session, events, config)
+    outcome = recompute(db, session)
+    warnings = _warnings(events, config, outcome)
 
     terminated = False
-    if should_terminate and session.status is SessionStatus.IN_PROGRESS:
-        exam_engine.finalize_session(
-            db,
-            session,
-            status=SessionStatus.TERMINATED,
-            reason=f"Automatically terminated: suspicion score {score:.1f}",
-        )
-        terminated = True
-        warnings.append("Your session has been terminated by the proctoring system.")
-        logger.warning("Session %s TERMINATED at score %.1f", session.id, score)
+    auto_submitted = False
+
+    if session.status is SessionStatus.IN_PROGRESS:
+        if outcome.should_auto_submit:
+            # Submitted, not terminated - and the distinction is the whole point. The
+            # paper is scored, queued for review and published through the ordinary
+            # workflow, exactly as if the candidate had pressed submit themselves.
+            # Leaving the window repeatedly is a fact worth recording and worth stopping
+            # the sitting over; it is not a finding of malpractice, and a genuine
+            # candidate must not lose their marks because their laptop misbehaved.
+            # The examiner sees the flag and rules on it afterwards.
+            reason = (
+                f"Automatically submitted: the candidate left the exam window "
+                f"{outcome.focus_violation_count} times "
+                f"(limit {int(config.get('max_focus_violations', 3))})"
+            )
+            exam_engine.finalize_session(
+                db, session, status=SessionStatus.AUTO_SUBMITTED, reason=reason
+            )
+            auto_submitted = True
+            warnings.append(
+                "You left the exam too many times. Your answers have been submitted "
+                "and the exam is now closed."
+            )
+            logger.warning(
+                "Session %s AUTO-SUBMITTED after %d focus violation(s)",
+                session.id,
+                outcome.focus_violation_count,
+            )
+        elif outcome.should_terminate:
+            exam_engine.finalize_session(
+                db,
+                session,
+                status=SessionStatus.TERMINATED,
+                reason=f"Automatically terminated: suspicion score {outcome.score:.1f}",
+            )
+            terminated = True
+            warnings.append("Your session has been terminated by the proctoring system.")
+            logger.warning("Session %s TERMINATED at score %.1f", session.id, outcome.score)
 
     return ProctorBatchOut(
         accepted=len(events),
-        suspicion_score=score,
+        suspicion_score=outcome.score,
         tab_switch_count=session.tab_switch_count,
-        is_flagged=flagged,
+        focus_violation_count=session.focus_violation_count,
+        focus_violations_left=outcome.focus_violations_left,
+        is_flagged=session.is_flagged,
         terminated=terminated,
+        auto_submitted=auto_submitted,
         warnings=warnings,
     )
 
 
 def _warnings(
-    session: ExamSession, events: Sequence[ProctorEventIn], config: dict
+    events: Sequence[ProctorEventIn], config: dict, outcome: SuspicionOutcome
 ) -> list[str]:
+    """What the candidate is told, worded so the next consequence is never a surprise.
+
+    The escalation is deliberate and stated up front: a warning, a final warning, then
+    the paper is submitted. A candidate who is about to lose their sitting deserves to
+    know it on the step before, not afterwards.
+    """
     warnings: list[str] = []
     types = {e.event_type for e in events}
+    left_the_exam = bool(types & FOCUS_VIOLATION_TYPES)
 
-    max_tabs = int(config.get("max_tab_switches", 3))
-    if session.tab_switch_count > max_tabs:
-        warnings.append(
-            f"You have left the exam tab {session.tab_switch_count} times. The limit is {max_tabs}."
-        )
-    elif ProctorEventType.TAB_SWITCH in types:
-        warnings.append(
-            f"Leaving the exam tab is recorded. "
-            f"{max_tabs - session.tab_switch_count} warning(s) remaining."
-        )
+    max_focus = int(config.get("max_focus_violations", 3))
+    ladder_on = max_focus > 0
+    if ladder_on and left_the_exam and not outcome.should_auto_submit:
+        remaining = outcome.focus_violations_left
+        if remaining == 1:
+            warnings.append(
+                "Final warning: leaving the exam again will submit your answers "
+                "and close the exam."
+            )
+        else:
+            warnings.append(
+                f"Warning {outcome.focus_violation_count} of {max_focus}: leaving the "
+                f"exam window is recorded. {remaining} more will submit your answers "
+                f"and close the exam."
+            )
+    elif not ladder_on and ProctorEventType.TAB_SWITCH in types:
+        # The ladder is off, so the honest thing to say is that it was noted. Guarded on
+        # ladder_on: without it, this fired on the *final* violation too - telling a
+        # candidate their tab switch "has been recorded" in the same breath as closing
+        # their exam, which reads as though nothing much had happened.
+        warnings.append("Leaving the exam tab has been recorded for the examiner.")
 
     if ProctorEventType.MULTIPLE_FACES in types:
         warnings.append("More than one person was detected in the camera frame.")

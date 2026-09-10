@@ -47,6 +47,11 @@ export default function ExamRunner() {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [finished, setFinished] = useState<string | null>(null);
+  /** Set when the exam was closed *for* the candidate, so the screen says why. */
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
+  const [inFullscreen, setInFullscreen] = useState(false);
+  /** False until the candidate has entered fullscreen once, so the gate can differ. */
+  const [fullscreenEverEntered, setFullscreenEverEntered] = useState(false);
   const [clearTarget, setClearTarget] = useState<PaperQuestion | null>(null);
 
   const examToken = useRef<string | null>(null);
@@ -54,6 +59,16 @@ export default function ExamRunner() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const saveTimers = useRef<Record<string, number>>({});
+  /**
+   * The payload behind each debounced save, kept so it can be forced out early.
+   *
+   * Without this, "answers are saved before automatic submission" would be a hope: a
+   * candidate who types and immediately switches tabs has their last edit sitting in a
+   * timer, and the server can submit the paper before it fires.
+   */
+  const pendingSaves = useRef<
+    Record<string, { selected_option_ids?: string[]; text_answer?: string }>
+  >({});
 
   /* ------------------------------------------------------------ load paper */
   useEffect(() => {
@@ -99,9 +114,21 @@ export default function ExamRunner() {
       examToken: examToken.current,
       config: session.proctor_config,
       callbacks: {
-        onStatus: setProctor,
+        onStatus: (status) => {
+          setProctor(status);
+          setInFullscreen(status.inFullscreen);
+        },
         onWarnings: (incoming) => setWarnings(incoming),
+        // Fires before the violation reaches the server, which is what makes the
+        // ordering "answers first, then the event, then the server's decision".
+        onFocusViolation: flushPendingSaves,
+        onAutoSubmitted: (reason) => {
+          setLockedReason(reason);
+          setFinished(reason);
+          toast(reason, "rose");
+        },
         onTerminated: (reason) => {
+          setLockedReason(reason);
           setFinished(reason);
           toast(reason, "rose");
         },
@@ -114,6 +141,9 @@ export default function ExamRunner() {
       void instance.flush().finally(() => instance.stop());
       engine.current = null;
     };
+    // flushPendingSaves is stable via useCallback on persist, which only depends on the
+    // session id - re-creating the engine on every answer edit would be a disaster.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   /* ------------------------------------------------------------- countdown */
@@ -164,13 +194,41 @@ export default function ExamRunner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining, session, finished]);
 
-  /* ------------------------------------------------------------- fullscreen */
+  /* ------------------------------------------------------------- fullscreen
+   *
+   * Enforced rather than requested. The old behaviour asked for fullscreen on the first
+   * click and then let the exam carry on happily in a window, which made "the exam runs
+   * in fullscreen" a suggestion. Now the paper is covered whenever fullscreen is not
+   * active, and only a user gesture can lift the cover - the browser will not grant
+   * fullscreen any other way.
+   */
   useEffect(() => {
-    if (!session?.proctor_config.require_fullscreen || finished) return;
-    const enter = () => void document.documentElement.requestFullscreen?.().catch(() => {});
-    window.addEventListener("click", enter, { once: true });
-    return () => window.removeEventListener("click", enter);
-  }, [session, finished]);
+    const sync = () => {
+      const inside = Boolean(document.fullscreenElement);
+      setInFullscreen(inside);
+      if (inside) setFullscreenEverEntered(true);
+    };
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  const requestFullscreen = useCallback(async () => {
+    // Through the engine when it is up, so its own state stays in step; directly
+    // otherwise, because the gate is shown before the camera has finished starting.
+    if (engine.current) {
+      await engine.current.enterFullscreen();
+    } else {
+      try {
+        await document.documentElement.requestFullscreen?.();
+      } catch {
+        /* the candidate can press the button again */
+      }
+    }
+    const inside = Boolean(document.fullscreenElement);
+    setInFullscreen(inside);
+    if (inside) setFullscreenEverEntered(true);
+  }, []);
 
   useEffect(() => {
     document.body.classList.add("exam-mode");
@@ -192,6 +250,8 @@ export default function ExamRunner() {
         if (err instanceof ApiError && err.status === 409) {
           setFinished(err.message);
         }
+      } finally {
+        delete pendingSaves.current[questionId];
       }
     },
     [sessionId],
@@ -199,6 +259,7 @@ export default function ExamRunner() {
 
   const queueSave = useCallback(
     (questionId: string, payload: { selected_option_ids?: string[]; text_answer?: string }) => {
+      pendingSaves.current[questionId] = payload;
       window.clearTimeout(saveTimers.current[questionId]);
       saveTimers.current[questionId] = window.setTimeout(
         () => void persist(questionId, payload),
@@ -207,6 +268,18 @@ export default function ExamRunner() {
     },
     [persist],
   );
+
+  /** Write every debounced edit now, and wait for it. */
+  const flushPendingSaves = useCallback(async () => {
+    const outstanding = Object.entries(pendingSaves.current);
+    if (!outstanding.length) return;
+    for (const [questionId] of outstanding) {
+      window.clearTimeout(saveTimers.current[questionId]);
+    }
+    await Promise.allSettled(
+      outstanding.map(([questionId, payload]) => persist(questionId, payload)),
+    );
+  }, [persist]);
 
   function chooseOption(question: PaperQuestion, optionId: string) {
     setAnswers((prev) => {
@@ -367,11 +440,18 @@ export default function ExamRunner() {
   }
 
   if (finished && session) {
+    // A paper closed by the proctoring rule is still a submitted paper. It says what
+    // happened and that the answers were kept, and it does not pronounce on the
+    // candidate - that is the examiner's call, made later, on the evidence.
     return (
       <CentredNotice
-        title="Successfully submitted your exam"
-        body={finished}
-        detail="Objective questions were scored on submission. Written answers go to an examiner for review — your result appears once it is published."
+        title={lockedReason ? "Exam closed and submitted" : "Successfully submitted your exam"}
+        body={lockedReason ?? finished}
+        detail={
+          lockedReason
+            ? "Your answers were saved and submitted for marking. The examiner will review the proctoring record alongside your paper, and your result appears once it is published."
+            : "Objective questions were scored on submission. Written answers go to an examiner for review — your result appears once it is published."
+        }
         action={
           <Button onClick={() => router.replace("/dashboard/candidate")}>Back to dashboard</Button>
         }
@@ -380,6 +460,16 @@ export default function ExamRunner() {
   }
 
   if (!session) return null;
+
+  /* The exam-window rule, as the candidate experiences it. The counts come from the
+     server (via the proctor engine and the heartbeat), so a reload does not reset
+     them. */
+  const violationLimit = Number(session.proctor_config.max_focus_violations ?? 3);
+  const violationCount = proctor?.focusViolations ?? 0;
+  const violationsLeft = proctor?.focusViolationsLeft ?? -1;
+  const finalWarning = violationLimit > 0 && violationsLeft === 1;
+  const mustReturnToFullscreen =
+    Boolean(session.proctor_config.require_fullscreen) && !inFullscreen && !finished;
 
   const question = visibleQuestions[current] ?? session.questions[current];
   const answer = answers[question.question_id] ?? { options: [], text: "", imageUrl: null };
@@ -390,6 +480,70 @@ export default function ExamRunner() {
 
   return (
     <div className="flex h-screen flex-col bg-paper">
+      {/* ------------------------------------------------- the fullscreen gate
+       *
+       * Covers the paper whenever fullscreen is required and not active. The button is
+       * the user gesture the browser insists on before it will grant fullscreen, so
+       * this is not merely a nag - there is no way to re-enter without it.
+       */}
+      {mustReturnToFullscreen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/95 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[16px] border border-line bg-surface p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-soft text-[22px]">
+              ⛶
+            </div>
+            <h2 className="text-[17px] font-bold tracking-tight text-ink">
+              {fullscreenEverEntered ? "Return to fullscreen" : "This exam runs in fullscreen"}
+            </h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
+              {fullscreenEverEntered
+                ? "You left fullscreen, and that has been recorded. Your timer is still running — return to fullscreen to carry on."
+                : "The paper opens once you enter fullscreen. Leaving fullscreen or switching tabs during the exam is recorded."}
+            </p>
+
+            {violationLimit > 0 && (
+              <p
+                className={cx(
+                  "mt-3 rounded-[10px] px-3 py-2 text-[12.5px]",
+                  violationsLeft === 1
+                    ? "bg-rose-soft text-rose-ink"
+                    : "bg-sunken text-ink-soft",
+                )}
+              >
+                {fullscreenEverEntered ? (
+                  violationsLeft === 1 ? (
+                    <>
+                      <span className="font-semibold">Final warning.</span> Leaving the
+                      exam once more will submit your answers and close the exam.
+                    </>
+                  ) : (
+                    <>
+                      Times you have left the exam:{" "}
+                      <span className="font-semibold">{violationCount}</span> of{" "}
+                      {violationLimit}. After {violationLimit}, your answers are
+                      submitted automatically and the exam closes.
+                    </>
+                  )
+                ) : (
+                  <>
+                    You may leave the exam window {violationLimit} time
+                    {violationLimit === 1 ? "" : "s"}. After that your answers are
+                    submitted automatically and the exam closes.
+                  </>
+                )}
+              </p>
+            )}
+
+            <Button className="mt-5 w-full" onClick={() => void requestFullscreen()}>
+              {fullscreenEverEntered ? "Return to fullscreen" : "Enter fullscreen and begin"}
+            </Button>
+            <p className="mt-2 text-[11.5px] text-ink-muted">
+              Your answers are saved as you go, including right now.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ------------------------------------------------------------ top bar */}
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-4 py-2.5 lg:px-6">
         <div className="flex min-w-0 items-center gap-3">
@@ -447,8 +601,25 @@ export default function ExamRunner() {
       )}
 
       {warnings.length > 0 && (
-        <div className="shrink-0 border-b border-amber/25 bg-amber-soft px-4 py-2 lg:px-6">
-          <p className="text-[12.5px] text-amber">{warnings.join(" ")}</p>
+        <div
+          className={cx(
+            "shrink-0 border-b px-4 py-2 lg:px-6",
+            // One violation left reads as red, not amber. The step before losing the
+            // sitting is the one that has to be impossible to skim past.
+            finalWarning
+              ? "border-rose/30 bg-rose-soft"
+              : "border-amber/25 bg-amber-soft",
+          )}
+        >
+          <p
+            className={cx(
+              "text-[12.5px] font-medium",
+              finalWarning ? "text-rose-ink" : "text-amber",
+            )}
+          >
+            {finalWarning && <span className="font-bold">⚠ </span>}
+            {warnings.join(" ")}
+          </p>
         </div>
       )}
       {proctor?.lastError && (

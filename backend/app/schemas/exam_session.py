@@ -102,6 +102,11 @@ class HeartbeatOut(BaseModel):
     seconds_remaining: int
     status: SessionStatus
     suspicion_score: float
+    #: Times the candidate left the exam window, and how many more are allowed. The
+    #: runner reads these so the count survives a refresh - a candidate cannot reset
+    #: their own warning ladder by reloading the page.
+    focus_violation_count: int = 0
+    focus_violations_left: int = -1
     warnings: list[str] = Field(default_factory=list)
     exam_token: str | None = None
 

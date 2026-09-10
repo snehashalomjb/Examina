@@ -36,6 +36,12 @@ DEFAULT_PROCTOR_CONFIG: dict[str, Any] = {
     "gaze_tracking_enabled": True,
     "gaze_sensitivity": 0.6,  # 0..1, higher = stricter
     "max_tab_switches": 3,  # warnings before the session is auto-flagged
+    # Leaving the exam - a tab switch, a minimise, or dropping out of fullscreen - is
+    # counted separately from the suspicion score. The score blends noisy vision signals
+    # and a flickering webcam should never submit somebody's paper; leaving the window is
+    # unambiguous and deliberate, so it gets its own ladder: warn, final warning, submit.
+    # 0 disables the ladder entirely and leaves these as scored signals only.
+    "max_focus_violations": 3,
     "terminate_on_score": 100.0,  # suspicion score that ends the session
     "flag_on_score": 45.0,  # suspicion score that flags for review
     "snapshot_interval_seconds": 60,

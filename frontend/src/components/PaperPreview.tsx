@@ -89,7 +89,7 @@ export function PaperPreview({
   useEffect(() => {
     (async () => {
       try {
-        setCandidates(await api.get<CandidateRow[]>("/candidates?limit=50"));
+        setCandidates(await api.get<CandidateRow[]>("/admin/candidates?limit=50"));
       } catch {
         setCandidates([]); // preview falls back to the examiner's own seed
       }

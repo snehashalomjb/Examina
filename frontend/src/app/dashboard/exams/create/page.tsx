@@ -521,6 +521,8 @@ export default function CreateExamWizard() {
   const [flagOnScore, setFlagOnScore] = useState(45);
   const [terminateOnScore, setTerminateOnScore] = useState(100);
   const [snapshotInterval, setSnapshotInterval] = useState(60);
+  /** Times a candidate may leave the exam window before it submits itself. 0 = off. */
+  const [maxFocusViolations, setMaxFocusViolations] = useState(3);
 
   // Current wizard step: 1..6
   const [step, setStep] = useState(1);
@@ -612,6 +614,7 @@ export default function CreateExamWizard() {
         setFlagOnScore(num("flag_on_score", 45));
         setTerminateOnScore(num("terminate_on_score", 100));
         setSnapshotInterval(num("snapshot_interval_seconds", 60));
+        setMaxFocusViolations(num("max_focus_violations", 3));
 
         setPool(await api.get<ExamPool>(`/exams/${exam.id}/pool`));
         setStep(5); // straight to the pool, which is why anyone reopens a draft
@@ -702,6 +705,7 @@ export default function CreateExamWizard() {
         snapshot_interval_seconds: snapshotInterval,
         require_microphone: proctorMicrophone,
         require_single_display: proctorSingleDisplay,
+        max_focus_violations: maxFocusViolations,
       },
       grading_config: { auto_publish_results: false },
       sections: sections.map((sec, idx) => ({
@@ -1882,6 +1886,18 @@ export default function CreateExamWizard() {
 
             <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field
+                label="Times a candidate may leave the exam"
+                hint="Tab switch, minimise, or leaving fullscreen. On the last one their answers are submitted and the exam closes. 0 turns this off."
+              >
+                <Input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={maxFocusViolations}
+                  onChange={(e) => setMaxFocusViolations(Number(e.target.value))}
+                />
+              </Field>
+              <Field
                 label="Tab switches before flagging"
                 hint="Earlier switches warn the candidate; this many flags the sitting."
               >
@@ -1938,9 +1954,22 @@ export default function CreateExamWizard() {
             </div>
 
             <Alert tone="accent">
-              A flagged sitting is still marked. You review the evidence and rule it a
-              genuine attempt or malpractice — and a genuine candidate&apos;s paper is
-              evaluated and published like anyone else&apos;s.
+              {maxFocusViolations > 0 ? (
+                <>
+                  Leaving the exam escalates: warning, final warning, then the answers are
+                  submitted and the exam closes at{" "}
+                  <span className="font-semibold">{maxFocusViolations}</span>. That is a
+                  submitted paper, not a void one — it is marked and published through the
+                  normal workflow. You review the evidence afterwards and rule the sitting
+                  a genuine attempt or malpractice.
+                </>
+              ) : (
+                <>
+                  Leaving the exam is recorded but will not close it. Flagged sittings are
+                  still marked — you review the evidence and rule each one a genuine
+                  attempt or malpractice.
+                </>
+              )}
             </Alert>
           </Card>
 
@@ -2004,6 +2033,14 @@ export default function CreateExamWizard() {
               <Summary label="Negative marking" value={negativeMarking ? "On" : "Off"} />
               <Summary label="Attempts allowed" value={String(maxAttempts)} />
               <Summary label="Randomised" value={randomize ? "Per candidate" : "Fixed order"} />
+              <Summary
+                label="Leaving the exam"
+                value={
+                  maxFocusViolations > 0
+                    ? `Auto-submits at ${maxFocusViolations}`
+                    : "Recorded only"
+                }
+              />
               <Summary
                 label="Target"
                 value={category === "academic" ? course || "Not set" : companyName || "Not set"}

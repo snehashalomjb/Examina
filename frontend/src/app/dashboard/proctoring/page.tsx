@@ -151,6 +151,11 @@ export default function ProctoringPage() {
                       {session.status.replace("_", " ")}
                     </Badge>
                     {session.is_flagged && <Badge tone="rose">flagged</Badge>}
+                    {session.focus_violation_count > 0 && (
+                      <Badge tone="rose">
+                        left exam {session.focus_violation_count}×
+                      </Badge>
+                    )}
                     {session.tab_switch_count > 0 && (
                       <Badge tone="amber">{session.tab_switch_count} tab</Badge>
                     )}

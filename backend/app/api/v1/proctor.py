@@ -55,7 +55,12 @@ from app.schemas.proctor import (
 )
 from app.services import exam_engine, proctor_ingest
 from app.services.exam_engine import needs_integrity_review
-from app.services.suspicion import event_weight, score_events, severity_for
+from app.services.suspicion import (
+    SuspicionOutcome,
+    event_weight,
+    score_events,
+    severity_for,
+)
 
 router = APIRouter(tags=["proctoring"])
 logger = get_logger("proctor")
@@ -63,7 +68,7 @@ logger = get_logger("proctor")
 MAX_SNAPSHOT_BYTES = 3 * 1024 * 1024
 
 
-def _recompute(db, session: ExamSession) -> tuple[float, bool, bool]:
+def _recompute(db, session: ExamSession) -> SuspicionOutcome:
     """Thin alias kept so this module reads on its own; the logic is shared with the
     WebSocket transport in :mod:`app.services.proctor_ingest`."""
     return proctor_ingest.recompute(db, session)
@@ -159,9 +164,10 @@ async def proctor_socket(
             db.refresh(session)
 
             await websocket.send_json(outcome.model_dump(mode="json"))
-            if outcome.terminated:
+            if outcome.terminated or outcome.auto_submitted:
                 await websocket.close(
-                    code=status.WS_1000_NORMAL_CLOSURE, reason="Session terminated"
+                    code=status.WS_1000_NORMAL_CLOSURE,
+                    reason="Session submitted" if outcome.auto_submitted else "Session terminated",
                 )
                 return
 
@@ -261,6 +267,7 @@ def list_monitored_sessions(
             submitted_at=s.submitted_at,
             suspicion_score=s.suspicion_score,
             tab_switch_count=s.tab_switch_count,
+            focus_violation_count=s.focus_violation_count,
             is_flagged=s.is_flagged,
             termination_reason=s.termination_reason,
             breakdown={},
@@ -300,6 +307,7 @@ def review_session(session_id: uuid.UUID, staff: CurrentStaff, db: DbSession) ->
         submitted_at=session.submitted_at,
         suspicion_score=session.suspicion_score,
         tab_switch_count=session.tab_switch_count,
+        focus_violation_count=session.focus_violation_count,
         is_flagged=session.is_flagged,
         termination_reason=session.termination_reason,
         integrity_verdict=session.integrity_verdict,

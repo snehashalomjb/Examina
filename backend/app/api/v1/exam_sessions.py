@@ -574,10 +574,20 @@ def heartbeat(session_id: uuid.UUID, session: ActiveExamSession, db: DbSession) 
             expires_at=session.expires_at.replace(tzinfo=session.expires_at.tzinfo or UTC),
         )
 
+    # The ladder's remaining count comes from the server on every beat, so a candidate
+    # who reloads the page - or clears their storage - does not get a fresh set of
+    # warnings. The count lives with the events, not with the browser.
+    max_focus = int(session.exam.proctor_config.get("max_focus_violations", 3))
+    violations_left = (
+        max(max_focus - session.focus_violation_count, 0) if max_focus > 0 else -1
+    )
+
     return HeartbeatOut(
         server_time=exam_engine.now(),
         seconds_remaining=exam_engine.seconds_remaining(session),
         status=session.status,
+        focus_violation_count=session.focus_violation_count,
+        focus_violations_left=violations_left,
         suspicion_score=session.suspicion_score,
         warnings=warnings,
         exam_token=token,

@@ -17,6 +17,18 @@ from app.db.models import DEFAULT_PROCTOR_CONFIG, ProctorEvent, ProctorEventType
 REPEAT_DECAY = 0.75
 MIN_MULTIPLIER = 0.25
 
+#: Leaving the exam window. Counted on its own ladder rather than through the suspicion
+#: score, which blends noisy vision signals - a webcam that flickers must never submit
+#: somebody's paper, but switching away from the exam is deliberate and unmistakable.
+#:
+#: ``window_blur`` is deliberately not here. It fires when a notification steals focus,
+#: when an on-screen keyboard opens, and on some window managers when nothing happened at
+#: all, so counting it towards an auto-submit would end honest sittings.
+FOCUS_VIOLATION_TYPES = {
+    ProctorEventType.TAB_SWITCH,
+    ProctorEventType.FULLSCREEN_EXIT,
+}
+
 SEVERITY_MULTIPLIER = {
     ProctorSeverity.INFO: 0.5,
     ProctorSeverity.WARNING: 1.0,
@@ -28,8 +40,16 @@ SEVERITY_MULTIPLIER = {
 class SuspicionOutcome:
     score: float
     tab_switch_count: int
+    #: Tab switches plus fullscreen exits - every time the candidate left the exam.
+    focus_violation_count: int
     should_flag: bool
     should_terminate: bool
+    #: The focus ladder ran out. The paper is submitted and marked normally - this is
+    #: not a verdict on the candidate, and deciding that stays the examiner's job.
+    should_auto_submit: bool
+    #: How many more times the candidate may leave before their paper is submitted.
+    #: -1 when the ladder is switched off, which is not the same as 0.
+    focus_violations_left: int
     breakdown: dict[str, float]
 
 
@@ -47,6 +67,7 @@ def score_events(
     breakdown: dict[str, float] = {}
     total = 0.0
     tab_switches = 0
+    focus_violations = 0
 
     for event in sorted(events, key=lambda e: e.occurred_at):
         key = event.event_type.value
@@ -62,17 +83,30 @@ def score_events(
 
         if event.event_type is ProctorEventType.TAB_SWITCH:
             tab_switches += 1
+        if event.event_type in FOCUS_VIOLATION_TYPES:
+            focus_violations += 1
 
     total = round(total, 2)
     max_tab_switches = int(config.get("max_tab_switches", 3))
     flag_at = float(config.get("flag_on_score", 45.0))
     terminate_at = float(config.get("terminate_on_score", 100.0))
+    max_focus = int(config.get("max_focus_violations", 3))
 
+    # 0 turns the ladder off: the events still score and still flag, but nobody's paper
+    # is submitted for them. An examiner running an open-book take-home wants that.
+    ladder_on = max_focus > 0
     return SuspicionOutcome(
         score=total,
         tab_switch_count=tab_switches,
-        should_flag=total >= flag_at or tab_switches > max_tab_switches,
+        focus_violation_count=focus_violations,
+        should_flag=(
+            total >= flag_at
+            or tab_switches > max_tab_switches
+            or (ladder_on and focus_violations >= max_focus)
+        ),
         should_terminate=total >= terminate_at,
+        should_auto_submit=ladder_on and focus_violations >= max_focus,
+        focus_violations_left=max(max_focus - focus_violations, 0) if ladder_on else -1,
         breakdown=breakdown,
     )
 
