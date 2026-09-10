@@ -67,6 +67,15 @@ export type QuestionCategory =
 
 export type QuestionStatus = "draft" | "published" | "archived";
 
+/** How a question came to exist. Provenance, not permission. */
+export type QuestionSource = "manual" | "ai_generated" | "imported";
+
+export const QUESTION_SOURCE_LABEL: Record<QuestionSource, string> = {
+  manual: "Written by hand",
+  ai_generated: "AI generated",
+  imported: "Imported",
+};
+
 export type ExamType = "academic" | "corporate";
 
 export type ShortlistStatus = "shortlisted" | "rejected" | "on_hold";
@@ -249,6 +258,12 @@ export interface Question {
   max_words: number | null;
   tags: string[] | null;
   is_active: boolean;
+  source: QuestionSource;
+  created_by_id?: string | null;
+  created_by_name?: string | null;
+  subject_code?: string | null;
+  /** True when the question is private to one exam rather than shelved in the bank. */
+  exam_only?: boolean;
   image_key?: string | null;
   image_url?: string | null;
   /** Set on a child question to attach it to its passage. */
@@ -261,6 +276,46 @@ export interface Question {
   /** Examiner view only - for numerical and fill_blank this IS the answer key. */
   spec?: QuestionSpec | null;
   options: Option[];
+}
+
+// ------------------------------------------------------- the exam question pool
+//
+// "Pool" and "paper" stay different words on purpose. The pool is everything an exam
+// may draw from; the paper is the subset one candidate sits.
+
+export interface PoolEntry {
+  question_id: string;
+  order_index: number;
+  /** Per-exam marks override. Null means "use the question's own marks". */
+  marks_override: number | null;
+  effective_marks: number;
+  body: string;
+  question_type: QuestionType;
+  difficulty: Difficulty;
+  category: QuestionCategory;
+  topic: string | null;
+  source: QuestionSource;
+  exam_only: boolean;
+  created_by_name: string | null;
+  option_count: number;
+  has_answer_key: boolean;
+}
+
+export interface PoolStats {
+  total_questions: number;
+  total_marks: number;
+  by_type: Record<string, number>;
+  by_difficulty: Record<string, number>;
+}
+
+export interface ExamPool {
+  exam_id: string;
+  entries: PoolEntry[];
+  stats: PoolStats;
+  /** How many questions the selection rules put on one candidate's paper. */
+  required_count: number;
+  can_publish: boolean;
+  problems: string[];
 }
 
 /** What the image upload endpoint returns. */

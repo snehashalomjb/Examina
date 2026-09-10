@@ -12,6 +12,7 @@ from app.api.v1 import (
     grading,
     login_requests,
     proctor,
+    question_import,
     questions,
     recruitment,
     results,
@@ -31,6 +32,7 @@ api_router.include_router(grading.router)
 api_router.include_router(results.router)
 api_router.include_router(recruitment.router)
 api_router.include_router(ai_questions.router)
+api_router.include_router(question_import.router)
 api_router.include_router(analytics.router)
 
 __all__ = ["api_router"]

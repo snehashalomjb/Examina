@@ -11,11 +11,21 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.deps import CurrentStaff, DbSession
 from app.core.logging_config import get_logger
-from app.db.models import AiQuestionDraft, DraftStatus, Question, QuestionOption, Subject
+from app.db.models import (
+    AiQuestionDraft,
+    DraftStatus,
+    Exam,
+    ExamQuestion,
+    Question,
+    QuestionOption,
+    QuestionSource,
+    Subject,
+    UserRole,
+)
 from app.db.models.enums import Difficulty, QuestionCategory, QuestionType
 from app.schemas.ai_gen import (
     AiDraftApprove,
@@ -23,6 +33,7 @@ from app.schemas.ai_gen import (
     AiDraftReject,
     AiGenerateRequest,
     AiPdfImportOut,
+    AiRegenerateRequest,
 )
 from app.services.ai_generator import generate_questions
 from app.services.pdf_extract import PdfError, extract_pdf_text
@@ -34,6 +45,18 @@ logger = get_logger("ai_questions")
 
 def _draft_out(draft: AiQuestionDraft) -> AiDraftOut:
     return AiDraftOut.model_validate(draft)
+
+
+def _compose_instructions(payload: AiGenerateRequest) -> str | None:
+    """Fold the language choice into the free-text instructions.
+
+    Kept out of the generator's signature: "write in Tamil" is an instruction like any
+    other, and threading a language parameter through every provider would buy nothing.
+    """
+    parts = [payload.extra_instructions] if payload.extra_instructions else []
+    if payload.language:
+        parts.append(f"Write every question and option in {payload.language}.")
+    return " ".join(parts) or None
 
 
 # ----------------------------------------------------------------- generate
@@ -55,33 +78,37 @@ def ai_generate(
     if payload.subject_id and db.get(Subject, payload.subject_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
-    raw_drafts = generate_questions(
-        category=payload.category,
-        topic=payload.topic,
-        difficulty=payload.difficulty,
-        question_type=payload.question_type,
-        count=payload.count,
-        extra_instructions=payload.extra_instructions,
-    )
-
     saved: list[AiQuestionDraft] = []
-    for item in raw_drafts:
-        draft = AiQuestionDraft(
-            subject_id=payload.subject_id,
+    for question_type, share in payload.type_plan():
+        raw_drafts = generate_questions(
             category=payload.category,
             topic=payload.topic,
             difficulty=payload.difficulty,
-            question_type=payload.question_type,
-            payload=item.get("payload", {}),
-            original_payload=item.get("payload", {}),
-            provider=item.get("provider", "stub"),
-            model=item.get("model"),
-            error=item.get("error"),
-            status=DraftStatus.PENDING,
-            requested_by_id=staff.id,
+            question_type=question_type,
+            count=share,
+            extra_instructions=_compose_instructions(payload),
+            source_text=payload.syllabus,
         )
-        db.add(draft)
-        saved.append(draft)
+        for item in raw_drafts:
+            body = dict(item.get("payload", {}))
+            if payload.marks_per_question is not None:
+                body["marks"] = payload.marks_per_question
+            draft = AiQuestionDraft(
+                subject_id=payload.subject_id,
+                category=payload.category,
+                topic=payload.topic,
+                difficulty=payload.difficulty,
+                question_type=question_type,
+                payload=body,
+                original_payload=body,
+                provider=item.get("provider", "stub"),
+                model=item.get("model"),
+                error=item.get("error"),
+                status=DraftStatus.PENDING,
+                requested_by_id=staff.id,
+            )
+            db.add(draft)
+            saved.append(draft)
 
     db.flush()
     for d in saved:
@@ -265,6 +292,13 @@ def approve_draft(
             detail=f"Draft is already {draft.status.value}",
         )
 
+    exam = _resolve_exam(db, staff, payload.exam_id)
+    if exam is not None and draft.subject_id not in (None, exam.subject_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This draft was generated for a different subject",
+        )
+
     p = payload.payload
     try:
         options_raw = p.get("options", [])
@@ -303,6 +337,10 @@ def approve_draft(
         marks=p.get("marks", 1.0),
         negative_marks=p.get("negative_marks", 0.0),
         tags=p.get("tags"),
+        # The examiner approved it, but a model wrote it. Recording that is what lets
+        # the bank browser show an "AI generated" shelf honestly a year from now.
+        source=QuestionSource.AI_GENERATED,
+        origin_exam_id=(exam.id if exam is not None and not payload.save_to_bank else None),
         created_by_id=staff.id,
     )
     for i, opt in enumerate(options_raw):
@@ -314,8 +352,26 @@ def approve_draft(
             )
         )
 
+    if exam is not None and question.subject_id is None:
+        # A draft generated without a subject still has to belong to one to enter a
+        # pool; the exam's own subject is the only defensible answer.
+        question.subject_id = exam.subject_id
+
     db.add(question)
     db.flush()
+
+    if exam is not None:
+        next_index = db.scalar(
+            select(func.coalesce(func.max(ExamQuestion.order_index), -1)).where(
+                ExamQuestion.exam_id == exam.id
+            )
+        )
+        db.add(
+            ExamQuestion(
+                exam_id=exam.id, question_id=question.id, order_index=(next_index or -1) + 1
+            )
+        )
+        db.flush()
 
     draft.payload = payload.payload
     draft.status = DraftStatus.APPROVED
@@ -329,6 +385,86 @@ def approve_draft(
         "%s approved AI draft %s → question %s", staff.email, draft_id, question.id
     )
     return _draft_out(draft)
+
+
+def _resolve_exam(db, staff, exam_id: uuid.UUID | None) -> Exam | None:
+    """The exam an approved draft is being added to, if any."""
+    if exam_id is None:
+        return None
+    exam = db.get(Exam, exam_id)
+    if exam is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    if staff.role is not UserRole.ADMIN and exam.created_by_id != staff.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only add questions to an exam you created",
+        )
+    return exam
+
+
+@router.post(
+    "/questions/ai-drafts/{draft_id}/regenerate",
+    response_model=AiDraftOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def regenerate_draft(
+    draft_id: uuid.UUID,
+    payload: AiRegenerateRequest,
+    staff: CurrentStaff,
+    db: DbSession,
+) -> AiDraftOut:
+    """Ask for another attempt at one draft, on the same subject, topic and type.
+
+    The first attempt is rejected rather than overwritten. An examiner who regenerates
+    four times should be able to see all four attempts and what they said was wrong
+    with each - that record is the difference between reviewing a model and trusting it.
+    """
+    draft = db.get(AiQuestionDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Draft not found")
+    if draft.status is DraftStatus.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This draft is already a question. Edit the question instead.",
+        )
+
+    instructions = payload.feedback or "Write a different question on the same material."
+    generated = generate_questions(
+        category=draft.category,
+        topic=draft.topic,
+        difficulty=payload.difficulty or draft.difficulty,
+        question_type=draft.question_type,
+        count=1,
+        extra_instructions=instructions,
+    )
+    item = generated[0] if generated else {"payload": {}, "provider": "stub"}
+
+    replacement = AiQuestionDraft(
+        subject_id=draft.subject_id,
+        category=draft.category,
+        topic=draft.topic,
+        difficulty=payload.difficulty or draft.difficulty,
+        question_type=draft.question_type,
+        payload=item.get("payload", {}),
+        original_payload=item.get("payload", {}),
+        provider=item.get("provider", "stub"),
+        model=item.get("model"),
+        error=item.get("error"),
+        status=DraftStatus.PENDING,
+        requested_by_id=staff.id,
+    )
+    db.add(replacement)
+
+    if draft.status is DraftStatus.PENDING:
+        draft.status = DraftStatus.REJECTED
+        draft.reject_reason = payload.feedback or "Regenerated"
+        draft.reviewed_by_id = staff.id
+        draft.reviewed_at = datetime.now(UTC)
+
+    db.flush()
+    db.refresh(replacement)
+    logger.info("%s regenerated AI draft %s", staff.email, draft_id)
+    return _draft_out(replacement)
 
 
 # ------------------------------------------------------------------- reject
