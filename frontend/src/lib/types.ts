@@ -485,6 +485,55 @@ export interface AiDraft {
   created_at: string;
 }
 
+// ------------------------------------------------------------ question import
+
+export interface ImportedOption {
+  text: string;
+  is_correct: boolean;
+}
+
+/** One parsed row, with everything wrong with it attached. */
+export interface ImportedRow {
+  /** 1-based including the header, so it matches the row number in Excel. */
+  row_number: number;
+  body: string;
+  question_type: QuestionType;
+  difficulty: Difficulty;
+  category: QuestionCategory;
+  topic: string | null;
+  marks: number;
+  negative_marks: number;
+  model_answer: string | null;
+  explanation: string | null;
+  tags: string[];
+  min_words: number | null;
+  max_words: number | null;
+  spec: Record<string, unknown> | null;
+  options: ImportedOption[];
+  /** Empty means the row passes the same validation the authoring form applies. */
+  problems: string[];
+  /** Where an identical question already exists — an earlier row, or the bank. */
+  duplicate_of: string | null;
+  /** Client-side only: whether the examiner has this row ticked for import. */
+  save_to_bank?: boolean;
+}
+
+export interface ImportParseResult {
+  filename: string;
+  total: number;
+  valid: number;
+  invalid: number;
+  duplicates: number;
+  rows: ImportedRow[];
+}
+
+export interface ImportResult {
+  created: number;
+  failed: number;
+  errors: { row_number?: number; error: string }[];
+  question_ids: string[];
+}
+
 // ---------------------------------------------------------------- analytics
 
 export interface TopicPerformance {

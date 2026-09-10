@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { AIGenerator } from "@/components/AIGenerator";
 import { ExamCategoryCard, ExamCategoryType } from "@/components/ExamCategoryCard";
 import { Hero } from "@/components/Hero";
+import { QuestionBankSelector } from "@/components/QuestionBankSelector";
+import { QuestionEditor } from "@/components/QuestionEditor";
+import { QuestionImporter } from "@/components/QuestionImporter";
+import { QuestionPool } from "@/components/QuestionPool";
 import {
   Alert,
   Badge,
@@ -13,6 +18,7 @@ import {
   Card,
   Field,
   Input,
+  Modal,
   Select,
   Textarea,
   cx,
@@ -22,6 +28,7 @@ import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type {
   Difficulty,
+  ExamPool,
   ExamType,
   Question,
   QuestionCategory,
@@ -461,6 +468,11 @@ export default function CreateExamWizard() {
   const [companyName, setCompanyName] = useState("");
   const [jobRole, setJobRole] = useState("");
 
+  // Randomisation. The pool and the paper are different things: the pool is every
+  // question the exam may draw from, the paper is what one candidate sits.
+  const [randomize, setRandomize] = useState(true);
+  const [shuffleOptions, setShuffleOptions] = useState(true);
+
   // Step 4: Sections & Rules
   const [sections, setSections] = useState<
     Array<{
@@ -468,21 +480,37 @@ export default function CreateExamWizard() {
       description: string;
       duration_minutes: number | null;
       marks_per_question: number | null;
+      negative_marks: number | null;
       rules: SelectionRule[];
     }>
   >([]);
 
-  // Step 5: Question Pool selection
+  // Step 5: the question pool.
+  //
+  // The pool lives on the server rather than in this component's state, because three
+  // of the four ways to fill it - authoring, AI approval, file import - create real
+  // questions that have to belong to a real exam. So the wizard saves a draft on the
+  // way into this step and edits the pool in place from there.
+  const [examId, setExamId] = useState<string | null>(null);
+  const [pool, setPool] = useState<ExamPool | null>(null);
+  const [poolTab, setPoolTab] = useState<"create" | "bank" | "ai" | "import">("bank");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  const [questionSearch, setQuestionSearch] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
 
-  // Step 6: Proctoring
+  // Step 6: Proctoring. AI detects and flags; the examiner rules on it afterwards.
+  // Nothing configured here fails a candidate on its own.
   const [proctorWebcam, setProctorWebcam] = useState(true);
   const [proctorGaze, setProctorGaze] = useState(true);
   const [proctorFullscreen, setProctorFullscreen] = useState(true);
   const [proctorBlockCopyPaste, setProctorBlockCopyPaste] = useState(true);
+  const [proctorMicrophone, setProctorMicrophone] = useState(true);
+  const [proctorSingleDisplay, setProctorSingleDisplay] = useState(true);
+  const [gazeSensitivity, setGazeSensitivity] = useState(0.6);
+  const [maxTabSwitches, setMaxTabSwitches] = useState(3);
+  const [flagOnScore, setFlagOnScore] = useState(45);
+  const [terminateOnScore, setTerminateOnScore] = useState(100);
+  const [snapshotInterval, setSnapshotInterval] = useState(60);
 
   // Current wizard step: 1..6
   const [step, setStep] = useState(1);
@@ -533,53 +561,17 @@ export default function CreateExamWizard() {
       setJobRole(p.default_role || "");
     }
 
-    setSections(p.sections.map((s) => ({ ...s, marks_per_question: s.marks_per_question })));
-
-    // Auto-select matching questions from question bank
-    const requiredRules = p.sections.flatMap((s) => s.rules);
-    const poolIds: string[] = [];
-    allQuestions.forEach((q) => {
-      const match = requiredRules.some(
-        (r) =>
-          r.question_type === q.question_type &&
-          (!r.category || r.category === q.category) &&
-          (!r.difficulty || r.difficulty === q.difficulty)
-      );
-      if (match && poolIds.length < 25) {
-        poolIds.push(q.id);
-      }
-    });
-    setSelectedQuestionIds(poolIds);
-  }
-
-  // Toggle single question in pool
-  function toggleQuestion(id: string) {
-    setSelectedQuestionIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    setSections(
+      p.sections.map((section) => ({
+        ...section,
+        marks_per_question: section.marks_per_question,
+        negative_marks: null,
+      })),
     );
+    // A template pre-fills configuration only. It deliberately does not guess at
+    // questions: an exam quietly stuffed with 25 loosely-matching questions is worse
+    // than an empty pool, because the examiner has no reason to look at it.
   }
-
-  // Select all matching questions
-  function selectAllMatching() {
-    const matched = filteredQuestions.map((q) => q.id);
-    setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...matched])));
-  }
-
-  const filteredQuestions = allQuestions.filter((q) => {
-    if (subjectId && q.subject_id !== subjectId && category === "academic") {
-      // allow flexible viewing
-    }
-    if (filterType !== "all" && q.question_type !== filterType) return false;
-    if (questionSearch) {
-      const s = questionSearch.toLowerCase();
-      return (
-        q.body.toLowerCase().includes(s) ||
-        (q.topic && q.topic.toLowerCase().includes(s)) ||
-        q.category.toLowerCase().includes(s)
-      );
-    }
-    return true;
-  });
 
   // Calculate total questions needed from all section rules
   const totalQuestionsNeeded = sections.reduce(
@@ -587,94 +579,202 @@ export default function CreateExamWizard() {
     0
   );
 
-  async function handleCreateExam() {
-    if (!title.trim()) {
-      toast("Please enter an exam title", "rose");
-      setStep(3);
-      return;
-    }
-    if (!subjectId) {
-      toast("Please select a subject", "rose");
-      setStep(3);
-      return;
-    }
-    if (sections.length === 0) {
-      toast("Please configure at least one section with selection rules", "rose");
-      setStep(4);
-      return;
-    }
+  /** Everything the exam endpoints take, built from the wizard's state. */
+  function buildPayload(): Record<string, unknown> {
+    const combinedRules: SelectionRule[] = sections.flatMap((sec) => sec.rules);
 
-    setSubmitting(true);
-    try {
-      // Combine all rules for the main selection_rules payload
-      const combinedRules: SelectionRule[] = [];
-      sections.forEach((sec) => {
-        sec.rules.forEach((r) => combinedRules.push(r));
-      });
-
-      // Prepare API payload matching ExamCreate
-      const payload: Record<string, unknown> = {
-        exam_type: category,
-        subject_id: subjectId,
-        title: title.trim(),
-        description: description.trim() || null,
-        instructions: instructions.trim() || null,
-        duration_minutes: Number(durationMinutes),
-        starts_at: new Date(startsAt).toISOString(),
-        ends_at: new Date(endsAt).toISOString(),
-        selection_rules: { rules: combinedRules.length > 0 ? combinedRules : [{ question_type: "mcq", difficulty: "medium", count: 5 }] },
-        randomize: true,
-        shuffle_options: true,
-        negative_marking: negativeMarking,
-        passing_percentage: passingPercentage ? Number(passingPercentage) : null,
-        declared_total_marks: declaredTotalMarks ? Number(declaredTotalMarks) : null,
-        max_attempts: maxAttempts,
-        difficulty: difficulty || null,
-        question_ids: selectedQuestionIds,
-        proctor_config: {
-          webcam_enabled: proctorWebcam,
-          gaze_tracking_enabled: proctorGaze,
-          require_fullscreen: proctorFullscreen,
-          block_copy_paste: proctorBlockCopyPaste,
-          gaze_sensitivity: 0.6,
-          max_tab_switches: 3,
-          flag_on_score: 45.0,
-          terminate_on_score: 100.0,
-          snapshot_interval_seconds: 60,
-        },
-        grading_config: {
-          auto_publish_results: category === "academic" && selectedPatternId === "acad-speedquiz",
-        },
-      };
-
-      // Mode-specific fields
-      if (category === "academic") {
-        payload.course = course.trim() || null;
-        payload.department = department.trim() || null;
-        payload.semester = semester.trim() || null;
-      } else {
-        payload.company_name = companyName.trim() || null;
-        payload.job_role = jobRole.trim() || null;
-      }
-
-      // Sections array
-      payload.sections = sections.map((sec, idx) => ({
+    const payload: Record<string, unknown> = {
+      exam_type: category,
+      subject_id: subjectId,
+      title: title.trim(),
+      description: description.trim() || null,
+      instructions: instructions.trim() || null,
+      duration_minutes: Number(durationMinutes),
+      starts_at: new Date(startsAt).toISOString(),
+      ends_at: new Date(endsAt).toISOString(),
+      selection_rules: {
+        rules: combinedRules.length
+          ? combinedRules
+          : [{ question_type: "mcq", difficulty: "medium", count: 5 }],
+      },
+      randomize,
+      shuffle_options: shuffleOptions,
+      negative_marking: negativeMarking,
+      passing_percentage: passingPercentage ? Number(passingPercentage) : null,
+      declared_total_marks: declaredTotalMarks ? Number(declaredTotalMarks) : null,
+      max_attempts: maxAttempts,
+      difficulty: difficulty || null,
+      proctor_config: {
+        webcam_enabled: proctorWebcam,
+        gaze_tracking_enabled: proctorGaze,
+        require_fullscreen: proctorFullscreen,
+        block_copy_paste: proctorBlockCopyPaste,
+        gaze_sensitivity: gazeSensitivity,
+        max_tab_switches: maxTabSwitches,
+        flag_on_score: flagOnScore,
+        terminate_on_score: Math.max(flagOnScore + 1, terminateOnScore),
+        snapshot_interval_seconds: snapshotInterval,
+        require_microphone: proctorMicrophone,
+        require_single_display: proctorSingleDisplay,
+      },
+      grading_config: { auto_publish_results: false },
+      sections: sections.map((sec, idx) => ({
         name: sec.name,
         description: sec.description || null,
         order_index: idx,
         selection_rules: { rules: sec.rules },
         marks_per_question: sec.marks_per_question || null,
+        negative_marks: sec.negative_marks ?? null,
         duration_minutes: sec.duration_minutes || null,
-      }));
+      })),
+    };
 
-      const created = await api.post<{ id: string; title: string }>("/exams", payload);
-      toast(`Exam "${title}" created successfully!`, "mint");
-      router.push(`/dashboard/exams`);
+    if (category === "academic") {
+      payload.course = course.trim() || null;
+      payload.department = department.trim() || null;
+      payload.semester = semester.trim() || null;
+    } else {
+      payload.company_name = companyName.trim() || null;
+      payload.job_role = jobRole.trim() || null;
+    }
+    return payload;
+  }
+
+  /** What stops this exam being publishable, in the examiner's words. */
+  function configurationProblems(): string[] {
+    const found: string[] = [];
+    if (!title.trim()) found.push("The exam needs a title.");
+    if (!subjectId) found.push("Pick the subject this exam belongs to.");
+    if (!startsAt || !endsAt) found.push("Set when the exam opens and closes.");
+    else if (new Date(endsAt) <= new Date(startsAt)) {
+      found.push("The exam window must end after it starts.");
+    } else {
+      const windowMinutes =
+        (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000;
+      if (durationMinutes > windowMinutes) {
+        found.push(
+          `The ${durationMinutes}-minute duration is longer than the exam window.`,
+        );
+      }
+    }
+    if (sections.length === 0) found.push("Add at least one section with selection rules.");
+    if (sections.some((sec) => sec.rules.length === 0)) {
+      found.push("Every section needs at least one selection rule.");
+    }
+    if (!sections.some((sec) => sec.name.trim())) found.push("Sections need names.");
+    return found;
+  }
+
+  /**
+   * Create the draft on first call, update it thereafter.
+   *
+   * Saving before the pool step is what makes authoring, AI approval and file import
+   * possible there - all three create questions that must belong to an exam. The exam
+   * is a draft throughout, and a draft is invisible to candidates.
+   */
+  const saveDraft = useCallback(
+    async (options?: { quiet?: boolean }): Promise<string | null> => {
+      const problems = configurationProblems();
+      if (problems.length) {
+        toast(problems[0], "rose");
+        if (!title.trim() || !subjectId || !startsAt) setStep(3);
+        else setStep(4);
+        return null;
+      }
+
+      setSavingDraft(true);
+      try {
+        const payload = buildPayload();
+        if (examId) {
+          await api.patch(`/exams/${examId}`, payload);
+          if (!options?.quiet) toast("Draft saved", "mint");
+          return examId;
+        }
+        const created = await api.post<{ id: string }>("/exams", {
+          ...payload,
+          question_ids: [],
+        });
+        setExamId(created.id);
+        if (!options?.quiet) toast("Draft saved — now build the question pool", "mint");
+        return created.id;
+      } catch (err) {
+        toast(
+          err instanceof ApiError
+            ? err.problems?.length
+              ? `${err.message}: ${err.problems.join(", ")}`
+              : err.message
+            : "Could not save the draft.",
+          "rose",
+        );
+        return null;
+      } finally {
+        setSavingDraft(false);
+      }
+    },
+    // buildPayload and configurationProblems read the whole form, so this is
+    // deliberately recreated on every render rather than pretending to a dep list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [examId, title, subjectId, startsAt, endsAt, durationMinutes, sections],
+  );
+
+  const refreshPool = useCallback(async (id: string) => {
+    try {
+      setPool(await api.get<ExamPool>(`/exams/${id}/pool`));
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not load the pool.", "rose");
+    }
+  }, []);
+
+  /** Save the draft, then move to the pool step with a live pool loaded. */
+  async function goToPool() {
+    const id = await saveDraft({ quiet: Boolean(examId) });
+    if (!id) return;
+    await refreshPool(id);
+    setStep(5);
+  }
+
+  async function addFromBank(questionIds: string[]) {
+    if (!examId) return;
+    try {
+      setPool(
+        await api.post<ExamPool>(`/exams/${examId}/questions`, { question_ids: questionIds }),
+      );
+      toast(`${questionIds.length} question(s) added`, "mint");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not add those questions.", "rose");
+    }
+  }
+
+  async function duplicateIntoExam(question: Question) {
+    if (!examId) return;
+    try {
+      await api.post(`/questions/${question.id}/duplicate`, { exam_id: examId });
+      await refreshPool(examId);
+      toast("Copied into this exam", "mint");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not duplicate that.", "rose");
+    }
+  }
+
+  async function publishExam() {
+    const id = await saveDraft({ quiet: true });
+    if (!id) return;
+
+    setSubmitting(true);
+    try {
+      await api.post(`/exams/${id}/publish`);
+      toast(`"${title}" is published`, "mint");
+      router.push("/dashboard/exams");
     } catch (err) {
       if (err instanceof ApiError) {
-        toast(err.problems?.length ? `${err.message}: ${err.problems.join(", ")}` : err.message, "rose");
+        toast(
+          err.problems?.length ? `${err.message}: ${err.problems.join(", ")}` : err.message,
+          "rose",
+        );
+        await refreshPool(id);
+        setStep(5);
       } else {
-        toast("Failed to create exam", "rose");
+        toast("Could not publish the exam.", "rose");
       }
     } finally {
       setSubmitting(false);
@@ -1060,9 +1160,12 @@ export default function CreateExamWizard() {
               />
             </Field>
 
-            <Field label="Number of Questions">
+            <Field
+              label="Questions per candidate"
+              hint="Calculated from the section rules — never typed, so it cannot contradict them."
+            >
               <div className="flex h-[38px] items-center rounded-[10px] border border-line bg-sunken px-3 text-[13px] font-semibold text-ink">
-                {totalQuestionsNeeded || selectedQuestionIds.length}
+                {totalQuestionsNeeded || "Set by your sections"}
               </div>
             </Field>
           </div>
@@ -1125,6 +1228,7 @@ export default function CreateExamWizard() {
                     description: "",
                     duration_minutes: null,
                     marks_per_question: 2,
+                    negative_marks: null,
                     rules: [{ question_type: "mcq", difficulty: "medium", count: 5 }],
                   },
                 ]);
@@ -1146,6 +1250,7 @@ export default function CreateExamWizard() {
                       description: "Main exam questions",
                       duration_minutes: null,
                       marks_per_question: 2,
+                      negative_marks: null,
                       rules: [{ question_type: "mcq", difficulty: "medium", count: 5 }],
                     },
                   ]);
@@ -1349,233 +1454,507 @@ export default function CreateExamWizard() {
             <Button variant="secondary" onClick={() => setStep(3)}>
               ← Back to Details
             </Button>
-            <Button onClick={() => setStep(5)}>Next: Select Question Pool →</Button>
+            <Button loading={savingDraft} onClick={() => void goToPool()}>
+              {examId ? "Next: Build Question Pool →" : "Save draft & build the pool →"}
+            </Button>
           </div>
         </div>
       )}
 
       {/* STEP 5: QUESTION POOL SELECTION */}
+      {/* STEP 5: BUILD QUESTION POOL — four sources, one pool */}
       {step === 5 && (
-        <Card className="space-y-4 animate-fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-ink">Select Questions from Bank</h2>
-              <p className="text-xs text-ink-muted">
-                Bind questions to your exam pool. Your rules will draw dynamically from this selected pool.
+              <h2 className="text-xl font-bold text-ink">Build Question Pool</h2>
+              <p className="text-sm text-ink-muted mt-0.5">
+                Write questions yourself, reuse the bank, generate a set with AI, or
+                import a file. Use as many of the four as you like.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge tone={selectedQuestionIds.length >= totalQuestionsNeeded ? "mint" : "amber"}>
-                {selectedQuestionIds.length} Selected (Needs at least {totalQuestionsNeeded})
+              <Badge tone={pool?.can_publish ? "mint" : "amber"}>
+                {pool?.stats.total_questions ?? 0} in the pool ·{" "}
+                {pool?.required_count ?? totalQuestionsNeeded} per paper
               </Badge>
-              <Button size="sm" variant="secondary" onClick={selectAllMatching}>
-                Select All Filtered
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={savingDraft}
+                onClick={() => void saveDraft()}
+              >
+                Save draft
               </Button>
             </div>
           </div>
 
-          {/* Search & Filters */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <div className="flex-1 min-w-[200px]">
-              <Input
-                value={questionSearch}
-                onChange={(e) => setQuestionSearch(e.target.value)}
-                placeholder="Search questions by keyword, topic, or category..."
-              />
-            </div>
-            <Select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="w-44"
-            >
-              <option value="all">All Question Types</option>
-              {Object.entries(TYPE_LABEL).map(([t, label]) => (
-                <option key={t} value={t}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {/* Question List */}
-          <div className="max-h-[400px] overflow-y-auto space-y-2 rounded-xl border border-line bg-sunken/20 p-2">
-            {filteredQuestions.length === 0 ? (
-              <p className="text-center text-xs text-ink-muted py-8">
-                No questions found matching your filter criteria.
-              </p>
-            ) : (
-              filteredQuestions.map((q) => {
-                const isSelected = selectedQuestionIds.includes(q.id);
-                return (
-                  <div
-                    key={q.id}
-                    onClick={() => toggleQuestion(q.id)}
+          {!examId ? (
+            <Alert tone="amber" title="Save the draft first">
+              The pool belongs to an exam, so the exam has to exist before questions can
+              join it. Go back a step and save the draft.
+            </Alert>
+          ) : (
+            <>
+              {/* the four sources */}
+              <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
+                {(
+                  [
+                    { key: "create", label: "+ Create Question" },
+                    { key: "bank", label: "Question Bank" },
+                    { key: "ai", label: "AI Generate" },
+                    { key: "import", label: "Import Questions" },
+                  ] as { key: typeof poolTab; label: string }[]
+                ).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setPoolTab(tab.key)}
                     className={cx(
-                      "flex items-start gap-3 rounded-lg border p-3 text-xs transition-all cursor-pointer",
-                      isSelected
-                        ? "border-accent bg-accent-soft/20 ring-1 ring-accent"
-                        : "border-line bg-surface hover:border-line-strong"
+                      "flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold transition-all",
+                      poolTab === tab.key
+                        ? "bg-accent text-white shadow-sm"
+                        : "text-ink-muted hover:bg-sunken hover:text-ink"
                     )}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleQuestion(q.id)}
-                      className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                    />
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                        <Badge tone="neutral">{TYPE_LABEL[q.question_type]}</Badge>
-                        <Badge tone={q.difficulty === "hard" ? "rose" : q.difficulty === "medium" ? "amber" : "mint"}>
-                          {q.difficulty}
-                        </Badge>
-                        <span className="text-[11px] font-semibold text-ink-muted">
-                          {q.category} {q.topic ? `· ${q.topic}` : ""}
-                        </span>
-                        <span className="ml-auto font-bold text-ink">{q.marks} marks</span>
-                      </div>
-                      <p className="text-ink font-medium line-clamp-2">{q.body}</p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <Card>
+                {poolTab === "create" && (
+                  <QuestionEditor
+                    subjects={subjects}
+                    examId={examId}
+                    lockedSubjectId={subjectId}
+                    stayOpen
+                    onSaved={() => void refreshPool(examId)}
+                  />
+                )}
+
+                {poolTab === "bank" && (
+                  <QuestionBankSelector
+                    subjects={subjects}
+                    subjectId={subjectId}
+                    alreadyIn={(pool?.entries ?? []).map((e) => e.question_id)}
+                    onAdd={addFromBank}
+                    onEdit={setEditingQuestion}
+                    onDuplicate={duplicateIntoExam}
+                    currentUserId={user?.id}
+                    isAdmin={user?.role === "admin"}
+                  />
+                )}
+
+                {poolTab === "ai" && (
+                  <AIGenerator
+                    subjects={subjects}
+                    examId={examId}
+                    subjectId={subjectId}
+                    onApproved={() => void refreshPool(examId)}
+                  />
+                )}
+
+                {poolTab === "import" && (
+                  <QuestionImporter
+                    subjects={subjects}
+                    examId={examId}
+                    subjectId={subjectId}
+                    onImported={() => void refreshPool(examId)}
+                  />
+                )}
+              </Card>
+
+              {/* the pool itself */}
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-ink">Exam Question Pool</h3>
+                  <Badge tone="neutral">
+                    {pool?.stats.total_questions ?? 0} / {pool?.required_count ?? 0} needed
+                  </Badge>
+                </div>
+                <QuestionPool
+                  pool={pool}
+                  reorderable={!randomize}
+                  onReorder={async (ids) => {
+                    setPool(
+                      await api.put<ExamPool>(`/exams/${examId}/questions/order`, {
+                        question_ids: ids,
+                      })
+                    );
+                  }}
+                  onRemove={async (questionId) => {
+                    setPool(
+                      await api.delete<ExamPool>(
+                        `/exams/${examId}/questions/${questionId}`
+                      )
+                    );
+                  }}
+                  onOverrideMarks={async (questionId, marks) => {
+                    setPool(
+                      await api.patch<ExamPool>(
+                        `/exams/${examId}/questions/${questionId}/marks`,
+                        { marks_override: marks }
+                      )
+                    );
+                  }}
+                  onEdit={async (questionId) => {
+                    try {
+                      setEditingQuestion(await api.get<Question>(`/questions/${questionId}`));
+                      setPoolTab("bank");
+                    } catch (err) {
+                      toast(
+                        err instanceof ApiError ? err.message : "Could not open that question.",
+                        "rose"
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </>
+          )}
 
           <div className="flex justify-between pt-4 border-t border-line">
             <Button variant="secondary" onClick={() => setStep(4)}>
               ← Back to Sections
             </Button>
-            <Button onClick={() => setStep(6)}>Next: Review & Proctoring →</Button>
-          </div>
-        </Card>
-      )}
-
-      {/* STEP 6: REVIEW & PROCTORING */}
-      {step === 6 && (
-        <div className="space-y-6 animate-fade-in">
-          <Card className="space-y-4">
-            <div>
-              <h2 className="text-lg font-bold text-ink">AI Proctoring & Integrity Controls</h2>
-              <p className="text-xs text-ink-muted">
-                Configure automated browser proctoring and real-time surveillance settings.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex items-start gap-3 rounded-xl border border-line p-3 cursor-pointer hover:bg-surface-elevated">
-                <input
-                  type="checkbox"
-                  checked={proctorWebcam}
-                  onChange={(e) => setProctorWebcam(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-                <div>
-                  <span className="font-semibold text-xs text-ink">Webcam Face Verification</span>
-                  <p className="text-[11px] text-ink-muted">
-                    Continuous facial presence and multiple-face detection.
-                  </p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-xl border border-line p-3 cursor-pointer hover:bg-surface-elevated">
-                <input
-                  type="checkbox"
-                  checked={proctorGaze}
-                  onChange={(e) => setProctorGaze(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-                <div>
-                  <span className="font-semibold text-xs text-ink">AI Gaze Tracking</span>
-                  <p className="text-[11px] text-ink-muted">
-                    Flags prolonged off-screen looking or abnormal eye movements.
-                  </p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-xl border border-line p-3 cursor-pointer hover:bg-surface-elevated">
-                <input
-                  type="checkbox"
-                  checked={proctorFullscreen}
-                  onChange={(e) => setProctorFullscreen(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-                <div>
-                  <span className="font-semibold text-xs text-ink">Mandatory Fullscreen Mode</span>
-                  <p className="text-[11px] text-ink-muted">
-                    Locks candidate into fullscreen; flags window exit attempts.
-                  </p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-xl border border-line p-3 cursor-pointer hover:bg-surface-elevated">
-                <input
-                  type="checkbox"
-                  checked={proctorBlockCopyPaste}
-                  onChange={(e) => setProctorBlockCopyPaste(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
-                />
-                <div>
-                  <span className="font-semibold text-xs text-ink">Block Copy / Paste & DevTools</span>
-                  <p className="text-[11px] text-ink-muted">
-                    Prevents clipboard copying, pasting, and inspector shortcuts.
-                  </p>
-                </div>
-              </label>
-            </div>
-          </Card>
-
-          {/* Summary Card */}
-          <Card className="space-y-4 border-accent/40 bg-accent-soft/5">
-            <h2 className="text-base font-bold text-ink">Summary Review</h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Mode</dt>
-                <dd className="font-bold text-ink">{category === "academic" ? "Academic" : "Corporate Hiring"}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Duration</dt>
-                <dd className="font-bold text-ink">{durationMinutes} minutes</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Total Marks</dt>
-                <dd className="font-bold text-ink">{declaredTotalMarks || "Auto"}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Passing Threshold</dt>
-                <dd className="font-bold text-ink">{passingPercentage ? `${passingPercentage}%` : "None"}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Sections</dt>
-                <dd className="font-bold text-ink">{sections.length} Section(s)</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Pool Bound</dt>
-                <dd className="font-bold text-ink">{selectedQuestionIds.length} questions</dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Target</dt>
-                <dd className="font-bold text-ink">
-                  {category === "academic" ? course || "Academic Course" : companyName || "Corporate Target"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-ink-muted uppercase text-[10px]">Negative Marking</dt>
-                <dd className="font-bold text-ink">{negativeMarking ? "Enabled" : "Disabled"}</dd>
-              </div>
-            </dl>
-          </Card>
-
-          <div className="flex justify-between pt-4">
-            <Button variant="secondary" onClick={() => setStep(5)}>
-              ← Back to Question Pool
-            </Button>
-            <Button onClick={handleCreateExam} disabled={submitting}>
-              {submitting ? "Creating Exam..." : "✓ Create & Save Exam"}
-            </Button>
+            <Button onClick={() => setStep(6)}>Next: Review & Publish →</Button>
           </div>
         </div>
       )}
+
+      {/* STEP 6: RANDOMISATION, PROCTORING, VALIDATION, PUBLISH */}
+      {step === 6 && (
+        <div className="space-y-6 animate-fade-in">
+          {/* ------------------------------------------------------ randomisation */}
+          <Card className="space-y-4">
+            <div>
+              <h2 className="text-lg font-bold text-ink">Randomisation</h2>
+              <p className="text-xs text-ink-muted">
+                The pool holds {pool?.stats.total_questions ?? 0} questions. Each
+                candidate sits {pool?.required_count ?? totalQuestionsNeeded} of them,
+                drawn by the section rules.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Toggle
+                checked={randomize}
+                onChange={setRandomize}
+                title="Unique paper per candidate"
+                body="Each paper is drawn deterministically from the pool, so two candidates rarely see the same set."
+              />
+              <Toggle
+                checked={shuffleOptions}
+                onChange={setShuffleOptions}
+                title="Shuffle options"
+                body="Option order differs per candidate, so &quot;the answer is C&quot; is not shareable."
+              />
+            </div>
+
+            {!randomize && (
+              <Alert tone="amber">
+                With randomisation off, every candidate sits the pool in the order you
+                arranged it — so the pool must hold exactly what you want asked.
+              </Alert>
+            )}
+          </Card>
+
+          {/* --------------------------------------------------------- proctoring */}
+          <Card className="space-y-4">
+            <div>
+              <h2 className="text-lg font-bold text-ink">Proctoring &amp; Integrity</h2>
+              <p className="text-xs text-ink-muted">
+                These settings decide what gets detected and flagged. They never decide
+                whether a candidate cheated — you rule on the evidence afterwards.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Toggle
+                checked={proctorWebcam}
+                onChange={setProctorWebcam}
+                title="Webcam face verification"
+                body="Continuous facial presence, plus multiple-face detection."
+              />
+              <Toggle
+                checked={proctorGaze}
+                onChange={setProctorGaze}
+                title="Gaze tracking"
+                body="Raises a signal on prolonged off-screen looking."
+              />
+              <Toggle
+                checked={proctorFullscreen}
+                onChange={setProctorFullscreen}
+                title="Fullscreen enforcement"
+                body="Tab switches and window blur are recorded with timestamps."
+              />
+              <Toggle
+                checked={proctorBlockCopyPaste}
+                onChange={setProctorBlockCopyPaste}
+                title="Block copy / paste"
+                body="Clipboard actions inside the runner are refused."
+              />
+              <Toggle
+                checked={proctorMicrophone}
+                onChange={setProctorMicrophone}
+                title="Require a microphone"
+                body="Checked during the pre-flight test, before the timer starts."
+              />
+              <Toggle
+                checked={proctorSingleDisplay}
+                onChange={setProctorSingleDisplay}
+                title="Single display only"
+                body="A second monitor is refused at pre-flight."
+              />
+            </div>
+
+            <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field
+                label="Tab switches before flagging"
+                hint="Earlier switches warn the candidate; this many flags the sitting."
+              >
+                <Input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={maxTabSwitches}
+                  onChange={(e) => setMaxTabSwitches(Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Gaze sensitivity" hint="0 is lenient, 1 is strict.">
+                <Input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={gazeSensitivity}
+                  onChange={(e) => setGazeSensitivity(Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Snapshot interval (seconds)">
+                <Input
+                  type="number"
+                  min="10"
+                  max="600"
+                  step="10"
+                  value={snapshotInterval}
+                  onChange={(e) => setSnapshotInterval(Number(e.target.value))}
+                />
+              </Field>
+              <Field
+                label="Suspicion score that flags"
+                hint="The sitting is marked for your review at this score."
+              >
+                <Input
+                  type="number"
+                  min="1"
+                  value={flagOnScore}
+                  onChange={(e) => setFlagOnScore(Number(e.target.value))}
+                />
+              </Field>
+              <Field
+                label="Suspicion score that ends the sitting"
+                hint="Must be above the flag score. Ending a sitting is not a verdict."
+              >
+                <Input
+                  type="number"
+                  min={flagOnScore + 1}
+                  value={terminateOnScore}
+                  onChange={(e) => setTerminateOnScore(Number(e.target.value))}
+                />
+              </Field>
+            </div>
+
+            <Alert tone="accent">
+              A flagged sitting is still marked. You review the evidence and rule it a
+              genuine attempt or malpractice — and a genuine candidate&apos;s paper is
+              evaluated and published like anyone else&apos;s.
+            </Alert>
+          </Card>
+
+          {/* ------------------------------------------------- review & validation */}
+          <Card className="space-y-4 border-accent/40 bg-accent-soft/5">
+            <h2 className="text-base font-bold text-ink">Review before publishing</h2>
+            <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <Summary label="Mode" value={category === "academic" ? "Academic" : "Corporate"} />
+              <Summary label="Duration" value={`${durationMinutes} minutes`} />
+              <Summary label="Declared marks" value={String(declaredTotalMarks || "Auto")} />
+              <Summary
+                label="Pass mark"
+                value={passingPercentage ? `${passingPercentage}%` : "None declared"}
+              />
+              <Summary label="Sections" value={`${sections.length}`} />
+              <Summary
+                label="Pool"
+                value={`${pool?.stats.total_questions ?? 0} questions · ${pool?.stats.total_marks ?? 0} marks`}
+              />
+              <Summary
+                label="Per candidate"
+                value={`${pool?.required_count ?? totalQuestionsNeeded} questions`}
+              />
+              <Summary label="Negative marking" value={negativeMarking ? "On" : "Off"} />
+              <Summary label="Attempts allowed" value={String(maxAttempts)} />
+              <Summary label="Randomised" value={randomize ? "Per candidate" : "Fixed order"} />
+              <Summary
+                label="Target"
+                value={category === "academic" ? course || "Not set" : companyName || "Not set"}
+              />
+              <Summary label="Status" value={examId ? "Draft saved" : "Not saved yet"} />
+            </dl>
+
+            <ValidationChecklist
+              items={[
+                { label: "Required details completed", ok: Boolean(title.trim() && subjectId) },
+                {
+                  label: "Exam window is valid and fits the duration",
+                  ok: configurationProblems().every((problem) => !problem.includes("window")),
+                },
+                { label: "At least one section with rules", ok: sections.length > 0 },
+                {
+                  label: "Enough questions in the pool for every rule",
+                  ok: Boolean(pool?.can_publish),
+                  detail: pool?.problems.join(" "),
+                },
+                {
+                  label: "Every pooled question has an answer key or model answer",
+                  ok: (pool?.entries ?? []).every((entry) => entry.has_answer_key),
+                  detail: (pool?.entries ?? []).some((entry) => !entry.has_answer_key)
+                    ? "Some pooled questions have nothing to grade against."
+                    : undefined,
+                },
+                {
+                  label: "Proctoring thresholds are consistent",
+                  ok: terminateOnScore > flagOnScore,
+                  detail: "The score that ends a sitting must be above the one that flags it.",
+                },
+              ]}
+            />
+          </Card>
+
+          <div className="flex flex-wrap justify-between gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setStep(5)}>
+              ← Back to the Question Pool
+            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" loading={savingDraft} onClick={() => void saveDraft()}>
+                Save draft
+              </Button>
+              <Button
+                onClick={() => void publishExam()}
+                disabled={submitting || !pool?.can_publish}
+                loading={submitting}
+              >
+                Publish exam
+              </Button>
+            </div>
+          </div>
+
+          {!pool?.can_publish && (
+            <Alert tone="amber" title="Publishing is blocked">
+              {pool?.problems.length
+                ? pool.problems.join(" ")
+                : "Build the question pool first — an exam with no questions cannot be sat."}
+            </Alert>
+          )}
+        </div>
+      )}
+
+      {/* Editing a question, from the bank browser or the pool - same editor either way. */}
+      {editingQuestion && (
+        <Modal open onClose={() => setEditingQuestion(null)} title="Edit question" size="xl">
+          <QuestionEditor
+            subjects={subjects}
+            question={editingQuestion}
+            onCancel={() => setEditingQuestion(null)}
+            onSaved={() => {
+              setEditingQuestion(null);
+              if (examId) void refreshPool(examId);
+            }}
+          />
+        </Modal>
+      )}
+
     </div>
+  );
+}
+
+
+function Toggle({
+  checked,
+  onChange,
+  title,
+  body,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  title: string;
+  body: string;
+}) {
+  return (
+    <label
+      className={cx(
+        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
+        checked ? "border-accent/50 bg-accent-soft/20" : "border-line hover:bg-sunken/40"
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-line text-accent focus:ring-accent"
+      />
+      <span>
+        <span className="text-xs font-semibold text-ink">{title}</span>
+        <span className="mt-0.5 block text-[11px] text-ink-muted">{body}</span>
+      </span>
+    </label>
+  );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] uppercase text-ink-muted">{label}</dt>
+      <dd className="font-bold text-ink">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * Every check, passing or not, with the failing ones explained.
+ *
+ * Showing the passes too is deliberate: six ticks and one cross tells the examiner what
+ * the platform actually verified, where a bare error message leaves them guessing
+ * whether anything else was checked at all.
+ */
+function ValidationChecklist({
+  items,
+}: {
+  items: { label: string; ok: boolean; detail?: string }[];
+}) {
+  return (
+    <ul className="space-y-1.5 border-t border-line pt-4">
+      {items.map((item) => (
+        <li key={item.label} className="flex items-start gap-2 text-xs">
+          <span
+            className={cx(
+              "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+              item.ok ? "bg-mint-soft text-mint" : "bg-amber-soft text-amber-ink"
+            )}
+          >
+            {item.ok ? "✓" : "!"}
+          </span>
+          <span>
+            <span className={item.ok ? "text-ink-soft" : "font-semibold text-ink"}>
+              {item.label}
+            </span>
+            {!item.ok && item.detail && (
+              <span className="mt-0.5 block text-[11px] text-ink-muted">{item.detail}</span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

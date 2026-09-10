@@ -134,6 +134,37 @@ export const api = {
     request<T>(path, { ...options, method: "DELETE" }),
   upload: <T>(path: string, formData: FormData, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "POST", formData }),
+  /**
+   * Save an authenticated endpoint's response to a file.
+   *
+   * A plain `<a download>` cannot carry the bearer token, so a link to a protected
+   * download silently returns a 403 page the browser cheerfully saves as a CSV.
+   */
+  async download(path: string, filename: string): Promise<void> {
+    const token = tokens.access();
+    const response = await fetch(`${BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        /* non-JSON error body */
+      }
+      const { message } = messageFrom(response.status, payload);
+      throw new ApiError(response.status, message);
+    }
+
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  },
 };
 
 /**
