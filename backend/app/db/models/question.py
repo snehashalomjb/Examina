@@ -14,11 +14,13 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.db.models.enums import (
     Difficulty,
     QuestionCategory,
+    QuestionSource,
     QuestionStatus,
     QuestionType,
 )
 
 if TYPE_CHECKING:
+    from app.db.models.exam import Exam
     from app.db.models.user import User
 
 
@@ -109,6 +111,28 @@ class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
+    #: Provenance. Defaults to ``manual`` so the pre-existing bank reads as authored,
+    #: which is what it was - the AI path did not exist when those rows were written.
+    source: Mapped[QuestionSource] = mapped_column(
+        Enum(
+            QuestionSource,
+            name="question_source",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        default=QuestionSource.MANUAL,
+        server_default=QuestionSource.MANUAL.value,
+        nullable=False,
+        index=True,
+    )
+    #: Set when the examiner authored this question *for one exam only* and declined to
+    #: shelve it in the reusable bank. It is a real question either way - stored, graded
+    #: and owned identically - but the bank browser hides it, because an examiner who
+    #: wrote a throwaway variant for one paper did not ask to see it forever after.
+    #: NULL means "in the bank", which is why every existing row is unaffected.
+    origin_exam_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("exams.id", ondelete="CASCADE"), index=True
+    )
+
     #: A passage/case-study question owns child questions; the children carry the marks
     #: and the passage carries none. Self-referential so one table still holds the bank.
     parent_question_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -121,6 +145,7 @@ class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     subject: Mapped[Subject] = relationship(back_populates="questions")
     created_by: Mapped[User | None] = relationship()
+    origin_exam: Mapped[Exam | None] = relationship()
     parent: Mapped[Question | None] = relationship(
         back_populates="children", remote_side="Question.id"
     )

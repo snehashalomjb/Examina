@@ -236,3 +236,70 @@ class PaperPreview(BaseModel):
     candidate_id: uuid.UUID
     total_marks: float
     entries: list[PaperPreviewEntry]
+
+
+# ------------------------------------------------------- the exam question pool
+#
+# "Pool" and "paper" are deliberately different words throughout. The pool is every
+# question an exam may draw from; the paper is the subset one candidate actually sits.
+# Conflating them is how examiners end up thinking a 50-question pool means a
+# 50-question exam.
+
+
+class PoolEntry(BaseModel):
+    """One question sitting in an exam's pool, with its position and effective marks."""
+
+    question_id: uuid.UUID
+    order_index: int
+    #: Per-exam marks override. Null means "use the question's own marks".
+    marks_override: float | None = None
+    effective_marks: float
+    body: str
+    question_type: QuestionType
+    difficulty: Difficulty
+    category: QuestionCategory
+    topic: str | None = None
+    source: str
+    #: True when the question lives only in this exam and not in the reusable bank.
+    exam_only: bool = False
+    created_by_name: str | None = None
+    option_count: int = 0
+    has_answer_key: bool = False
+
+
+class PoolStats(BaseModel):
+    """The distribution an examiner needs to see before publishing."""
+
+    total_questions: int = 0
+    total_marks: float = 0.0
+    by_type: dict[str, int] = Field(default_factory=dict)
+    by_difficulty: dict[str, int] = Field(default_factory=dict)
+
+
+class ExamPoolOut(BaseModel):
+    exam_id: uuid.UUID
+    entries: list[PoolEntry] = Field(default_factory=list)
+    stats: PoolStats
+    #: How many questions the selection rules will put on one candidate's paper.
+    required_count: int = 0
+    can_publish: bool = False
+    problems: list[str] = Field(default_factory=list)
+
+
+class PoolAdd(BaseModel):
+    """Append existing bank questions to a pool, keeping what is already there."""
+
+    question_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=500)
+
+
+class PoolReorder(BaseModel):
+    """The pool's complete new order. Must name every question currently in it."""
+
+    question_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=1000)
+
+
+class PoolMarks(BaseModel):
+    """Override what one question is worth *in this exam only*."""
+
+    #: Null clears the override, restoring the question's own marks.
+    marks_override: float | None = Field(default=None, ge=0)

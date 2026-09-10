@@ -19,13 +19,16 @@ from app.core.logging_config import get_logger
 from app.core.storage import build_key, presigned_url, put_object
 from app.db.models import (
     Difficulty,
+    Exam,
     ExamQuestion,
     Question,
     QuestionCategory,
     QuestionOption,
+    QuestionSource,
     QuestionStatus,
     QuestionType,
     Subject,
+    UserRole,
 )
 from app.schemas.common import Message
 from app.schemas.question import (
@@ -33,6 +36,7 @@ from app.schemas.question import (
     BulkQuestionResult,
     OptionIn,
     QuestionCreate,
+    QuestionDuplicate,
     QuestionImageOut,
     QuestionOutFull,
     QuestionUpdate,
@@ -53,6 +57,9 @@ def _to_full(question: Question) -> QuestionOutFull:
     """
     out = QuestionOutFull.model_validate(question)
     out.image_url = presigned_url(question.image_key)
+    out.created_by_name = question.created_by.full_name if question.created_by else None
+    out.subject_code = question.subject.code if question.subject else None
+    out.exam_only = question.origin_exam_id is not None
     by_id = {o.id: o for o in question.options}
     for option in out.options:
         source = by_id.get(option.id)
@@ -188,6 +195,13 @@ def list_questions(
     question_status: QuestionStatus | None = Query(default=None, alias="status"),
     marks: float | None = None,
     search: str | None = None,
+    source: QuestionSource | None = None,
+    #: Only questions this examiner wrote. Cheaper for the client than knowing its own id.
+    mine: bool = False,
+    created_by: uuid.UUID | None = None,
+    #: Questions private to one exam. Without it, exam-only questions stay out of the
+    #: bank browser entirely, which is the whole point of marking them private.
+    exam_id: uuid.UUID | None = None,
     include_inactive: bool = False,
     include_children: bool = False,
     limit: int = Query(200, ge=1, le=500),
@@ -196,7 +210,11 @@ def list_questions(
     """Browse the bank. Every filter in the spec, all optional, all combinable."""
     stmt = (
         select(Question)
-        .options(selectinload(Question.options))
+        .options(
+            selectinload(Question.options),
+            selectinload(Question.created_by),
+            selectinload(Question.subject),
+        )
         .order_by(Question.created_at.desc())
         .limit(limit)
         .offset(offset)
@@ -221,6 +239,19 @@ def list_questions(
         stmt = stmt.where(Question.status == question_status)
     if marks is not None:
         stmt = stmt.where(Question.marks == marks)
+    if source:
+        stmt = stmt.where(Question.source == source)
+    if mine:
+        stmt = stmt.where(Question.created_by_id == staff.id)
+    if created_by:
+        stmt = stmt.where(Question.created_by_id == created_by)
+    # A question authored for one exam only is not bank material. It is visible when
+    # that exam is named, and nowhere else.
+    stmt = stmt.where(
+        Question.origin_exam_id == exam_id
+        if exam_id
+        else Question.origin_exam_id.is_(None)
+    )
     if search:
         needle = f"%{search.lower()}%"
         stmt = stmt.where(
@@ -253,10 +284,65 @@ def list_topics(
     return sorted(t for t in db.scalars(stmt) if t and t.strip())
 
 
+def _resolve_owning_exam(db, staff, exam_id: uuid.UUID | None) -> Exam | None:
+    """Load the exam a question is being authored into, refusing what is not editable."""
+    if exam_id is None:
+        return None
+    exam = db.get(Exam, exam_id)
+    if exam is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    if staff.role is not UserRole.ADMIN and exam.created_by_id != staff.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only add questions to an exam you created",
+        )
+    return exam
+
+
+def _append_to_pool(db, exam: Exam, question: Question) -> None:
+    """Put a freshly authored question at the end of its exam's pool."""
+    next_index = db.scalar(
+        select(func.coalesce(func.max(ExamQuestion.order_index), -1)).where(
+            ExamQuestion.exam_id == exam.id
+        )
+    )
+    db.add(
+        ExamQuestion(
+            exam_id=exam.id, question_id=question.id, order_index=(next_index or -1) + 1
+        )
+    )
+
+
+def _may_edit(staff, question: Question) -> bool:
+    """An examiner owns what they wrote. An admin may edit anything.
+
+    Questions with no recorded author (seeded before authorship was tracked) stay
+    editable by any staff member - locking them would strand the existing bank.
+    """
+    if staff.role is UserRole.ADMIN:
+        return True
+    return question.created_by_id in (None, staff.id)
+
+
+def _require_edit(staff, question: Question) -> None:
+    if not _may_edit(staff, question):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This question belongs to another examiner. Duplicate it to make your own copy.",
+        )
+
+
 @router.post("/questions", response_model=QuestionOutFull, status_code=status.HTTP_201_CREATED)
 def create_question(payload: QuestionCreate, staff: CurrentStaff, db: DbSession) -> QuestionOutFull:
     if db.get(Subject, payload.subject_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+
+    exam = _resolve_owning_exam(db, staff, payload.exam_id)
+    if exam is not None and payload.subject_id != exam.subject_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The question's subject must match the exam's subject",
+        )
 
     question = Question(
         subject_id=payload.subject_id,
@@ -276,13 +362,27 @@ def create_question(payload: QuestionCreate, staff: CurrentStaff, db: DbSession)
         min_words=payload.min_words,
         max_words=payload.max_words,
         tags=payload.tags,
+        source=payload.source,
+        # Private to the exam only when the examiner both named an exam and declined
+        # the bank. No exam means nowhere else to live, so it is shelved.
+        origin_exam_id=(exam.id if exam is not None and not payload.save_to_bank else None),
         created_by_id=staff.id,
     )
     _apply_options(question, payload.options)
     db.add(question)
     db.flush()
+
+    if exam is not None:
+        _append_to_pool(db, exam, question)
+        db.flush()
+
     db.refresh(question)
-    logger.info("%s added a %s question", staff.email, question.question_type.value)
+    logger.info(
+        "%s added a %s question (%s)",
+        staff.email,
+        question.question_type.value,
+        "exam-only" if question.origin_exam_id else "bank",
+    )
     return _to_full(question)
 
 
@@ -335,6 +435,79 @@ def get_question(question_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> 
     return _to_full(question)
 
 
+@router.post(
+    "/questions/{question_id}/duplicate",
+    response_model=QuestionOutFull,
+    status_code=status.HTTP_201_CREATED,
+)
+def duplicate_question(
+    question_id: uuid.UUID, payload: QuestionDuplicate, staff: CurrentStaff, db: DbSession
+) -> QuestionOutFull:
+    """Copy a question, with its options and answer key, into the caller's name.
+
+    Reading another examiner's question is allowed; editing it is not. Duplicating is
+    the sanctioned way to build on someone else's work without altering their copy.
+    """
+    original = db.scalar(
+        select(Question)
+        .where(Question.id == question_id)
+        .options(selectinload(Question.options))
+    )
+    if original is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    exam = _resolve_owning_exam(db, staff, payload.exam_id)
+    if exam is not None and original.subject_id != exam.subject_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The question's subject must match the exam's subject",
+        )
+
+    copy = Question(
+        subject_id=original.subject_id,
+        question_type=original.question_type,
+        category=original.category,
+        topic=original.topic,
+        difficulty=original.difficulty,
+        body=original.body,
+        model_answer=original.model_answer,
+        explanation=original.explanation,
+        rubric=original.rubric,
+        spec=original.spec,
+        image_key=original.image_key,
+        marks=original.marks,
+        negative_marks=original.negative_marks,
+        min_words=original.min_words,
+        max_words=original.max_words,
+        tags=original.tags,
+        # The copy is the caller's own work from here on, so it carries their id and a
+        # manual provenance - a hand-picked copy of an AI draft is a human decision.
+        source=original.source,
+        status=original.status,
+        origin_exam_id=(exam.id if exam is not None and not payload.save_to_bank else None),
+        created_by_id=staff.id,
+    )
+    for option in original.options:
+        copy.options.append(
+            QuestionOption(
+                text=option.text,
+                image_key=option.image_key,
+                is_correct=option.is_correct,
+                order_index=option.order_index,
+            )
+        )
+    db.add(copy)
+    db.flush()
+
+    if exam is not None:
+        _append_to_pool(db, exam, copy)
+        db.flush()
+
+    db.refresh(copy)
+    logger.info("%s duplicated question %s", staff.email, question_id)
+    return _to_full(copy)
+
+
 @router.patch("/questions/{question_id}", response_model=QuestionOutFull)
 def update_question(
     question_id: uuid.UUID, payload: QuestionUpdate, staff: CurrentStaff, db: DbSession
@@ -342,6 +515,7 @@ def update_question(
     question = db.get(Question, question_id)
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    _require_edit(staff, question)
 
     data = payload.model_dump(exclude_unset=True, exclude={"options"})
     for field, value in data.items():
@@ -385,6 +559,7 @@ def delete_question(question_id: uuid.UUID, staff: CurrentStaff, db: DbSession) 
     question = db.get(Question, question_id)
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    _require_edit(staff, question)
 
     in_use = db.scalar(
         select(func.count(ExamQuestion.id)).where(ExamQuestion.question_id == question_id)

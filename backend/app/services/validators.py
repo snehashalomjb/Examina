@@ -14,6 +14,7 @@ from app.db.models.enums import (
     CONTAINER_TYPES,
     OPTION_BEARING_TYPES,
     Difficulty,
+    QuestionCategory,
     QuestionType,
 )
 from app.services.question_spec import SpecError, validate_spec
@@ -178,11 +179,33 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
         if not isinstance(count, int) or count <= 0:
             raise ValidationError(f"Rule #{index + 1} needs a positive integer count")
 
+        # category and topic are optional narrowings. They were being parsed off the
+        # payload and then dropped here, so a corporate rule that asked for "aptitude"
+        # silently matched nothing - the pool resolved to zero and the exam could not
+        # publish. Carrying them through is what makes those rules mean anything.
+        category_raw = rule.get("category")
+        category = None
+        if category_raw:
+            try:
+                category = QuestionCategory(category_raw)
+            except ValueError as exc:
+                raise ValidationError(
+                    f"Rule #{index + 1} has an unknown category '{category_raw}'"
+                ) from exc
+
+        topic = rule.get("topic")
+        if topic is not None:
+            if not isinstance(topic, str):
+                raise ValidationError(f"Rule #{index + 1} has a non-string topic")
+            topic = topic.strip() or None
+
         normalised.append(
             {
                 "question_type": qtype.value,
                 "difficulty": difficulty.value if difficulty else None,
                 "count": count,
+                "category": category.value if category else None,
+                "topic": topic,
             }
         )
     return normalised

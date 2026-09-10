@@ -223,8 +223,40 @@ class TestSelectionRules:
                 "question_type": QuestionType.MCQ.value,
                 "difficulty": Difficulty.EASY.value,
                 "count": 5,
+                # Both narrowings are always present in the normalised shape, null when
+                # the rule declared none, so the generator never has to use .get().
+                "category": None,
+                "topic": None,
             }
         ]
+
+    def test_category_and_topic_survive_normalisation(self):
+        """They used to be parsed off the payload and then dropped.
+
+        A corporate rule asking for aptitude questions matched the whole pool instead,
+        and a rule asking for a topic that existed nowhere still resolved - so the
+        selection an examiner configured was not the selection that ran.
+        """
+        rules = normalise_selection_rules(
+            {
+                "rules": [
+                    {
+                        "question_type": "mcq",
+                        "count": 3,
+                        "category": "aptitude",
+                        "topic": "  Percentages  ",
+                    }
+                ]
+            }
+        )
+        assert rules[0]["category"] == "aptitude"
+        assert rules[0]["topic"] == "Percentages"
+
+    def test_unknown_category_rejected(self):
+        with pytest.raises(ValidationError, match="unknown category"):
+            normalise_selection_rules(
+                {"rules": [{"question_type": "mcq", "count": 1, "category": "vibes"}]}
+            )
 
     def test_null_difficulty_means_any(self):
         rules = normalise_selection_rules(

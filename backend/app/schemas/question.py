@@ -8,7 +8,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.db.models.enums import Difficulty, QuestionCategory, QuestionStatus, QuestionType
+from app.db.models.enums import (
+    Difficulty,
+    QuestionCategory,
+    QuestionSource,
+    QuestionStatus,
+    QuestionType,
+)
 from app.schemas.common import ORMModel
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
@@ -81,6 +87,17 @@ class QuestionBase(BaseModel):
 class QuestionCreate(QuestionBase):
     options: list[OptionIn] = Field(default_factory=list)
 
+    #: Where this question came from. The client may declare it, but the AI and import
+    #: paths set it server-side - a caller cannot dress an AI draft up as hand-authored.
+    source: QuestionSource = QuestionSource.MANUAL
+    #: Set when the question is being authored from inside an exam wizard. The question
+    #: is added to that exam's pool as soon as it is saved.
+    exam_id: uuid.UUID | None = None
+    #: "Save to My Question Bank". False keeps the question private to ``exam_id``, which
+    #: is the only case where it means anything - a question with no exam has nowhere
+    #: else to live, so it is shelved regardless.
+    save_to_bank: bool = True
+
     @model_validator(mode="after")
     def check_domain_rules(self) -> QuestionCreate:
         try:
@@ -101,6 +118,14 @@ class QuestionCreate(QuestionBase):
         except ValidationError as exc:
             raise ValueError(str(exc)) from exc
         return self
+
+
+class QuestionDuplicate(BaseModel):
+    """Copy a question. Everything is optional - an unmodified copy is a valid ask."""
+
+    #: Where the copy lands. Null shelves it in the bank like the original.
+    exam_id: uuid.UUID | None = None
+    save_to_bank: bool = True
 
 
 class QuestionUpdate(BaseModel):
@@ -126,6 +151,8 @@ class QuestionUpdate(BaseModel):
 class QuestionOut(ORMModel):
     id: uuid.UUID
     subject_id: uuid.UUID
+    #: Denormalised for the bank browser, which shows the subject on every card.
+    subject_code: str | None = None
     question_type: QuestionType
     category: QuestionCategory
     topic: str | None = None
@@ -138,6 +165,12 @@ class QuestionOut(ORMModel):
     max_words: int | None = None
     tags: list[str] | None = None
     is_active: bool
+    source: QuestionSource = QuestionSource.MANUAL
+    created_by_id: uuid.UUID | None = None
+    #: Who wrote it, for the "Created by" line and the edit-permission check.
+    created_by_name: str | None = None
+    #: True when the question is private to one exam rather than shelved in the bank.
+    exam_only: bool = False
     image_key: str | None = None
     image_url: str | None = None
     parent_question_id: uuid.UUID | None = None

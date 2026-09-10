@@ -26,9 +26,15 @@ from app.schemas.exam import (
     ExamCreate,
     ExamOut,
     ExamPoolCheck,
+    ExamPoolOut,
     ExamUpdate,
     PaperPreview,
     PaperPreviewEntry,
+    PoolAdd,
+    PoolEntry,
+    PoolMarks,
+    PoolReorder,
+    PoolStats,
     SectionOut,
 )
 from app.services.paper_generator import check_pool_satisfies_rules, generate_paper
@@ -104,6 +110,9 @@ def _load_exam(db, exam_id: uuid.UUID) -> Exam:
             selectinload(Exam.exam_questions)
             .selectinload(ExamQuestion.question)
             .selectinload(Question.options),
+            selectinload(Exam.exam_questions)
+            .selectinload(ExamQuestion.question)
+            .selectinload(Question.created_by),
             selectinload(Exam.subject),
             selectinload(Exam.sections),
         )
@@ -113,25 +122,72 @@ def _load_exam(db, exam_id: uuid.UUID) -> Exam:
     return exam
 
 
-def _set_pool(db, exam: Exam, question_ids: list[uuid.UUID]) -> None:
-    questions = list(db.scalars(select(Question).where(Question.id.in_(question_ids))))
-    found = {q.id for q in questions}
-    missing = set(question_ids) - found
+def _resolve_pool_questions(db, exam: Exam, question_ids: list[uuid.UUID]) -> list[Question]:
+    """Load the given questions in the caller's order, refusing anything unusable.
+
+    Order matters: ``order_index`` is assigned from the position in this list, and a
+    ``SELECT ... WHERE id IN (...)`` returns rows in whatever order the planner likes.
+    Reading the pool back out of the query result - which is what this used to do -
+    silently discarded the ordering the examiner had just arranged.
+    """
+    by_id = {
+        q.id: q
+        for q in db.scalars(
+            select(Question)
+            .where(Question.id.in_(question_ids))
+            .options(selectinload(Question.options))
+        )
+    }
+    missing = [qid for qid in question_ids if qid not in by_id]
     if missing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"{len(missing)} question id(s) do not exist",
         )
-    off_subject = [q for q in questions if q.subject_id != exam.subject_id]
+
+    ordered = [by_id[qid] for qid in question_ids]
+
+    off_subject = [q for q in ordered if q.subject_id != exam.subject_id]
     if off_subject:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"{len(off_subject)} question(s) belong to a different subject",
         )
+    # A question authored for a *different* exam is not shared material. Letting one
+    # into a second paper would surprise the examiner who wrote it as a one-off.
+    borrowed = [q for q in ordered if q.origin_exam_id is not None and q.origin_exam_id != exam.id]
+    if borrowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{len(borrowed)} question(s) belong privately to another exam",
+        )
+    return ordered
 
+
+def _set_pool(
+    db,
+    exam: Exam,
+    question_ids: list[uuid.UUID],
+    marks_overrides: dict[uuid.UUID, float] | None = None,
+) -> None:
+    """Replace the pool with exactly these questions, in exactly this order."""
+    ordered = _resolve_pool_questions(db, exam, question_ids)
+    overrides = marks_overrides or {}
+
+    seen: set[uuid.UUID] = set()
     exam.exam_questions.clear()
-    for index, question in enumerate(questions):
-        exam.exam_questions.append(ExamQuestion(question_id=question.id, order_index=index))
+    db.flush()  # the DELETEs must land before re-inserting, or the unique index trips
+    for index, question in enumerate(ordered):
+        if question.id in seen:  # a duplicated id is a client slip, not a second slot
+            continue
+        seen.add(question.id)
+        exam.exam_questions.append(
+            ExamQuestion(
+                question_id=question.id,
+                order_index=index,
+                marks_override=overrides.get(question.id),
+            )
+        )
 
 
 def _set_sections(db, exam: Exam, section_payloads: list) -> None:
@@ -288,6 +344,178 @@ def pool_check(exam_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> ExamPo
         pool_size=len(exam.exam_questions),
         required_count=_required_count(exam),
     )
+
+
+# --------------------------------------------------------------- pool management
+#
+# The pool is edited incrementally from the wizard - questions arrive one at a time
+# from four different sources - so replacing the whole list on every change (which is
+# what PATCH /exams/{id} does) would make the UI fight itself. These endpoints add,
+# remove and reorder in place instead.
+
+
+def _pool_entry(eq: ExamQuestion) -> PoolEntry:
+    question = eq.question
+    return PoolEntry(
+        question_id=question.id,
+        order_index=eq.order_index,
+        marks_override=eq.marks_override,
+        effective_marks=eq.effective_marks,
+        body=question.body,
+        question_type=question.question_type,
+        difficulty=question.difficulty,
+        category=question.category,
+        topic=question.topic,
+        source=question.source.value,
+        exam_only=question.origin_exam_id is not None,
+        created_by_name=question.created_by.full_name if question.created_by else None,
+        option_count=len(question.options),
+        has_answer_key=any(o.is_correct for o in question.options)
+        or question.model_answer is not None
+        or question.spec is not None,
+    )
+
+
+def _pool_out(exam: Exam) -> ExamPoolOut:
+    entries = sorted(
+        (_pool_entry(eq) for eq in exam.exam_questions), key=lambda e: e.order_index
+    )
+    by_type: dict[str, int] = {}
+    by_difficulty: dict[str, int] = {}
+    for entry in entries:
+        by_type[entry.question_type.value] = by_type.get(entry.question_type.value, 0) + 1
+        by_difficulty[entry.difficulty.value] = by_difficulty.get(entry.difficulty.value, 0) + 1
+
+    problems = check_pool_satisfies_rules(exam)
+    return ExamPoolOut(
+        exam_id=exam.id,
+        entries=entries,
+        stats=PoolStats(
+            total_questions=len(entries),
+            total_marks=round(sum(e.effective_marks for e in entries), 2),
+            by_type=by_type,
+            by_difficulty=by_difficulty,
+        ),
+        required_count=_required_count(exam),
+        can_publish=not problems,
+        problems=problems,
+    )
+
+
+def _guard_editable(db, exam: Exam) -> None:
+    """A pool may not change once anyone has sat the paper it produced."""
+    if exam.status is ExamStatus.PUBLISHED and db.scalar(
+        select(func.count(ExamSession.id)).where(ExamSession.exam_id == exam.id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Candidates have already started this exam; its questions can no longer change",
+        )
+
+
+@router.get("/{exam_id}/pool", response_model=ExamPoolOut)
+def get_pool(exam_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> ExamPoolOut:
+    """The exam's question pool, its distribution, and whether it can be published."""
+    return _pool_out(_load_exam(db, exam_id))
+
+
+@router.post("/{exam_id}/questions", response_model=ExamPoolOut)
+def add_to_pool(
+    exam_id: uuid.UUID, payload: PoolAdd, staff: CurrentStaff, db: DbSession
+) -> ExamPoolOut:
+    """Append questions to the pool. Ids already present are ignored, not duplicated."""
+    exam = _load_exam(db, exam_id)
+    _guard_editable(db, exam)
+
+    present = {eq.question_id for eq in exam.exam_questions}
+    fresh = [qid for qid in payload.question_ids if qid not in present]
+    _resolve_pool_questions(db, exam, fresh)  # validates subject and ownership
+
+    next_index = max((eq.order_index for eq in exam.exam_questions), default=-1) + 1
+    for offset, question_id in enumerate(fresh):
+        exam.exam_questions.append(
+            ExamQuestion(question_id=question_id, order_index=next_index + offset)
+        )
+
+    db.flush()
+    logger.info("%s added %d question(s) to exam %s", staff.email, len(fresh), exam_id)
+    return _pool_out(_load_exam(db, exam_id))
+
+
+@router.delete("/{exam_id}/questions/{question_id}", response_model=ExamPoolOut)
+def remove_from_pool(
+    exam_id: uuid.UUID, question_id: uuid.UUID, staff: CurrentStaff, db: DbSession
+) -> ExamPoolOut:
+    exam = _load_exam(db, exam_id)
+    _guard_editable(db, exam)
+
+    entry = next((eq for eq in exam.exam_questions if eq.question_id == question_id), None)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="That question is not in this pool"
+        )
+    exam.exam_questions.remove(entry)
+    db.flush()
+
+    # Close the gap left behind, so order_index stays a dense 0..n-1 sequence.
+    for index, eq in enumerate(sorted(exam.exam_questions, key=lambda e: e.order_index)):
+        eq.order_index = index
+    db.flush()
+    return _pool_out(_load_exam(db, exam_id))
+
+
+@router.put("/{exam_id}/questions/order", response_model=ExamPoolOut)
+def reorder_pool(
+    exam_id: uuid.UUID, payload: PoolReorder, staff: CurrentStaff, db: DbSession
+) -> ExamPoolOut:
+    """Set the pool's order. The payload must be a permutation of the current pool.
+
+    Refusing a partial list rather than quietly appending the remainder: a client that
+    sends nine of ten ids has lost one, and guessing where the tenth belongs would hide
+    the bug behind a plausible-looking result.
+    """
+    exam = _load_exam(db, exam_id)
+    _guard_editable(db, exam)
+
+    current = {eq.question_id for eq in exam.exam_questions}
+    given = list(dict.fromkeys(payload.question_ids))
+    if set(given) != current or len(given) != len(current):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"The order must list every question in the pool exactly once "
+                f"({len(current)} expected, {len(given)} distinct given)"
+            ),
+        )
+
+    position = {question_id: index for index, question_id in enumerate(given)}
+    for eq in exam.exam_questions:
+        eq.order_index = position[eq.question_id]
+    db.flush()
+    logger.info("%s reordered the pool of exam %s", staff.email, exam_id)
+    return _pool_out(_load_exam(db, exam_id))
+
+
+@router.patch("/{exam_id}/questions/{question_id}/marks", response_model=ExamPoolOut)
+def override_pool_marks(
+    exam_id: uuid.UUID,
+    question_id: uuid.UUID,
+    payload: PoolMarks,
+    staff: CurrentStaff,
+    db: DbSession,
+) -> ExamPoolOut:
+    """Re-weight a question for this exam without touching the bank copy."""
+    exam = _load_exam(db, exam_id)
+    _guard_editable(db, exam)
+
+    entry = next((eq for eq in exam.exam_questions if eq.question_id == question_id), None)
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="That question is not in this pool"
+        )
+    entry.marks_override = payload.marks_override
+    db.flush()
+    return _pool_out(_load_exam(db, exam_id))
 
 
 @router.post("/{exam_id}/publish", response_model=ExamOut)

@@ -116,6 +116,19 @@ class QuestionStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
+class QuestionSource(str, enum.Enum):
+    """How a question came to exist.
+
+    Kept as provenance rather than a permission: an imported question is not less
+    valid than a typed one, but an examiner browsing the bank wants to know which
+    of these an AI wrote, and the spec asks for that shelf explicitly.
+    """
+
+    MANUAL = "manual"
+    AI_GENERATED = "ai_generated"
+    IMPORTED = "imported"
+
+
 class DraftStatus(str, enum.Enum):
     """Review state of an AI-generated question draft.
 

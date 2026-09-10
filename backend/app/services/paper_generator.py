@@ -40,23 +40,49 @@ def compute_seed(*, exam_id: uuid.UUID, candidate_id: uuid.UUID, salt: str) -> s
     return blake2b(payload, digest_size=16).hexdigest()
 
 
-def _pool_matching(
-    exam_questions: list[ExamQuestion], question_type: str, difficulty: str | None
-) -> list[ExamQuestion]:
-    return [
-        eq
-        for eq in exam_questions
-        if eq.question.is_active
-        and eq.question.question_type.value == question_type
-        and (difficulty is None or eq.question.difficulty.value == difficulty)
-    ]
+def _matches(eq: ExamQuestion, rule: dict) -> bool:
+    """Whether one pooled question satisfies one selection rule.
+
+    Every narrowing the rule declares must hold; a narrowing the rule leaves null means
+    "any". Topic is compared case-insensitively on trimmed text because it is free text
+    typed by an examiner, and "OOP" and "oop " are the same topic to a human.
+    """
+    question = eq.question
+    if not question.is_active:
+        return False
+    if question.question_type.value != rule["question_type"]:
+        return False
+    if rule.get("difficulty") and question.difficulty.value != rule["difficulty"]:
+        return False
+    if rule.get("category") and question.category.value != rule["category"]:
+        return False
+    topic = rule.get("topic")
+    if topic:
+        if not question.topic:
+            return False
+        if question.topic.strip().casefold() != topic.strip().casefold():
+            return False
+    return True
+
+
+def _pool_matching(exam_questions: list[ExamQuestion], rule: dict) -> list[ExamQuestion]:
+    return [eq for eq in exam_questions if _matches(eq, rule)]
 
 
 def _rule_label(rule: dict) -> str:
     label = rule["question_type"]
-    if rule["difficulty"]:
+    if rule.get("difficulty"):
         label += f"/{rule['difficulty']}"
+    if rule.get("category"):
+        label += f" in {rule['category']}"
+    if rule.get("topic"):
+        label += f" on '{rule['topic']}'"
     return label
+
+
+def _specificity(rule: dict) -> int:
+    """How many narrowings a rule declares. More specific rules draw first."""
+    return sum(1 for key in ("difficulty", "category", "topic") if rule.get(key))
 
 
 def _ordered_rules(rules: list[dict]) -> list[dict]:
@@ -65,9 +91,10 @@ def _ordered_rules(rules: list[dict]) -> list[dict]:
     A rule with ``difficulty: null`` can draw from any difficulty, so if it ran first it
     could eat the only 'hard' questions and starve a later hard-specific rule. Ordering
     specific rules ahead of catch-alls removes that failure mode, and the ordering is
-    stable so determinism is unaffected.
+    stable so determinism is unaffected. Category and topic narrow the same way, so they
+    count towards specificity too.
     """
-    return sorted(rules, key=lambda r: (r["difficulty"] is None, r["question_type"]))
+    return sorted(rules, key=lambda r: (-_specificity(r), r["question_type"]))
 
 
 def check_pool_satisfies_rules(exam: Exam) -> list[str]:
@@ -86,7 +113,7 @@ def check_pool_satisfies_rules(exam: Exam) -> list[str]:
     for rule in _ordered_rules(rules):
         available = [
             eq
-            for eq in _pool_matching(exam.exam_questions, rule["question_type"], rule["difficulty"])
+            for eq in _pool_matching(exam.exam_questions, rule)
             if eq.question_id not in used
         ]
         if len(available) < rule["count"]:
@@ -114,7 +141,7 @@ def generate_paper(*, exam: Exam, candidate_id: uuid.UUID) -> tuple[str, list[Pa
     for rule in _ordered_rules(rules):
         pool = [
             eq
-            for eq in _pool_matching(exam.exam_questions, rule["question_type"], rule["difficulty"])
+            for eq in _pool_matching(exam.exam_questions, rule)
             if eq.question_id not in used
         ]
         if len(pool) < rule["count"]:
