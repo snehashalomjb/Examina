@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { AIGenerator } from "@/components/AIGenerator";
@@ -30,6 +30,7 @@ import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type {
   Difficulty,
+  Exam,
   ExamPool,
   Question,
   QuestionType,
@@ -439,6 +440,9 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
 export default function CreateExamWizard() {
   const { user } = useRequireAuth(["examiner", "admin"]);
   const router = useRouter();
+  // ?exam=<id> reopens a draft. Saving a draft you cannot come back to is a trap, and
+  // the pool step deliberately leaves drafts behind.
+  const resumeId = useSearchParams().get("exam");
 
   // Step 1: Category
   const [category, setCategory] = useState<ExamCategoryType>("academic");
@@ -499,6 +503,10 @@ export default function CreateExamWizard() {
   const [assignedCount, setAssignedCount] = useState(0);
   /** Review tab: the summary and checklist, or the candidate's-eye paper. */
   const [reviewTab, setReviewTab] = useState<"summary" | "paper">("summary");
+  /** Set once the exam is live, so the wizard can show what was published. */
+  const [published, setPublished] = useState<{ id: string; questions: number } | null>(
+    null,
+  );
 
   // Step 6: Proctoring. AI detects and flags; the examiner rules on it afterwards.
   // Nothing configured here fails a candidate on its own.
@@ -536,6 +544,89 @@ export default function CreateExamWizard() {
     }
     void loadData();
   }, []);
+
+  /**
+   * Reopen a draft.
+   *
+   * Everything the wizard collects is read back off the exam, so the second visit is
+   * the same form with the same values - not a fresh form that will overwrite half of
+   * them with defaults on the next save.
+   */
+  useEffect(() => {
+    if (!resumeId || !user) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const exam = await api.get<Exam>(`/exams/${resumeId}`);
+        if (cancelled) return;
+
+        setExamId(exam.id);
+        setCategory(exam.exam_type === "corporate" ? "corporate" : "academic");
+        setTitle(exam.title);
+        setDescription(exam.description ?? "");
+        setInstructions(exam.instructions ?? "");
+        setSubjectId(exam.subject_id);
+        setDurationMinutes(exam.duration_minutes);
+        setStartsAt(new Date(exam.starts_at).toISOString().slice(0, 16));
+        setEndsAt(new Date(exam.ends_at).toISOString().slice(0, 16));
+        setDeclaredTotalMarks(exam.declared_total_marks ?? "");
+        setPassingPercentage(exam.passing_percentage ?? "");
+        setNegativeMarking(exam.negative_marking);
+        setMaxAttempts(exam.max_attempts);
+        setDifficulty(exam.difficulty ?? "");
+        setRandomize(exam.randomize);
+        setShuffleOptions(exam.shuffle_options);
+        setCourse(exam.course ?? "");
+        setDepartment(exam.department ?? "");
+        setSemester(exam.semester ?? "");
+        setCompanyName(exam.company_name ?? "");
+        setJobRole(exam.job_role ?? "");
+
+        setSections(
+          [...exam.sections]
+            .sort((a, b) => a.order_index - b.order_index)
+            .map((section) => ({
+              name: section.name,
+              description: section.description ?? "",
+              duration_minutes: section.duration_minutes,
+              marks_per_question: section.marks_per_question,
+              negative_marks: section.negative_marks,
+              rules: section.selection_rules?.rules ?? [],
+            })),
+        );
+
+        const config = exam.proctor_config as unknown as Record<string, unknown>;
+        const bool = (key: string, fallback: boolean) =>
+          typeof config[key] === "boolean" ? (config[key] as boolean) : fallback;
+        const num = (key: string, fallback: number) =>
+          typeof config[key] === "number" ? (config[key] as number) : fallback;
+        setProctorWebcam(bool("webcam_enabled", true));
+        setProctorGaze(bool("gaze_tracking_enabled", true));
+        setProctorFullscreen(bool("require_fullscreen", true));
+        setProctorBlockCopyPaste(bool("block_copy_paste", true));
+        setProctorMicrophone(bool("require_microphone", true));
+        setProctorSingleDisplay(bool("require_single_display", true));
+        setGazeSensitivity(num("gaze_sensitivity", 0.6));
+        setMaxTabSwitches(num("max_tab_switches", 3));
+        setFlagOnScore(num("flag_on_score", 45));
+        setTerminateOnScore(num("terminate_on_score", 100));
+        setSnapshotInterval(num("snapshot_interval_seconds", 60));
+
+        setPool(await api.get<ExamPool>(`/exams/${exam.id}/pool`));
+        setStep(5); // straight to the pool, which is why anyone reopens a draft
+      } catch (err) {
+        toast(
+          err instanceof ApiError ? err.message : "Could not open that draft.",
+          "rose",
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeId, user]);
 
   // When pattern is selected, pre-fill fields
   function applyPattern(p: ExamPattern) {
@@ -759,7 +850,7 @@ export default function CreateExamWizard() {
     try {
       await api.post(`/exams/${id}/publish`);
       toast(`"${title}" is published`, "mint");
-      router.push("/dashboard/exams");
+      setPublished({ id, questions: pool?.required_count ?? 0 });
     } catch (err) {
       if (err instanceof ApiError) {
         toast(
@@ -803,6 +894,68 @@ export default function CreateExamWizard() {
         </Badge>
       </div>
 
+      {/* Published. The wizard stops being a form and becomes a receipt. */}
+      {published && (
+        <Card className="space-y-4 border-mint/50 bg-mint-soft/20">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-[16px] text-white">
+              ✓
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-ink">Exam published</h2>
+              <p className="text-[13px] text-ink-muted">
+                {title} is live for its window. Only assigned candidates can see it.
+              </p>
+            </div>
+          </div>
+
+          <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+            <Summary label="Exam ID" value={published.id.slice(0, 8)} />
+            <Summary label="Questions per candidate" value={String(published.questions)} />
+            <Summary
+              label="Candidates assigned"
+              value={assignedCount ? String(assignedCount) : "None yet"}
+            />
+            <Summary
+              label="Window"
+              value={`${new Date(startsAt).toLocaleDateString()} → ${new Date(endsAt).toLocaleDateString()}`}
+            />
+          </dl>
+
+          <div className="rounded-[10px] border border-line bg-surface p-3">
+            <p className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
+              How candidates reach it
+            </p>
+            <p className="mt-1 text-[13px] text-ink-soft">
+              There is no shareable link, by design. An assigned candidate signs in and
+              finds the exam under <span className="font-medium text-ink">My Exams</span>,
+              which is what keeps a paper from being opened by whoever has the URL.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/exams">
+              <Button size="sm">Back to exams</Button>
+            </Link>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setPublished(null);
+                setStep(6);
+              }}
+            >
+              Assign more candidates
+            </Button>
+            <Link href="/dashboard/exams/create">
+              <Button size="sm" variant="ghost">
+                Create another
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      )}
+
       {/* Stepper Wizard Bar */}
       <div className="flex items-center justify-between rounded-xl border border-line bg-surface p-2 shadow-sm">
         {[
@@ -845,7 +998,7 @@ export default function CreateExamWizard() {
       </div>
 
       {/* STEP 1: EXAM CATEGORY */}
-      {step === 1 && (
+      {step === 1 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div className="text-center max-w-xl mx-auto mb-6">
             <h2 className="text-xl font-bold text-ink">Select Examination Category</h2>
@@ -892,7 +1045,7 @@ export default function CreateExamWizard() {
       )}
 
       {/* STEP 2: PATTERN / BLUEPRINT PRESETS */}
-      {step === 2 && (
+      {step === 2 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex items-center justify-between">
             <div>
@@ -997,7 +1150,7 @@ export default function CreateExamWizard() {
       )}
 
       {/* STEP 3: EXAM DETAILS */}
-      {step === 3 && (
+      {step === 3 && !published && (
         <Card className="space-y-5 animate-fade-in">
           <div>
             <h2 className="text-lg font-bold text-ink">Exam Details & Target Configuration</h2>
@@ -1205,7 +1358,7 @@ export default function CreateExamWizard() {
       )}
 
       {/* STEP 4: SECTIONS & SELECTION RULES */}
-      {step === 4 && (
+      {step === 4 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex items-center justify-between">
             <div>
@@ -1459,7 +1612,7 @@ export default function CreateExamWizard() {
 
       {/* STEP 5: QUESTION POOL SELECTION */}
       {/* STEP 5: BUILD QUESTION POOL — four sources, one pool */}
-      {step === 5 && (
+      {step === 5 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1620,7 +1773,7 @@ export default function CreateExamWizard() {
       )}
 
       {/* STEP 6: CANDIDATES */}
-      {step === 6 && (
+      {step === 6 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div>
             <h2 className="text-xl font-bold text-ink">Assign Candidates</h2>
@@ -1642,7 +1795,7 @@ export default function CreateExamWizard() {
       )}
 
       {/* STEP 7: RANDOMISATION, PROCTORING, VALIDATION, PUBLISH */}
-      {step === 7 && (
+      {step === 7 && !published && (
         <div className="space-y-6 animate-fade-in">
           {/* ------------------------------------------------------ randomisation */}
           <Card className="space-y-4">

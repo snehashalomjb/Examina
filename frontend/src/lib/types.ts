@@ -404,6 +404,10 @@ export interface Exam {
   // Mode-specific
   passing_percentage: number | null;
   declared_total_marks: number | null;
+  /** How many sittings one candidate may take. */
+  max_attempts: number;
+  /** A descriptive tag shown to candidates. Null means "mixed". */
+  difficulty: Difficulty | null;
   // Academic
   course: string | null;
   department: string | null;

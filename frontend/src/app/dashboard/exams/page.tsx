@@ -290,13 +290,22 @@ export default function ExamsPage() {
 
                 <div className="mt-auto flex items-center gap-2 pt-4 flex-wrap">
                   {exam.status === "draft" && (
-                    <Button
-                      size="sm"
-                      onClick={() => publish(exam)}
-                      disabled={Boolean(check && !check.can_publish)}
-                    >
-                      Publish
-                    </Button>
+                    <>
+                      {/* A draft with an unfinished pool is the common case, and the
+                          wizard is where it gets finished. */}
+                      <Link href={`/dashboard/exams/create?exam=${exam.id}`}>
+                        <Button size="sm" variant={check?.can_publish ? "secondary" : "primary"}>
+                          Continue editing
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        onClick={() => publish(exam)}
+                        disabled={Boolean(check && !check.can_publish)}
+                      >
+                        Publish
+                      </Button>
+                    </>
                   )}
                   {exam.status === "published" && (
                     <Button size="sm" variant="secondary" onClick={() => close(exam)}>

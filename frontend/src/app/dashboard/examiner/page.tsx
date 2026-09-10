@@ -233,10 +233,14 @@ export default function ExaminerDashboard() {
             <h2 className="mb-3 text-[15px] font-semibold text-ink">Quick Actions</h2>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { href: "/dashboard/exams", label: "Create Exam", icon: <ExamIcon /> },
-                { href: "/dashboard/questions", label: "Add Question", icon: <BankIcon /> },
+                // "Create Exam" went to the exam list, which is one click short of the
+                // thing it names. The wizard is the destination.
+                { href: "/dashboard/exams/create", label: "Create Exam", icon: <ExamIcon /> },
+                { href: "/dashboard/questions?compose=1", label: "Create Question", icon: <BankIcon /> },
                 { href: "/dashboard/questions/ai-generate", label: "AI Generate", icon: <SparkleIcon /> },
-                { href: "/dashboard/proctoring", label: "Proctoring", icon: <ShieldIcon /> },
+                { href: "/dashboard/questions", label: "Question Bank", icon: <BankIcon /> },
+                { href: "/dashboard/grading", label: "Review Grading", icon: <SparkleIcon /> },
+                { href: "/dashboard/proctoring", label: "Review Proctoring", icon: <ShieldIcon /> },
               ].map((action) => (
                 <Link key={action.href} href={action.href}>
                   <button className="w-full rounded-[10px] border border-line bg-surface p-3 text-left hover:bg-sunken hover:border-line-strong transition-all">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -69,6 +70,9 @@ const SHELVES: { key: Shelf; label: string }[] = [
 
 export default function QuestionBankPage() {
   const { user } = useRequireAuth(["examiner", "admin"]);
+  // "Create Question" from the dashboard lands here with the editor already open,
+  // rather than on a list the examiner then has to find a button on.
+  const searchParams = useSearchParams();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +89,7 @@ export default function QuestionBankPage() {
   /** The shelves the bank is organised into. Filter presets, not separate stores. */
   const [shelf, setShelf] = useState<Shelf>("all");
 
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(searchParams.get("compose") === "1");
   const [editing, setEditing] = useState<Question | null>(null);
   const [addingSubject, setAddingSubject] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
