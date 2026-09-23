@@ -41,6 +41,7 @@ from app.db.session import SessionLocal
 from app.seed_question_bank_bulk import FLOOR_PER_TYPE
 from app.seed_question_bank_bulk import top_up as top_up_question_bank
 from app.seed_question_bank_images import top_up_images
+from app.seed_sql_questions import seed_sql_questions
 
 logger = get_logger("seed")
 
@@ -1363,6 +1364,7 @@ def seed(db: Session) -> None:
         "VRB101": _subject(db, "VRB101", "Verbal Ability & English", "Grammar, vocabulary, reading comprehension"),
         "TECH101": _subject(db, "TECH101", "Core Technical & System Design", "Frontend, backend, distributed systems, architecture"),
         "CODE101": _subject(db, "CODE101", "Programming Challenges", "Hands-on coding problems, algorithmic implementations"),
+        "SQL101": _subject(db, "SQL101", "SQL & Databases", "Structured Query Language: DDL, DML, joins, aggregations, window functions, normalisation, transactions"),
     }
 
     questions = _seed_questions(db, subjects, examiner)
@@ -1373,6 +1375,9 @@ def seed(db: Session) -> None:
     # filters (type, difficulty, subject) all have something to show rather than one
     # hand-picked handful.
     top_up_question_bank(db, examiner)
+
+    # 150 handcrafted SQL questions covering MCQ, multi-select, true/false, short answer, long answer.
+    seed_sql_questions(db, examiner)
 
     # Real, meaningful diagram-based questions (process diagrams, Gantt charts, OSI
     # stacks, decision trees, attention weights, search trees, CNN architectures, ...)
