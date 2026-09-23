@@ -113,11 +113,14 @@ export default function ResultDetailPage() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-[1040px] px-5 py-8">
-      {/* nav bar */}
+      {/* Premium nav bar */}
       <div className="mb-7 flex items-center justify-between gap-4">
-        <Link href={backHref} className="flex items-center gap-2.5">
-          <Mark size={24} />
-          <span className="text-[14px] font-semibold tracking-tight text-ink">Smart Assess.ai</span>
+        <Link href={backHref} className="flex items-center gap-2.5 group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[9px] transition-transform duration-200 group-hover:scale-105"
+            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))", border: "1px solid rgba(99,102,241,0.2)" }}>
+            <Mark size={18} />
+          </div>
+          <span className="text-[14px] font-bold tracking-tight text-ink">Examina</span>
         </Link>
         <div className="flex items-center gap-2.5">
           {detail && (
@@ -132,7 +135,7 @@ export default function ResultDetailPage() {
             </Button>
           )}
           <Link href={backHref}>
-            <Button variant="secondary" size="sm">Back</Button>
+            <Button variant="secondary" size="sm">← Back</Button>
           </Link>
         </div>
       </div>
@@ -149,10 +152,26 @@ export default function ResultDetailPage() {
 
       {detail && (
         <div className="space-y-6">
-          {/* ─────────────────────── hero score card ─────────────────────── */}
-          <div className="overflow-hidden rounded-[20px] border border-line bg-gradient-to-br from-surface to-sunken/60 shadow-sm">
+          {/* ─────────────────────── premium score card ─────────────────────── */}
+          <div className="overflow-hidden rounded-[22px] shadow-[var(--shadow-lift)]"
+            style={{
+              background: isPass === null
+                ? "linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%)"
+                : isPass
+                  ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 60%, #f0fdf4 100%)"
+                  : "linear-gradient(135deg, #fff1f2 0%, #ffe4e6 60%, #fff1f2 100%)",
+              border: `1px solid ${isPass === null ? "rgba(99,102,241,0.15)" : isPass ? "rgba(22,163,74,0.2)" : "rgba(220,38,38,0.15)"}`,
+            }}>
+            {/* Top gradient bar */}
+            <div className="h-[4px]" style={{
+              background: isPass === null
+                ? "linear-gradient(90deg, #4f46e5, #818cf8, #7c3aed)"
+                : isPass
+                  ? "linear-gradient(90deg, #16a34a, #22c55e, #0d9488)"
+                  : "linear-gradient(90deg, #dc2626, #ef4444, #f97316)",
+            }} />
             <div className="flex flex-col items-center gap-6 px-8 py-10 sm:flex-row sm:items-start">
-              {/* Ring */}
+              {/* Score ring */}
               <div className="relative flex h-36 w-36 shrink-0 items-center justify-center">
                 <ScoreRing pct={detail.result.percentage} pass={isPass} />
                 <div className="absolute flex flex-col items-center">
@@ -176,11 +195,15 @@ export default function ResultDetailPage() {
                   <div className="mt-4">
                     <span
                       className={cx(
-                        "inline-block rounded-[10px] px-5 py-1.5 text-[14px] font-bold tracking-widest",
+                        "inline-block rounded-[10px] px-5 py-1.5 text-[14px] font-bold tracking-widest shadow-sm",
                         isPass
-                          ? "bg-mint-soft text-mint"
-                          : "bg-rose-soft text-rose",
+                          ? "text-white"
+                          : "text-white",
                       )}
+                      style={isPass
+                        ? { background: "linear-gradient(135deg, #16a34a, #22c55e)", boxShadow: "0 4px 12px -2px rgba(22,163,74,0.4)" }
+                        : { background: "linear-gradient(135deg, #dc2626, #ef4444)", boxShadow: "0 4px 12px -2px rgba(220,38,38,0.3)" }
+                      }
                     >
                       {statusLabel}
                     </span>
@@ -228,8 +251,8 @@ export default function ResultDetailPage() {
             </div>
 
             {detail.result.pending_review_count > 0 && (
-              <div className="border-t border-amber/20 bg-amber-soft/40 px-8 py-3">
-                <p className="text-[12.5px] text-amber">
+              <div className="border-t border-amber/20 bg-amber-soft/60 px-8 py-3">
+                <p className="text-[12.5px] font-medium text-amber-ink">
                   ⚠ {detail.result.pending_review_count} answer
                   {detail.result.pending_review_count === 1 ? " is" : "s are"} still awaiting
                   examiner review — your score may change.

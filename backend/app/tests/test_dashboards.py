@@ -455,3 +455,189 @@ def test_the_console_counts_a_draft_exam_as_neither_open_nor_upcoming(
     data = live_operations.build(db, examiner)
     assert data["exams_today_count"] == 0
     assert data["upcoming_exams"] == []
+
+
+class TestLiveExamsRollup:
+    """One row per exam, not per candidate - the admin/examiner 'Live Examinations'
+    table, distinct from the per-session `live_sessions` list above."""
+
+    def test_a_quiet_platform_reports_no_live_exams(self, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        assert live_operations.live_exams(db, examiner) == []
+
+    def test_a_published_open_exam_is_reported_with_real_counts(self, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        candidates = [make_user(db, role=UserRole.CANDIDATE) for _ in range(3)]
+        subject = make_subject(db)
+        exam = make_exam(
+            db,
+            subject,
+            examiner,
+            questions=[make_question(db, subject) for _ in range(2)],
+            candidates=candidates,
+        )
+        _sitting(db, exam, candidates[0])
+        _sitting(db, exam, candidates[1])
+        flagged = _sitting(db, exam, candidates[2])
+        flagged.is_flagged = True
+        db.flush()
+
+        rows = live_operations.live_exams(db, examiner)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["exam_title"] == exam.title
+        assert row["examiner_name"] == examiner.full_name
+        assert row["candidate_count"] == 3
+        assert row["active_count"] == 3
+        assert row["flagged_count"] == 1
+        assert row["time_remaining_str"] != "00:00"
+
+    def test_a_draft_exam_never_appears(self, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        make_exam(
+            db,
+            subject,
+            examiner,
+            questions=[make_question(db, subject)],
+            status=ExamStatus.DRAFT,
+        )
+        assert live_operations.live_exams(db, examiner) == []
+
+    def test_an_examiner_sees_only_their_own_live_exams(self, db: Session):
+        mine = make_user(db, role=UserRole.EXAMINER)
+        theirs = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        make_exam(db, subject, theirs, questions=[make_question(db, subject)])
+        assert live_operations.live_exams(db, mine) == []
+
+    def test_an_admin_sees_every_live_exam(self, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        admin = make_user(db, role=UserRole.ADMIN)
+        subject = make_subject(db)
+        make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+        assert len(live_operations.live_exams(db, admin)) == 1
+
+    def test_the_endpoint_is_staff_only(self, client: TestClient, db: Session):
+        candidate = make_user(db, role=UserRole.CANDIDATE)
+        response = client.get(
+            "/api/v1/analytics/live-exams", headers=auth_headers(client, candidate)
+        )
+        assert response.status_code == 403
+
+
+class TestAdminStatsAndSystemHealth:
+    def test_live_and_completed_exam_counts_are_real_not_the_raw_total(
+        self, client: TestClient, db: Session
+    ):
+        admin = make_user(db, role=UserRole.ADMIN)
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        now = datetime.now(UTC)
+
+        make_exam(db, subject, examiner, questions=[make_question(db, subject)])  # live
+        completed = make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+        completed.starts_at = now - timedelta(days=2)
+        completed.ends_at = now - timedelta(days=1)
+        db.flush()
+
+        response = client.get("/api/v1/admin/stats", headers=auth_headers(client, admin))
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["live_exams"] == 1
+        assert body["completed_exams"] == 1
+        assert body["exams"] == 2  # the raw total is unchanged
+
+    def test_system_health_is_examiner_blocked_and_admin_allowed(
+        self, client: TestClient, db: Session
+    ):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        admin = make_user(db, role=UserRole.ADMIN)
+
+        blocked = client.get(
+            "/api/v1/admin/system-health", headers=auth_headers(client, examiner)
+        )
+        assert blocked.status_code == 403
+
+        response = client.get(
+            "/api/v1/admin/system-health", headers=auth_headers(client, admin)
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["database"]["status"] == "operational"
+        assert body["api"]["status"] == "operational"
+        # These two are honestly labelled "configured", never claimed as measured.
+        assert body["websocket"]["basis"] == "configured"
+        assert body["ai_proctoring"]["basis"] == "configured"
+
+
+class TestExamEffectiveStatus:
+    """ExamOut.effective_status - derived from status + the window, never stored."""
+
+    def test_a_published_open_exam_is_live(self, client: TestClient, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+
+        response = client.get(
+            f"/api/v1/exams/{exam.id}", headers=auth_headers(client, examiner)
+        )
+        assert response.json()["effective_status"] == "live"
+
+    def test_a_published_exam_in_the_future_is_scheduled(self, client: TestClient, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+        exam.starts_at = datetime.now(UTC) + timedelta(days=1)
+        exam.ends_at = datetime.now(UTC) + timedelta(days=2)
+        db.flush()
+
+        response = client.get(
+            f"/api/v1/exams/{exam.id}", headers=auth_headers(client, examiner)
+        )
+        assert response.json()["effective_status"] == "scheduled"
+
+    def test_a_published_exam_past_its_window_is_completed(
+        self, client: TestClient, db: Session
+    ):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+        exam.starts_at = datetime.now(UTC) - timedelta(days=2)
+        exam.ends_at = datetime.now(UTC) - timedelta(days=1)
+        db.flush()
+
+        response = client.get(
+            f"/api/v1/exams/{exam.id}", headers=auth_headers(client, examiner)
+        )
+        assert response.json()["effective_status"] == "completed"
+
+    def test_a_draft_exam_is_draft_regardless_of_its_window(
+        self, client: TestClient, db: Session
+    ):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(
+            db,
+            subject,
+            examiner,
+            questions=[make_question(db, subject)],
+            status=ExamStatus.DRAFT,
+        )
+
+        response = client.get(
+            f"/api/v1/exams/{exam.id}", headers=auth_headers(client, examiner)
+        )
+        assert response.json()["effective_status"] == "draft"
+
+    def test_a_closed_exam_is_archived(self, client: TestClient, db: Session):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(db, subject, examiner, questions=[make_question(db, subject)])
+        exam.status = ExamStatus.CLOSED
+        db.flush()
+
+        response = client.get(
+            f"/api/v1/exams/{exam.id}", headers=auth_headers(client, examiner)
+        )
+        assert response.json()["effective_status"] == "archived"

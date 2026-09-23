@@ -215,6 +215,9 @@ def make_exam(
     status: ExamStatus = ExamStatus.PUBLISHED,
     negative_marking: bool = True,
     randomize: bool = True,
+    #: Kept True here so the existing suite keeps exercising the shuffling path. The
+    #: product default is False - see `Exam.shuffle_options`.
+    shuffle_options: bool = True,
     grading_config: dict | None = None,
 ) -> Exam:
     now = datetime.now(UTC)
@@ -229,7 +232,7 @@ def make_exam(
             or [{"question_type": "mcq", "difficulty": "easy", "count": len(questions)}]
         },
         randomize=randomize,
-        shuffle_options=True,
+        shuffle_options=shuffle_options,
         negative_marking=negative_marking,
         paper_salt=generate_salt(),
         proctor_config={**DEFAULT_PROCTOR_CONFIG},

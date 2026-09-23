@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -23,7 +24,7 @@ import { useRequireAuth } from "@/lib/auth";
 import type { IntegrityVerdict, ProctorEvent, ProctorReview } from "@/lib/types";
 import { INTEGRITY_VERDICT_LABEL } from "@/lib/types";
 
-const EVENT_LABEL: Record<string, string> = {
+export const EVENT_LABEL: Record<string, string> = {
   face_missing: "Face not visible",
   multiple_faces: "Multiple people detected",
   phone_detected: "Phone detected in frame",
@@ -35,9 +36,17 @@ const EVENT_LABEL: Record<string, string> = {
   paste_attempt: "Paste attempt",
   copy_attempt: "Copy attempt",
   devtools_open: "Developer tools opened",
+  right_click: "Right-click",
+  cut_attempt: "Cut attempt",
+  text_selection: "Text selection",
+  additional_person: "Additional person in frame",
+  mic_disconnected: "Microphone disconnected",
+  network_lost: "Internet connection lost",
+  headphones_manual: "Headphone/Earphone — Manual Review Required",
 };
 
 export default function ProctorReviewPage() {
+  const t = useTranslations("proctoring");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const params = useParams<{ sessionId: string }>();
   const [review, setReview] = useState<ProctorReview | null>(null);
@@ -74,6 +83,26 @@ export default function ProctorReviewPage() {
     }
   }
 
+  /**
+   * Headphones/earphones have no automated check - MediaPipe has no class for them - so
+   * a reviewer who spots a pair while watching the evidence logs it by hand. It carries
+   * weight 0 and never moves the suspicion score on its own; it is a note for whoever
+   * rules on the sitting, not a verdict.
+   */
+  async function flagHeadphones() {
+    const note = window.prompt("Optional note (e.g. which snapshot shows it)") ?? undefined;
+    try {
+      await api.post(
+        `/proctoring/sessions/${params.sessionId}/flag-headphones` +
+          (note ? `?note=${encodeURIComponent(note)}` : ""),
+      );
+      toast("Flagged for manual review", "amber");
+      void load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not flag this session", "rose");
+    }
+  }
+
   if (!user) return null;
 
   const snapshots = review?.events.filter((event) => event.snapshot_url) ?? [];
@@ -87,11 +116,18 @@ export default function ProctorReviewPage() {
             ← All sessions
           </Button>
         </Link>
-        {review?.status === "in_progress" && (
-          <Button variant="danger" size="sm" onClick={terminate}>
-            Terminate session
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {review && (
+            <Button variant="secondary" size="sm" onClick={flagHeadphones}>
+              🎧 Flag headphones
+            </Button>
+          )}
+          {review?.status === "in_progress" && (
+            <Button variant="danger" size="sm" onClick={terminate}>
+              Terminate session
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -110,7 +146,7 @@ export default function ProctorReviewPage() {
 
           <div className="grid gap-4 sm:grid-cols-4">
             <Card>
-              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Suspicion score</p>
+              <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_suspicion_score")}</p>
               <p
                 className={cx(
                   "mt-1.5 text-[26px] font-semibold leading-none",
@@ -128,7 +164,7 @@ export default function ProctorReviewPage() {
               {/* The count the exam-window rule acts on: tab switches plus fullscreen
                   exits. Shown ahead of the raw tab count because this is the number
                   that closed the sitting, if anything did. */}
-              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Left the exam</p>
+              <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_left_the_exam")}</p>
               <p
                 className={cx(
                   "mt-1.5 text-[26px] font-semibold leading-none",
@@ -143,13 +179,13 @@ export default function ProctorReviewPage() {
               </p>
             </Card>
             <Card>
-              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Events</p>
+              <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_events")}</p>
               <p className="mt-1.5 text-[26px] font-semibold leading-none text-ink">
                 {review.events.length}
               </p>
             </Card>
             <Card>
-              <p className="text-[12px] uppercase tracking-wide text-ink-muted">Status</p>
+              <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_status")}</p>
               <p className="mt-2 flex flex-wrap gap-1.5">
                 <Badge
                   tone={
@@ -168,7 +204,7 @@ export default function ProctorReviewPage() {
           </div>
 
           {review.termination_reason && (
-            <Alert tone="rose" title="Termination">
+            <Alert tone="rose" title={t("alert_termination")}>
               {review.termination_reason}
             </Alert>
           )}
@@ -179,13 +215,13 @@ export default function ProctorReviewPage() {
             {/* -------------------------------------------------- timeline */}
             <Card>
               <SectionTitle
-                title="Event timeline"
-                hint="Ordered by when it happened on the candidate's machine; the server timestamps arrival separately."
+                title={t("title_event_timeline")}
+                hint={t("hint_event_timeline")}
               />
               {review.events.length === 0 ? (
                 <EmptyState
-                  title="Clean session"
-                  body="No proctoring events were recorded for this sitting."
+                  title={t("title_clean_session")}
+                  body={t("body_clean_session")}
                 />
               ) : (
                 <ol className="relative space-y-3 pl-5">
@@ -241,9 +277,9 @@ export default function ProctorReviewPage() {
             {/* --------------------------------------------------- side panel */}
             <div className="space-y-5">
               <Card>
-                <SectionTitle title="Score breakdown" hint="What contributed, and by how much." />
+                <SectionTitle title={t("title_score_breakdown")} hint={t("hint_score_breakdown")} />
                 {Object.keys(review.breakdown).length === 0 ? (
-                  <p className="text-[13px] text-ink-muted">Nothing contributed to the score.</p>
+                  <p className="text-[13px] text-ink-muted">{t("body_nothing_contributed")}</p>
                 ) : (
                   <ul className="space-y-3">
                     {Object.entries(review.breakdown)
@@ -266,12 +302,12 @@ export default function ProctorReviewPage() {
 
               <Card>
                 <SectionTitle
-                  title="Snapshots"
-                  hint={`${snapshots.length} frame${snapshots.length === 1 ? "" : "s"} stored`}
+                  title={t("title_snapshots")}
+                  hint={t("hint_snapshots_frame_count", { count: snapshots.length, frames: snapshots.length === 1 ? "frame" : "frames" })}
                 />
                 {snapshots.length === 0 ? (
                   <p className="text-[13px] text-ink-muted">
-                    No webcam frames were captured for this session.
+                    {t("body_no_webcam_frames")}
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
@@ -343,6 +379,7 @@ function IntegrityPanel({
   review: ProctorReview;
   onRuled: () => void;
 }) {
+  const t = useTranslations("proctoring");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<IntegrityVerdict | null>(null);
 
@@ -383,8 +420,8 @@ function IntegrityPanel({
       )}
     >
       <SectionTitle
-        title="Integrity ruling"
-        hint="Proctoring flags a sitting; you decide what it was. A flagged paper's result stays withheld until this is answered."
+        title={t("hero_integrity_ruling")}
+        hint={t("hint_integrity_ruling")}
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -416,7 +453,7 @@ function IntegrityPanel({
       {ruled && (
         <div className="mt-3 rounded-[10px] border border-line bg-surface-sunk px-3 py-2.5 text-[13px]">
           <p className="text-ink-soft">
-            {review.integrity_note || <span className="italic text-ink-muted">No note given</span>}
+            {review.integrity_note || <span className="italic text-ink-muted">{t("empty_no_note_given")}</span>}
           </p>
           <p className="mt-1 text-[12px] text-ink-muted">
             {review.integrity_reviewed_by ?? "Unknown examiner"}

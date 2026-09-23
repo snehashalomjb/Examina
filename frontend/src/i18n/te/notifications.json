@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "కెమెరా యాక్సెస్ అవసరం",
+  "microphone_access_required": "మైక్రోఫోన్ యాక్సెస్ అవసరం",
+  "connection_unstable": "ఇంటర్నెట్ కనెక్షన్ అస్థిరంగా ఉంది",
+  "exam_submitted_successfully": "పరీక్ష విజయవంతంగా సమర్పించబడింది",
+  "confirm_submit": "మీరు ఖచ్చితంగా సమర్పించాలనుకుంటున్నారా?",
+  "cannot_return_question": "మీరు ఈ ప్రశ్నకు తిరిగి వెళ్లలేరు",
+  "time_almost_over": "సమయం దాదాపు అయిపోయింది",
+  "changes_saved": "మార్పులు సేవ్ చేయబడ్డాయి",
+  "action_failed": "చర్య విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి."
+}

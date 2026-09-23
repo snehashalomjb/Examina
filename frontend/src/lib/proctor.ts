@@ -24,9 +24,39 @@ const WASM_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/models/face_landmarker.task";
 const OBJECT_MODEL_PATH = "/models/efficientdet_lite0.tflite";
 
+/**
+ * MediaPipe's WASM runtime logs its own startup notices - "Created TensorFlow Lite
+ * XNNPACK delegate for CPU" and similar glog "INFO:"/"WARNING:" lines - by calling
+ * `console.error` directly, not by throwing. Next's dev overlay treats any
+ * `console.error` call as a crash and shows it as one, misattributing the stack to
+ * whichever MediaPipe call happened to be in flight. Nothing actually failed. This
+ * filters exactly those known-benign lines out of `console.error` for the duration of
+ * one MediaPipe call, so a real error from the same call still surfaces normally.
+ */
+const BENIGN_MEDIAPIPE_LOG = /^(INFO|WARNING): |XNNPACK delegate|TensorFlow Lite/i;
+
+async function quietingMediaPipeLogs<T>(fn: () => Promise<T> | T): Promise<T> {
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === "string" && BENIGN_MEDIAPIPE_LOG.test(args[0])) return;
+    originalError(...args);
+  };
+  try {
+    return await fn();
+  } finally {
+    console.error = originalError;
+  }
+}
+
 /** COCO label the EfficientDet-Lite0 model uses for a mobile phone. */
 const PHONE_CATEGORY = "cell phone";
 const PHONE_SCORE_THRESHOLD = 0.5;
+/** Same model's "person" class - a coarser body-in-frame signal, independent of the
+ *  face landmarker's face count. Two people can share a frame with only one face
+ *  clearly visible (someone leaning in from behind, say), which multiple_faces misses. */
+const PERSON_CATEGORY = "person";
+const PERSON_SCORE_THRESHOLD = 0.5;
+const PERSON_SAMPLES = 6; // ~1.5s
 
 /** Must match WS_SUBPROTOCOL in backend/app/api/v1/proctor.py. */
 const WS_SUBPROTOCOL = "exam-proctor.v1";
@@ -71,6 +101,8 @@ interface BufferedEvent {
   occurred_at: string;
   severity?: "info" | "warning" | "critical";
   duration_ms?: number;
+  confidence?: number;
+  question_id?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -89,6 +121,12 @@ export interface ProctorCallbacks {
   onFocusViolation?: () => Promise<void> | void;
   /** The paper was submitted for them. Distinct from a termination. */
   onAutoSubmitted?: (reason: string) => void;
+  /**
+   * Fired the instant a suspicious event is recorded locally, before the next flush.
+   * Drives the immediate visual feedback (severity dot, the brief red outline for a
+   * high-risk event) - waiting for the server round trip would make it feel laggy.
+   */
+  onEvent?: (type: ProctorEventType, severity: "info" | "warning" | "critical") => void;
 }
 
 interface LandmarkPoint {
@@ -146,7 +184,10 @@ export class ProctorEngine {
   private awayStreak = 0;
   private darkStreak = 0;
   private phoneStreak = 0;
+  private personStreak = 0;
   private hiddenSince: number | null = null;
+  private lastSelectionRecordAt = 0;
+  private micStream: MediaStream | null = null;
 
   private status: ProctorStatus = {
     cameraReady: false,
@@ -191,6 +232,12 @@ export class ProctorEngine {
     return this.transport;
   }
 
+  /** The raw camera stream, for the live-monitoring broadcaster to attach to a
+   * peer connection. Null until the camera has actually started (or if it never did). */
+  getMediaStream(): MediaStream | null {
+    return this.stream;
+  }
+
   getStatus(): ProctorStatus {
     return { ...this.status };
   }
@@ -200,11 +247,19 @@ export class ProctorEngine {
     this.callbacks.onStatus(this.getStatus());
   }
 
+  /** Which question was on screen, set by the exam runner as the candidate navigates. */
+  private currentQuestionId: string | undefined;
+
+  setCurrentQuestionId(questionId: string | undefined) {
+    this.currentQuestionId = questionId;
+  }
+
   private record(
     type: ProctorEventType,
     metadata?: Record<string, unknown>,
     severity?: BufferedEvent["severity"],
     durationMs?: number,
+    confidence?: number,
   ) {
     if (this.stopped) return;
     if (this.buffer.length >= MAX_BUFFER) this.buffer.shift();
@@ -213,8 +268,11 @@ export class ProctorEngine {
       occurred_at: new Date().toISOString(),
       severity,
       duration_ms: durationMs,
+      confidence,
+      question_id: this.currentQuestionId,
       metadata,
     });
+    this.callbacks.onEvent?.(type, severity ?? "info");
   }
 
   // ------------------------------------------------------------------ start
@@ -246,13 +304,17 @@ export class ProctorEngine {
       this.update({
         cameraReady: false,
         visionMode: "off",
-        lastError: "Camera unavailable. Grant camera access and reload to continue being proctored.",
+        lastError: "proctoring:camera_unavailable_warning",
       });
       void this.flush();
       return;
     }
 
     await this.initVision();
+
+    if (this.config.require_microphone) {
+      await this.initMic();
+    }
 
     this.sampleTimer = window.setInterval(() => void this.sample(), SAMPLE_INTERVAL_MS);
 
@@ -265,25 +327,29 @@ export class ProctorEngine {
   private async initVision() {
     try {
       const vision = await import("@mediapipe/tasks-vision");
-      const fileset = await vision.FilesetResolver.forVisionTasks(WASM_PATH);
-      const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
-        runningMode: "VIDEO",
-        numFaces: 3, // enough to notice a second person without paying for a crowd
-        outputFaceBlendshapes: false,
-        outputFacialTransformationMatrixes: false,
-      });
+      const fileset = await quietingMediaPipeLogs(() => vision.FilesetResolver.forVisionTasks(WASM_PATH));
+      const landmarker = await quietingMediaPipeLogs(() =>
+        vision.FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
+          runningMode: "VIDEO",
+          numFaces: 3, // enough to notice a second person without paying for a crowd
+          outputFaceBlendshapes: false,
+          outputFacialTransformationMatrixes: false,
+        }),
+      );
       this.landmarker = landmarker as unknown as ProctorEngine["landmarker"];
       this.update({ visionMode: "landmarks" });
 
       // A missing/failed phone model must never take face detection down with it.
       try {
-        const objectDetector = await vision.ObjectDetector.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: OBJECT_MODEL_PATH, delegate: "GPU" },
-          runningMode: "VIDEO",
-          scoreThreshold: PHONE_SCORE_THRESHOLD,
-          maxResults: 5,
-        });
+        const objectDetector = await quietingMediaPipeLogs(() =>
+          vision.ObjectDetector.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: OBJECT_MODEL_PATH, delegate: "GPU" },
+            runningMode: "VIDEO",
+            scoreThreshold: PHONE_SCORE_THRESHOLD,
+            maxResults: 5,
+          }),
+        );
         this.objectDetector = objectDetector as unknown as ProctorEngine["objectDetector"];
       } catch (error) {
         console.warn("Phone/object detector unavailable, face detection continues without it", error);
@@ -293,8 +359,28 @@ export class ProctorEngine {
       this.update({
         visionMode: "degraded",
         lastError:
-          "Face detection could not start. Your camera is still recorded for review, and browser activity is still monitored.",
+          "proctoring:face_detection_failed_warning",
       });
+    }
+  }
+
+  /** Only watches for the mic disappearing - no audio content is analysed or sent. */
+  private async initMic() {
+    try {
+      this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.micStream.getAudioTracks().forEach((track) => {
+        track.addEventListener("ended", () => {
+          this.record("mic_disconnected", { reason: "track_ended" }, "warning");
+          void this.flush();
+        });
+        track.addEventListener("mute", () => {
+          this.record("mic_disconnected", { reason: "track_muted" }, "warning");
+          void this.flush();
+        });
+      });
+    } catch {
+      this.record("mic_disconnected", { reason: "permission_denied_or_unavailable" }, "warning");
+      void this.flush();
     }
   }
 
@@ -323,14 +409,14 @@ export class ProctorEngine {
       return; // a dropped frame is not evidence of anything
     }
 
-    const phoneSeen = detections.some((d) =>
-      d.categories.some((c) => c.categoryName === PHONE_CATEGORY && c.score >= PHONE_SCORE_THRESHOLD),
-    );
+    const phoneMatch = detections
+      .flatMap((d) => d.categories)
+      .find((c) => c.categoryName === PHONE_CATEGORY && c.score >= PHONE_SCORE_THRESHOLD);
 
-    if (phoneSeen) {
+    if (phoneMatch) {
       this.phoneStreak += 1;
       if (this.phoneStreak === PHONE_SAMPLES) {
-        this.record("phone_detected", { samples: this.phoneStreak }, "critical");
+        this.record("phone_detected", { samples: this.phoneStreak }, "critical", undefined, phoneMatch.score);
         void this.snapshot("phone_detected");
       }
     } else {
@@ -338,6 +424,20 @@ export class ProctorEngine {
     }
 
     this.update({ phoneDetected: this.phoneStreak >= PHONE_SAMPLES });
+
+    const personCount = detections.filter((d) =>
+      d.categories.some((c) => c.categoryName === PERSON_CATEGORY && c.score >= PERSON_SCORE_THRESHOLD),
+    ).length;
+
+    if (personCount > 1) {
+      this.personStreak += 1;
+      if (this.personStreak === PERSON_SAMPLES) {
+        this.record("additional_person", { person_count: personCount }, "critical");
+        void this.snapshot("additional_person");
+      }
+    } else {
+      this.personStreak = 0;
+    }
   }
 
   private sampleWithLandmarks() {
@@ -548,6 +648,34 @@ export class ProctorEngine {
       this.record("copy_attempt", undefined, "info");
     };
 
+    const onCut = (event: ClipboardEvent) => {
+      if (!this.config.block_copy_paste) return;
+      event.preventDefault();
+      this.record("cut_attempt", undefined, "warning");
+      void this.flush();
+    };
+
+    const onContextMenu = (event: MouseEvent) => {
+      if (this.config.block_copy_paste) event.preventDefault();
+      this.record("right_click", undefined, "info");
+    };
+
+    let selectionThrottled = false;
+    const onSelectStart = () => {
+      // Reading the question involves selecting text constantly, so this is throttled
+      // hard rather than streak-gated like the vision signals - it is evidence of
+      // frequency, not a single alarming moment.
+      if (selectionThrottled) return;
+      selectionThrottled = true;
+      window.setTimeout(() => { selectionThrottled = false; }, 5000);
+      this.record("text_selection", undefined, "info");
+    };
+
+    const onOffline = () => {
+      this.record("network_lost", undefined, "warning");
+      void this.flush();
+    };
+
     const onUnload = () => {
       if (this.buffer.length === 0) return;
       flushOnUnload(
@@ -563,6 +691,10 @@ export class ProctorEngine {
     document.addEventListener("fullscreenchange", onFullscreen);
     document.addEventListener("paste", onPaste);
     document.addEventListener("copy", onCopy);
+    document.addEventListener("cut", onCut);
+    document.addEventListener("contextmenu", onContextMenu);
+    document.addEventListener("selectstart", onSelectStart);
+    window.addEventListener("offline", onOffline);
     window.addEventListener("pagehide", onUnload);
 
     this.detachListeners = [
@@ -571,6 +703,10 @@ export class ProctorEngine {
       () => document.removeEventListener("fullscreenchange", onFullscreen),
       () => document.removeEventListener("paste", onPaste),
       () => document.removeEventListener("copy", onCopy),
+      () => document.removeEventListener("cut", onCut),
+      () => document.removeEventListener("contextmenu", onContextMenu),
+      () => document.removeEventListener("selectstart", onSelectStart),
+      () => window.removeEventListener("offline", onOffline),
       () => window.removeEventListener("pagehide", onUnload),
     ];
   }
@@ -698,14 +834,14 @@ export class ProctorEngine {
     if (outcome.auto_submitted) {
       this.callbacks.onAutoSubmitted?.(
         outcome.warnings.at(-1) ??
-          "You left the exam too many times. Your answers have been submitted.",
+          "proctoring:too_many_focus_violations",
       );
       this.stop();
       return;
     }
     if (outcome.terminated) {
       this.callbacks.onTerminated(
-        outcome.warnings.at(-1) ?? "Your session was terminated by the proctoring system.",
+        outcome.warnings.at(-1) ?? "proctoring:session_terminated",
       );
       this.stop();
     }
@@ -766,6 +902,9 @@ export class ProctorEngine {
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
 
+    this.micStream?.getTracks().forEach((track) => track.stop());
+    this.micStream = null;
+
     if (this.video) this.video.srcObject = null;
   }
 }
@@ -781,16 +920,20 @@ export async function detectFaceOnce(
   video: HTMLVideoElement,
 ): Promise<{ faceDetected: boolean; faceCount: number }> {
   const vision = await import("@mediapipe/tasks-vision");
-  const fileset = await vision.FilesetResolver.forVisionTasks(WASM_PATH);
-  const landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
-    runningMode: "VIDEO",
-    numFaces: 3,
-    outputFaceBlendshapes: false,
-    outputFacialTransformationMatrixes: false,
-  });
+  const fileset = await quietingMediaPipeLogs(() => vision.FilesetResolver.forVisionTasks(WASM_PATH));
+  const landmarker = await quietingMediaPipeLogs(() =>
+    vision.FaceLandmarker.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
+      runningMode: "VIDEO",
+      numFaces: 3,
+      outputFaceBlendshapes: false,
+      outputFacialTransformationMatrixes: false,
+    }),
+  );
   try {
-    const result = landmarker.detectForVideo(video, performance.now());
+    // The delegate is already created by this point, but the very first inference can
+    // still emit the same startup notices, so this call is quieted too.
+    const result = await quietingMediaPipeLogs(() => landmarker.detectForVideo(video, performance.now()));
     const faceCount = result.faceLandmarks?.length ?? 0;
     return { faceDetected: faceCount === 1, faceCount };
   } finally {

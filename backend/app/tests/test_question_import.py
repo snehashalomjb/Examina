@@ -223,6 +223,105 @@ class TestWordAndProse:
         assert rows[0].options[1].is_correct
         assert rows[1].options[0].is_correct
 
+    def test_a_mixed_type_paper_extracts_every_section_not_just_the_first(self):
+        """5 Single Choice, 5 True/False, 3 Multiple Choice - all 13, not just section A."""
+        docx = pytest.importorskip("docx")
+        document = docx.Document()
+        lines = ["Section A — Single Choice (Easy)"]
+        for n in range(1, 6):
+            lines += [f"{n}. Single choice question {n}?", "A. First", "B. Second", "Answer: A"]
+        lines.append("Section B — True/False (Medium)")
+        for n in range(6, 11):
+            lines += [f"{n}. True/false question {n}?", "True", "False", "Answer: True"]
+        lines.append("Section C — Multiple Choice (Medium)")
+        for n in range(11, 14):
+            lines += [
+                f"{n}. Multiple choice question {n}?",
+                "A. Alpha",
+                "B. Beta",
+                "C. Gamma",
+                "D. Delta",
+                # Not every option, since a multi-select question with every option
+                # marked correct is refused by validate_question - same rule the
+                # manual editor is bound by, and out of scope for this fix.
+                "Answer: A, B, C",
+            ]
+        for line in lines:
+            document.add_paragraph(line)
+        buffer = io.BytesIO()
+        document.save(buffer)
+
+        rows = parse_questions(filename="paper.docx", data=buffer.getvalue())
+        assert len(rows) == 13
+        assert [r.problems for r in rows] == [[]] * 13
+        types = [r.question_type.value for r in rows]
+        assert types[:5] == ["mcq"] * 5
+        assert types[5:10] == ["true_false"] * 5
+        assert types[10:] == ["multi_select"] * 3
+
+    def test_bare_true_false_lines_do_not_leak_into_the_question_body(self):
+        docx = pytest.importorskip("docx")
+        document = docx.Document()
+        for line in [
+            "1. A model can perform poorly when training data is unrepresentative.",
+            "True",
+            "False",
+            "Answer: True",
+        ]:
+            document.add_paragraph(line)
+        buffer = io.BytesIO()
+        document.save(buffer)
+
+        rows = parse_questions(filename="paper.docx", data=buffer.getvalue())
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.ok, row.problems
+        assert row.question_type.value == "true_false"
+        assert row.body == "A model can perform poorly when training data is unrepresentative."
+        assert [(o.text, o.is_correct) for o in row.options] == [("True", True), ("False", False)]
+
+    def test_an_answer_written_as_the_full_option_text_names_that_option(self):
+        docx = pytest.importorskip("docx")
+        document = docx.Document()
+        for line in [
+            "1. Which language is this?",
+            "A. Python",
+            "B. Java",
+            "C. C++",
+            "D. HTML",
+            "Answer: Python",
+        ]:
+            document.add_paragraph(line)
+        buffer = io.BytesIO()
+        document.save(buffer)
+
+        rows = parse_questions(filename="paper.docx", data=buffer.getvalue())
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.ok, row.problems
+        assert [o.is_correct for o in row.options] == [True, False, False, False]
+
+    def test_a_table_per_section_is_merged_not_just_the_first(self):
+        docx = pytest.importorskip("docx")
+        document = docx.Document()
+        header_cells = ["Question", "Type", "Option A", "Option B", "Correct"]
+        for section_rows in (
+            [["Section A Q1?", "mcq", "yes", "no", "A"]],
+            [["Section B Q1?", "true_false", "", "", "TRUE"]],
+        ):
+            table = document.add_table(rows=1 + len(section_rows), cols=len(header_cells))
+            for column, value in enumerate(header_cells):
+                table.cell(0, column).text = value
+            for row_index, values in enumerate(section_rows, start=1):
+                for column, value in enumerate(values):
+                    table.cell(row_index, column).text = value
+        buffer = io.BytesIO()
+        document.save(buffer)
+
+        rows = parse_questions(filename="paper.docx", data=buffer.getvalue())
+        assert [r.body for r in rows] == ["Section A Q1?", "Section B Q1?"]
+        assert [r.ok for r in rows] == [True, True]
+
     def test_a_word_table_wins_over_prose_when_both_are_present(self):
         docx = pytest.importorskip("docx")
         document = docx.Document()
@@ -237,6 +336,40 @@ class TestWordAndProse:
 
         rows = parse_questions(filename="paper.docx", data=buffer.getvalue())
         assert [r.body for r in rows] == ["From the table?"]
+
+
+class TestPdf:
+    def _pdf_bytes(self, lines: list[str]) -> bytes:
+        pytest.importorskip("reportlab")
+        from reportlab.pdfgen import canvas
+
+        buffer = io.BytesIO()
+        pdf = canvas.Canvas(buffer)
+        y = 800
+        for line in lines:
+            pdf.drawString(50, y, line)
+            y -= 20
+        pdf.save()
+        return buffer.getvalue()
+
+    def test_a_pdf_with_a_question_table_is_imported_directly(self):
+        data = self._pdf_bytes(
+            [
+                "1. What is supervised learning?",
+                "A. Learning without data",
+                "B. Learning from labelled data",
+                "Answer: B",
+            ]
+        )
+        rows = parse_questions(filename="paper.pdf", data=data)
+        assert len(rows) == 1
+        assert rows[0].ok, rows[0].problems
+        assert rows[0].options[1].is_correct
+
+    def test_a_pdf_with_no_questions_points_at_ai_generate(self):
+        data = self._pdf_bytes(["Syllabus", "Unit 1: Introduction", "Unit 2: Data structures"])
+        with pytest.raises(ImportError_, match="AI Generate"):
+            parse_questions(filename="syllabus.pdf", data=data)
 
 
 class TestSpreadsheet:

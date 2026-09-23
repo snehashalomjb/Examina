@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -14,7 +15,7 @@ import {
   cx,
   formatDate,
 } from "@/components/ui";
-import { IconArrowRight, IconClock, IconExam, IconShield } from "@/components/icons";
+import { IconArrowRight, IconClock, IconShield } from "@/components/icons";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type { CandidateExamCard, SessionStatus } from "@/lib/types";
@@ -26,18 +27,12 @@ const STATUS_TONE: Record<SessionStatus, "accent" | "mint" | "amber" | "rose"> =
   terminated: "rose",
 };
 
-const STATUS_LABEL: Record<SessionStatus, string> = {
-  in_progress: "In progress",
-  submitted: "Submitted",
-  auto_submitted: "Auto-submitted",
-  terminated: "Terminated",
-};
-
 /**
  * My Exams — every paper assigned to this candidate.
  */
 export default function MyExamsPage() {
   const { user } = useRequireAuth(["candidate"]);
+  const t = useTranslations("exam");
   const [exams, setExams] = useState<CandidateExamCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +75,8 @@ export default function MyExamsPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="My Examinations"
-        body="Assigned assessments across Academic courses and Corporate hiring assessments. Open an exam to view details and launch the proctored runner."
+        title={t("my_examinations_title")}
+        body={t("my_examinations_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -91,9 +86,9 @@ export default function MyExamsPage() {
         <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
           {(
             [
-              { key: "all", label: `All Exams (${exams.length})` },
-              { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
-              { key: "corporate", label: `💼 Corporate Hiring (${exams.filter((e) => e.exam_type === "corporate").length})` },
+              { key: "all", label: `${t("all_exams_tab")} (${exams.length})` },
+              { key: "academic", label: `🎓 ${t("academic_exams_tab")} (${exams.filter((e) => e.exam_type === "academic").length})` },
+              { key: "corporate", label: `💼 ${t("corporate_exams_tab")} (${exams.filter((e) => e.exam_type === "corporate").length})` },
             ] as { key: typeof filterMode; label: string }[]
           ).map((tab) => (
             <button
@@ -121,38 +116,38 @@ export default function MyExamsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          title="No examinations found"
-          body={exams.length === 0 ? "When an examiner assigns you to a paper it will appear here." : "No exams match the selected filter category."}
+          title={t("no_examinations_found")}
+          body={exams.length === 0 ? t("no_exams_assigned") : t("no_exams_filtered")}
         />
       ) : (
         <>
-          <Section title="Open for Attempt" count={open.length}>
+          <Section title={t("open_for_attempt")} count={open.length}>
             {open.length === 0 ? (
               <EmptyState
-                title="Nothing open right now"
-                body="None of your assigned exams are inside their active window at this time."
+                title={t("nothing_open_right_now")}
+                body={t("no_open_exams")}
               />
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {open.map((card) => (
-                  <ExamCard key={card.exam_id} card={card} />
+                  <ExamCard key={card.exam_id} card={card} t={t} />
                 ))}
               </div>
             )}
           </Section>
 
           {scheduled.length > 0 && (
-            <Section title="Upcoming / Scheduled" count={scheduled.length}>
+            <Section title={t("upcoming_scheduled")} count={scheduled.length}>
               <div className="grid gap-4 md:grid-cols-2">
                 {scheduled.map((card) => (
-                  <ExamCard key={card.exam_id} card={card} />
+                  <ExamCard key={card.exam_id} card={card} t={t} />
                 ))}
               </div>
             </Section>
           )}
 
           {done.length > 0 && (
-            <Section title="Completed Submissions" count={done.length}>
+            <Section title={t("completed_submissions")} count={done.length}>
               <Card>
                 <ul className="divide-y divide-line">
                   {done.map((card) => (
@@ -175,7 +170,7 @@ export default function MyExamsPage() {
                       <div className="flex items-center gap-2">
                         {card.session_status && (
                           <Badge tone={STATUS_TONE[card.session_status]}>
-                            {STATUS_LABEL[card.session_status]}
+                            {t(`${card.session_status}`)}
                           </Badge>
                         )}
                         {card.result_published && card.result_id ? (
@@ -190,18 +185,18 @@ export default function MyExamsPage() {
                             )}
                             {card.passed !== null && card.passed !== undefined && (
                               <Badge tone={card.passed ? "mint" : "rose"} size="xs">
-                                {card.passed ? "Pass" : "Fail"}
+                                {card.passed ? t("pass") : t("fail")}
                               </Badge>
                             )}
                             <Link href={`/results/${card.result_id}`}>
                               <Button size="sm" variant="secondary">
-                                View Result
+                                {t("view_result")}
                               </Button>
                             </Link>
                           </>
                         ) : (
                           <span className="text-[12px] text-ink-muted">
-                            Awaiting examiner review
+                            {t("awaiting_examiner_review")}
                           </span>
                         )}
                       </div>
@@ -237,7 +232,7 @@ function Section({
   );
 }
 
-function ExamCard({ card }: { card: CandidateExamCard }) {
+function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof useTranslations> }) {
   const isCorp = card.exam_type === "corporate";
 
   return (
@@ -272,23 +267,23 @@ function ExamCard({ card }: { card: CandidateExamCard }) {
           </div>
           <div className="flex flex-col items-end gap-1">
             <Badge tone={isCorp ? "purple" : "accent"}>
-              {isCorp ? "Hiring Drive" : "Academic"}
+              {isCorp ? t("hiring_drive") : t("academic")}
             </Badge>
             {card.can_start ? (
               <Badge tone={card.session_status === "in_progress" ? "accent" : "mint"}>
-                {card.session_status === "in_progress" ? "resume" : "open now"}
+                {card.session_status === "in_progress" ? t("resume") : t("open_now")}
               </Badge>
             ) : (
-              <Badge tone="amber">scheduled</Badge>
+              <Badge tone="amber">{t("scheduled")}</Badge>
             )}
           </div>
         </div>
 
         <dl className="mt-4 grid grid-cols-3 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
           {[
-            ["Duration", `${card.duration_minutes} min`],
-            ["Questions", String(card.total_questions)],
-            ["Closes", formatDate(card.ends_at, false)],
+            [t("duration_label"), `${card.duration_minutes} min`],
+            [t("questions_label"), String(card.total_questions)],
+            [t("closes_label"), formatDate(card.ends_at, false)],
           ].map(([label, value]) => (
             <div key={label}>
               <dt className="text-[10.5px] uppercase tracking-wide text-ink-muted">{label}</dt>
@@ -299,29 +294,29 @@ function ExamCard({ card }: { card: CandidateExamCard }) {
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-ink-muted">
           <span className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 border border-line">
-            <IconShield size={12} /> AI Proctored
+            <IconShield size={12} /> {t("ai_proctored")}
           </span>
           {card.sections_count && card.sections_count > 0 ? (
             <span className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 border border-line">
-              📑 {card.sections_count} Sections
+              📑 {t("sections", { count: card.sections_count })}
             </span>
           ) : null}
           {card.has_coding && (
             <span className="inline-flex items-center gap-1 rounded bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 px-2 py-0.5 border border-purple-200 dark:border-purple-800 font-semibold">
-              💻 Coding Challenge
+              {t("coding_challenge")}
             </span>
           )}
           <span className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 border border-line">
-            <IconClock size={12} /> Single Attempt
+            <IconClock size={12} /> {t("single_attempt")}
           </span>
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/60 pt-3">
-        <p className="text-[11.5px] text-ink-muted">{card.reason ?? "Ready for sitting"}</p>
+        <p className="text-[11.5px] text-ink-muted">{card.reason ?? t("ready_for_sitting")}</p>
         <Link href={`/dashboard/candidate/exams/${card.exam_id}`}>
           <Button size="sm" variant={card.can_start ? "primary" : "secondary"}>
-            {card.can_start ? "Start / Resume" : "View Details"}
+            {card.can_start ? t("start_resume") : t("view_details")}
             <IconArrowRight size={14} />
           </Button>
         </Link>

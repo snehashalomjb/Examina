@@ -345,3 +345,11 @@ def live_dashboard_telemetry(staff: CurrentStaff, db: DbSession) -> dict:
     return live_operations.build(db, staff)
 
 
+@router.get("/analytics/live-exams")
+def live_exams_telemetry(staff: CurrentStaff, db: DbSession) -> list[dict]:
+    """One row per exam currently open, for the "Live Examinations" table - an admin
+    sees every exam on the platform, an examiner sees their own, same scope as the
+    dashboard above."""
+    return live_operations.live_exams(db, staff)
+
+

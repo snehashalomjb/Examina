@@ -16,11 +16,11 @@ import {
   EmptyState,
   Field,
   Input,
-  Modal,
   Select,
   Skeleton,
   cx,
 } from "@/components/ui";
+import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { ApiError, api } from "@/lib/api";
 import {
   CATEGORY_LABEL,
@@ -405,103 +405,3 @@ export function QuestionBankSelector({
   );
 }
 
-/**
- * The examiner's view of a question, answer key included.
- *
- * Deliberately different from what the candidate sees. The candidate's runner renders
- * options with no correctness marking at all; here the key is the point.
- */
-export function QuestionPreviewModal({
-  question,
-  onClose,
-}: {
-  question: Question | null;
-  onClose: () => void;
-}) {
-  if (!question) return null;
-  const spec = (question.spec ?? {}) as Record<string, unknown>;
-
-  return (
-    <Modal open onClose={onClose} title="Question preview">
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-1.5">
-          <Badge tone="neutral">{QUESTION_TYPE_LABEL[question.question_type]}</Badge>
-          <Badge tone={DIFFICULTY_TONE[question.difficulty]}>{question.difficulty}</Badge>
-          <Badge tone="accent">{question.marks} marks</Badge>
-          {question.negative_marks > 0 && (
-            <Badge tone="rose">−{question.negative_marks} if wrong</Badge>
-          )}
-          {question.topic && <Badge tone="neutral">{question.topic}</Badge>}
-        </div>
-
-        <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">
-          {question.body}
-        </p>
-
-        {question.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={question.image_url}
-            alt="Question figure"
-            className="max-h-64 rounded-[10px] border border-line object-contain"
-          />
-        )}
-
-        {question.options.length > 0 && (
-          <ul className="space-y-1.5">
-            {question.options.map((option, index) => (
-              <li
-                key={option.id}
-                className={cx(
-                  "flex items-center gap-2 rounded-[9px] border px-3 py-2 text-[13.5px]",
-                  option.is_correct
-                    ? "border-mint bg-mint-soft text-ink"
-                    : "border-line bg-surface text-ink-soft",
-                )}
-              >
-                <span className="font-semibold">{String.fromCharCode(65 + index)}</span>
-                <span className="flex-1">{option.text}</span>
-                {option.is_correct && <Badge tone="mint">correct</Badge>}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {typeof spec.answer !== "undefined" && (
-          <Detail label="Expected answer">
-            {String(spec.answer)}
-            {typeof spec.tolerance === "number" && spec.tolerance > 0
-              ? ` ± ${spec.tolerance}`
-              : ""}
-            {typeof spec.unit === "string" && spec.unit ? ` ${spec.unit}` : ""}
-          </Detail>
-        )}
-        {Array.isArray(spec.accepted_answers) && (
-          <Detail label="Accepted answers">
-            {(spec.accepted_answers as string[]).join(" · ")}
-          </Detail>
-        )}
-        {question.model_answer && (
-          <Detail label="Model answer">{question.model_answer}</Detail>
-        )}
-        {question.explanation && <Detail label="Explanation">{question.explanation}</Detail>}
-
-        <p className="text-[12px] text-ink-muted">
-          Everything marked correct here stays on the server. The candidate&apos;s paper
-          carries the question and its options, and nothing else.
-        </p>
-      </div>
-    </Modal>
-  );
-}
-
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-[10px] border border-line bg-sunken/50 p-3">
-      <p className="mb-1 text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
-        {label}
-      </p>
-      <p className="whitespace-pre-wrap text-[13.5px] text-ink">{children}</p>
-    </div>
-  );
-}

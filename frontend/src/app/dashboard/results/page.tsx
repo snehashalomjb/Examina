@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -20,6 +21,7 @@ import type { Result } from "@/lib/types";
 
 export default function MyResultsPage() {
   const { user } = useRequireAuth(["candidate"]);
+  const t = useTranslations("results");
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +44,8 @@ export default function MyResultsPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Your results"
-        body="A result appears here only after an examiner has reviewed every written answer and published the paper."
+        title={t("your_results_title")}
+        body={t("your_results_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -56,11 +58,11 @@ export default function MyResultsPage() {
         </div>
       ) : results.length === 0 ? (
         <EmptyState
-          title="No published results yet"
-          body="Once your paper has been marked and released, it will show up here with question-level feedback."
+          title={t("no_published_results")}
+          body={t("no_results_body")}
           action={
             <Link href="/dashboard/candidate">
-              <Button size="sm">Back to exams</Button>
+              <Button size="sm">{t("back_to_exams")}</Button>
             </Link>
           }
         />
@@ -73,7 +75,7 @@ export default function MyResultsPage() {
               <Card key={result.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[12px] uppercase tracking-wide text-ink-muted">Score</p>
+                    <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("score_label")}</p>
                     <p className="mt-1 text-[30px] font-semibold leading-none tracking-tight text-ink">
                       {result.obtained_marks}
                       <span className="text-[16px] font-medium text-ink-muted">
@@ -91,9 +93,9 @@ export default function MyResultsPage() {
 
                 <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
                   {[
-                    ["Correct", result.correct_count, "text-mint"],
-                    ["Incorrect", result.incorrect_count, "text-rose"],
-                    ["Blank", result.unanswered_count, "text-ink-muted"],
+                    [t("correct"), result.correct_count, "text-mint"],
+                    [t("incorrect"), result.incorrect_count, "text-rose"],
+                    [t("blank"), result.unanswered_count, "text-ink-muted"],
                   ].map(([label, value, tint]) => (
                     <div key={label as string} className="rounded-[9px] bg-sunken/60 py-2">
                       <dt className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</dt>
@@ -104,11 +106,11 @@ export default function MyResultsPage() {
 
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <p className="text-[12px] text-ink-muted">
-                    Published {formatDate(result.published_at, false)}
+                    {t("published_date", { date: formatDate(result.published_at, false) })}
                   </p>
                   <Link href={`/results/${result.id}`}>
                     <Button size="sm" variant="secondary">
-                      Question feedback
+                      {t("question_feedback")}
                     </Button>
                   </Link>
                 </div>

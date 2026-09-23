@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -54,6 +55,7 @@ interface SystemCheck {
  * proctored paper.
  */
 export default function ExamDetailPage() {
+  const t = useTranslations("exam");
   const { user } = useRequireAuth(["candidate"]);
   const params = useParams<{ examId: string }>();
   const router = useRouter();
@@ -74,13 +76,13 @@ export default function ExamDetailPage() {
         if (cancelled) return;
         const found = cards.find((c) => c.exam_id === params.examId);
         if (!found) {
-          setError("This examination is not assigned to you.");
+          setError(t("exam_not_assigned"));
         } else {
           setCard(found);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load this examination.");
+          setError(err instanceof ApiError ? err.message : t("could_not_load_exam"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -98,7 +100,7 @@ export default function ExamDetailPage() {
       const session = await api.post<{ session_id: string }>(`/exams/${card.exam_id}/start`);
       router.push(`/exam/${session.session_id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not start the exam", "rose");
+      toast(err instanceof ApiError ? err.message : t("could_not_start_exam"), "rose");
       setStarting(false);
     }
   }
@@ -117,9 +119,9 @@ export default function ExamDetailPage() {
   if (error || !card) {
     return (
       <div className="space-y-5">
-        <Alert tone="rose">{error ?? "Examination not found."}</Alert>
+        <Alert tone="rose">{error ?? t("exam_not_found")}</Alert>
         <Link href="/dashboard/candidate/exams">
-          <Button variant="secondary">Back to my exams</Button>
+          <Button variant="secondary">{t("back_to_exams")}</Button>
         </Link>
       </div>
     );
@@ -130,12 +132,12 @@ export default function ExamDetailPage() {
       <div>
         <Link href="/dashboard/candidate/exams">
           <Button variant="ghost" size="sm">
-            ← My exams
+            ← {t("my_exams")}
           </Button>
         </Link>
       </div>
 
-      <Hero title={card.title} body={`${card.subject_name} · ${card.reason ?? "Assigned to you"}`} />
+      <Hero title={card.title} body={`${card.subject_name} · ${card.reason ?? t("assigned_to_you")}`} />
 
       <Stepper stage={stage} />
 
@@ -166,13 +168,13 @@ export default function ExamDetailPage() {
 }
 
 /* --------------------------------------------------------------------- stepper */
-const STAGES: { key: Stage; label: string }[] = [
-  { key: "details", label: "Exam details" },
-  { key: "system-check", label: "System check" },
-  { key: "instructions", label: "Instructions" },
-];
-
 function Stepper({ stage }: { stage: Stage }) {
+  const t = useTranslations("exam");
+  const STAGES: { key: Stage; label: string }[] = [
+    { key: "details", label: t("exam_details") },
+    { key: "system-check", label: t("system_check") },
+    { key: "instructions", label: t("instructions_title") },
+  ];
   const index = STAGES.findIndex((s) => s.key === stage);
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -206,17 +208,18 @@ function ExamDetails({
   card: CandidateExamCard;
   onContinue: () => void;
 }) {
+  const t = useTranslations("exam");
   return (
     <Card>
-      <SectionTitle title="Examination details" hint="Read this before you continue." />
+      <SectionTitle title={t("exam_details_title")} hint={t("read_before_continue")} />
 
       <dl className="grid gap-3 sm:grid-cols-4">
         {(
           [
-            { label: "Duration", value: `${card.duration_minutes} min`, Icon: IconClock },
-            { label: "Questions", value: String(card.total_questions), Icon: IconExam },
-            { label: "Opens", value: formatDate(card.starts_at), Icon: IconClock },
-            { label: "Closes", value: formatDate(card.ends_at), Icon: IconClock },
+            { label: t("duration_label"), value: `${card.duration_minutes} min`, Icon: IconClock },
+            { label: t("questions_label"), value: String(card.total_questions), Icon: IconExam },
+            { label: t("opens_label"), value: formatDate(card.starts_at), Icon: IconClock },
+            { label: t("closes_label"), value: formatDate(card.ends_at), Icon: IconClock },
           ] as const
         ).map(({ label, value, Icon }) => (
           <div key={label} className="rounded-[11px] border border-line p-3">
@@ -231,10 +234,10 @@ function ExamDetails({
 
       <div className="mt-5 space-y-2.5">
         {[
-          "Your paper is generated for you alone — no two candidates get the same questions in the same order.",
-          "You have a single attempt. The exam submits itself automatically when your time runs out.",
-          "Your answers save as you work, so a refresh or a dropped connection will not lose them.",
-          "Objective questions are marked immediately. Written answers are reviewed by an examiner before your result is released.",
+          t("paper_unique"),
+          t("single_attempt"),
+          t("answers_autosave"),
+          t("marking_process"),
         ].map((line) => (
           <div key={line} className="flex gap-2.5">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rotate-45 bg-accent" />
@@ -245,10 +248,10 @@ function ExamDetails({
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <p className="text-[12.5px] text-ink-muted">
-          {card.can_start ? "This exam is open now." : card.reason}
+          {card.can_start ? t("exam_open_now") : card.reason}
         </p>
         <Button onClick={onContinue} disabled={!card.can_start}>
-          Continue to system check
+          {t("continue_to_system_check")}
           <IconArrowRight size={15} />
         </Button>
       </div>
@@ -287,6 +290,7 @@ function SystemCheckStage({
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const t = useTranslations("exam");
   const config = card.proctor_config;
   const needCamera = proctorFlag(config, "webcam_enabled", true);
   const needMic = proctorFlag(config, "require_microphone", true);
@@ -296,47 +300,55 @@ function SystemCheckStage({
 
   const initialChecks = useMemo<SystemCheck[]>(() => {
     const list: SystemCheck[] = [];
+    // Required for every exam type, unconditionally - a candidate on an unsupported
+    // browser needs to know before the sitting starts, not mid-exam when a check fails.
+    list.push({
+      key: "browser",
+      label: t("browser_label"),
+      detail: t("browser_required"),
+      state: "idle",
+    });
     if (needCamera) {
       list.push({
         key: "camera",
-        label: "Camera & face detection",
-        detail: "Proctoring needs to see your face for the whole sitting.",
+        label: t("camera_face_label"),
+        detail: t("camera_needs_face"),
         state: "idle",
       });
     }
     if (needMic) {
       list.push({
         key: "microphone",
-        label: "Microphone",
-        detail: "Your microphone must be enabled before you can start.",
+        label: t("microphone_label"),
+        detail: t("microphone_required"),
         state: "idle",
       });
     }
     list.push({
       key: "speed",
-      label: "Internet speed",
-      detail: `Needs at least ${minMbps} Mbps so autosave and snapshots keep up.`,
+      label: t("internet_speed_label"),
+      detail: t("internet_speed_detail", { minMbps }),
       state: "idle",
     });
     if (needFullscreen) {
       list.push({
         key: "fullscreen",
-        label: "Fullscreen",
-        detail: "The exam runs in fullscreen for its whole duration.",
+        label: t("fullscreen_label"),
+        detail: t("fullscreen_detail"),
         state: "idle",
       });
     }
     if (needDisplay) {
       list.push({
         key: "display",
-        label: "Single display only",
-        detail: "Only one monitor may be connected during the exam.",
+        label: t("display_label"),
+        detail: t("display_detail"),
         state: "idle",
       });
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [t]);
 
   const [checks, setChecks] = useState<SystemCheck[]>(initialChecks);
   const [running, setRunning] = useState(false);
@@ -358,6 +370,21 @@ function SystemCheckStage({
       ),
     );
 
+    // --- browser support ----------------------------------------------------
+    // Feature-detected rather than sniffed from the user-agent string, which lies
+    // constantly - a browser that actually has these APIs can actually run the exam,
+    // regardless of what it claims to be.
+    const browserSupported =
+      typeof navigator.mediaDevices?.getUserMedia === "function" &&
+      typeof document.documentElement.requestFullscreen === "function" &&
+      typeof window.WebSocket !== "undefined";
+    update("browser", {
+      state: browserSupported ? "pass" : "fail",
+      message: browserSupported
+        ? t("supported")
+        : t("browser_not_supported"),
+    });
+
     // --- camera + face -----------------------------------------------------
     if (needCamera) {
       try {
@@ -373,23 +400,23 @@ function SystemCheckStage({
           ? await detectFaceOnce(videoRef.current)
           : { faceCount: 0 };
         if (faceCount === 1) {
-          update("camera", { state: "pass", message: "Face detected" });
+          update("camera", { state: "pass", message: t("face_detected") });
         } else if (faceCount === 0) {
           update("camera", {
             state: "fail",
-            message: "No face detected. Make sure you're visible and well lit, then re-run.",
+            message: t("no_face_detected"),
           });
         } else {
           update("camera", {
             state: "fail",
-            message: `${faceCount} people detected. Only you may be in frame.`,
+            message: t("multiple_faces_detected", { faceCount }),
           });
         }
       } catch {
         cameraStreamRef.current = null;
         update("camera", {
           state: "fail",
-          message: "No camera access. Allow camera permission in your browser, then re-run.",
+          message: t("camera_access_denied"),
         });
       }
     }
@@ -403,12 +430,12 @@ function SystemCheckStage({
         stream.getTracks().forEach((t) => t.stop());
         update("microphone", {
           state: live ? "pass" : "fail",
-          message: live ? "Microphone available" : "Microphone did not report as active.",
+          message: live ? t("microphone_available") : t("microphone_not_active"),
         });
       } catch {
         update("microphone", {
           state: "fail",
-          message: "No microphone access. Allow microphone permission in your browser, then re-run.",
+          message: t("microphone_access_denied"),
         });
       }
     }
@@ -428,13 +455,13 @@ function SystemCheckStage({
         state: mbps >= minMbps ? "pass" : "fail",
         message:
           mbps >= minMbps
-            ? `${mbps.toFixed(1)} Mbps`
-            : `Only ${mbps.toFixed(1)} Mbps measured — needs at least ${minMbps} Mbps.`,
+            ? t("speed_mbps", { mbps: mbps.toFixed(1) })
+            : t("speed_too_low", { mbps: mbps.toFixed(1), minMbps }),
       });
     } catch {
       update("speed", {
         state: "fail",
-        message: "Could not reach the exam server. Check your connection and re-run.",
+        message: t("server_unreachable"),
       });
     }
 
@@ -457,13 +484,13 @@ function SystemCheckStage({
       update(
         "fullscreen",
         document.fullscreenElement
-          ? { state: "pass", message: "Fullscreen active" }
-          : { state: "fail", message: "Not in fullscreen yet. Click Enable fullscreen." },
+          ? { state: "pass", message: t("fullscreen_active") }
+          : { state: "fail", message: t("fullscreen_not_enabled") },
       );
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
-  }, [needFullscreen, update]);
+  }, [needFullscreen, update, t]);
 
   async function enterFullscreen() {
     try {
@@ -471,7 +498,7 @@ function SystemCheckStage({
     } catch {
       update("fullscreen", {
         state: "fail",
-        message: "Fullscreen was blocked by the browser. Allow it and try again.",
+        message: t("fullscreen_blocked"),
       });
     }
   }
@@ -482,11 +509,11 @@ function SystemCheckStage({
     if (typeof (window as WindowWithScreenDetails).getScreenDetails !== "function") {
       update("display", {
         state: "unsupported",
-        message: "This browser can't verify display count. Please confirm only one monitor is connected.",
+        message: t("display_browser_unsupported"),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needDisplay]);
+  }, [needDisplay, t]);
 
   async function checkDisplays() {
     const getScreenDetails = (window as WindowWithScreenDetails).getScreenDetails;
@@ -499,13 +526,13 @@ function SystemCheckStage({
         state: count === 1 ? "pass" : "fail",
         message:
           count === 1
-            ? "Single display detected"
-            : `${count} displays detected. Disconnect the extra monitor(s) and re-check.`,
+            ? t("display_single")
+            : t("display_multiple", { count }),
       });
     } catch {
       update("display", {
         state: "fail",
-        message: "Display permission was blocked. Allow it and try again.",
+        message: t("display_permission_denied"),
       });
     }
   }
@@ -524,8 +551,8 @@ function SystemCheckStage({
   return (
     <Card>
       <SectionTitle
-        title="System check"
-        hint="Every check below must pass before the exam can start."
+        title={t("system_check_title")}
+        hint={t("system_check_hint")}
       />
 
       <ul className="space-y-2.5">
@@ -584,18 +611,18 @@ function SystemCheckStage({
 
                 {check.key === "fullscreen" && check.state !== "pass" && (
                   <Button size="sm" variant="secondary" className="mt-2" onClick={() => void enterFullscreen()}>
-                    Enable fullscreen
+                    {t("enable_fullscreen")}
                   </Button>
                 )}
 
                 {check.key === "display" && check.state === "idle" && (
                   <Button size="sm" variant="secondary" className="mt-2" onClick={() => void checkDisplays()}>
-                    Check displays
+                    {t("check_displays")}
                   </Button>
                 )}
                 {check.key === "display" && check.state === "fail" && (
                   <Button size="sm" variant="secondary" className="mt-2" onClick={() => void checkDisplays()}>
-                    Re-check displays
+                    {t("recheck_displays")}
                   </Button>
                 )}
               </div>
@@ -606,22 +633,22 @@ function SystemCheckStage({
 
       {!allClear && (
         <div className="mt-4">
-          <Alert tone="amber" title="Fix these before you start">
-            {blocking.map((c) => c.label).join(", ")} must pass before you can continue.
+          <Alert tone="amber" title={t("fix_before_start")}>
+            {blocking.map((c) => c.label).join(", ")} {t("must_pass_to_continue")}
           </Alert>
         </div>
       )}
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack}>
-          Back
+          {t("back_button")}
         </Button>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => void runAuto()} loading={running}>
-            Re-run checks
+            {t("rerun_checks")}
           </Button>
           <Button onClick={onContinue} disabled={running || !allClear}>
-            Continue
+            {t("continue_button")}
             <IconArrowRight size={15} />
           </Button>
         </div>
@@ -646,45 +673,45 @@ function InstructionsStage({
   onBack: () => void;
   onStart: () => void;
 }) {
+  const t = useTranslations("exam");
   return (
     <Card>
       <SectionTitle
-        title="Instructions"
-        hint="The clock starts the moment you begin, and it does not pause."
+        title={t("instructions_title")}
+        hint={t("instructions_hint")}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-[11px] border border-line p-4">
           <p className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <IconExam size={15} /> Sitting the paper
+            <IconExam size={15} /> {t("sitting_paper")}
           </p>
           <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-ink-soft">
-            <li>· {card.total_questions} questions, {card.duration_minutes} minutes.</li>
-            <li>· Move freely between questions using the palette.</li>
-            <li>· Answers save automatically as you type or select.</li>
-            <li>· Blank answers score zero and never attract a negative mark.</li>
-            <li>· Submitting is final — you cannot reopen the paper.</li>
+            <li>· {t("questions_duration", { total_questions: card.total_questions, duration_minutes: card.duration_minutes })}</li>
+            <li>· {t("move_between_questions")}</li>
+            <li>· {t("answers_auto_save")}</li>
+            <li>· {t("blank_no_negative")}</li>
+            <li>· {t("submit_final")}</li>
           </ul>
         </div>
 
         <div className="rounded-[11px] border border-line p-4">
           <p className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-ink">
-            <IconShield size={15} /> While you are monitored
+            <IconShield size={15} /> {t("while_monitored")}
           </p>
           <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-ink-soft">
-            <li>· Stay in frame, alone, with your face visible.</li>
-            <li>· Leaving the exam tab is recorded and warned about.</li>
-            <li>· Exiting fullscreen and copy/paste attempts are recorded.</li>
-            <li>· Webcam snapshots are stored for examiner review.</li>
-            <li>· A high suspicion score can end your session automatically.</li>
+            <li>· {t("stay_in_frame")}</li>
+            <li>· {t("leaving_recorded")}</li>
+            <li>· {t("fullscreen_copy_paste")}</li>
+            <li>· {t("snapshots_stored")}</li>
+            <li>· {t("high_suspicion")}</li>
           </ul>
         </div>
       </div>
 
       <div className="mt-4">
-        <Alert tone="amber" title="One attempt only">
-          Once you start, this counts as your attempt even if you close the browser. If
-          your time expires the paper is submitted for you.
+        <Alert tone="amber" title={t("one_attempt_title")}>
+          {t("one_attempt_detail")}
         </Alert>
       </div>
 
@@ -696,17 +723,16 @@ function InstructionsStage({
           className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
         />
         <span className="text-[13px] leading-relaxed text-ink-soft">
-          I have read the instructions, I am sitting this examination alone, and I consent
-          to webcam and browser-activity monitoring for its duration.
+          {t("monitoring_consent")}
         </span>
       </label>
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack}>
-          Back
+          {t("back_button")}
         </Button>
         <Button onClick={onStart} loading={starting} disabled={!agreed}>
-          {card.session_status === "in_progress" ? "Resume examination" : "Start examination"}
+          {card.session_status === "in_progress" ? t("resume_exam") : t("start_exam_button")}
           <IconArrowRight size={15} />
         </Button>
       </div>
@@ -714,7 +740,7 @@ function InstructionsStage({
       {!agreed && (
         <p className="mt-2 flex items-center justify-end gap-1.5 text-[12px] text-ink-muted">
           <IconAlert size={13} />
-          Confirm the declaration to begin.
+          {t("confirm_declaration")}
         </p>
       )}
     </Card>

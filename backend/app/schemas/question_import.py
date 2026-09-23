@@ -26,6 +26,11 @@ class ImportedRow(BaseModel):
     #: 1-based including the header, so it matches the row number in Excel.
     row_number: int
     body: str = ""
+    #: Resolved from the row's own "Subject" cell when the file has one, otherwise the
+    #: import's default subject. Null only when the cell named a subject that does not
+    #: exist - see ``problems`` for that case.
+    subject_id: uuid.UUID | None = None
+    subject_name: str | None = None
     question_type: QuestionType
     difficulty: Difficulty
     category: QuestionCategory
@@ -52,6 +57,12 @@ class ImportParseOut(BaseModel):
     invalid: int
     duplicates: int
     rows: list[ImportedRow]
+    #: Every worksheet in the workbook, when the file is an .xlsx/.xlsm with more than
+    #: one. Empty for every other format, or a single-sheet workbook - nothing for the
+    #: examiner to choose between.
+    sheet_names: list[str] = Field(default_factory=list)
+    #: Which sheet ``rows`` was actually read from.
+    sheet_name: str | None = None
 
 
 class ImportRowIn(BaseModel):
@@ -59,6 +70,9 @@ class ImportRowIn(BaseModel):
 
     row_number: int = 0
     body: str = Field(..., min_length=1)
+    #: Per-row subject override. Null means "use the import's default subject" - the
+    #: only behaviour a single-subject file has ever needed.
+    subject_id: uuid.UUID | None = None
     question_type: QuestionType
     difficulty: Difficulty = Difficulty.MEDIUM
     category: QuestionCategory = QuestionCategory.ACADEMIC

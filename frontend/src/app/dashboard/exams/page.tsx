@@ -28,11 +28,11 @@ import type {
   EnrollmentRow,
   Exam,
   ExamPoolCheck,
-  ExamType,
   Question,
   QuestionType,
   SelectionRule,
   Subject,
+  TopPerformer,
 } from "@/lib/types";
 import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
 
@@ -189,6 +189,8 @@ export default function ExamsPage() {
         </div>
       </div>
 
+      <TopPerformerBySubject subjects={subjects} />
+
       {building && (
         <ExamBuilder
           subjects={subjects}
@@ -317,11 +319,11 @@ export default function ExamsPage() {
                   <Link href={`/dashboard/exams/${exam.id}/analytics`}>
                     <Button size="sm" variant="ghost">Analytics</Button>
                   </Link>
-                  {exam.exam_type === "corporate" && (
-                    <Link href={`/dashboard/exams/${exam.id}/ranking`}>
-                      <Button size="sm" variant="ghost">Ranking</Button>
-                    </Link>
-                  )}
+                  <Link href={`/dashboard/exams/${exam.id}/ranking`}>
+                    <Button size="sm" variant="ghost">
+                      {exam.exam_type === "corporate" ? "Ranking" : "Candidate Report"}
+                    </Button>
+                  </Link>
                   {exam.results_published && <Badge tone="mint">results published</Badge>}
                 </div>
               </Card>
@@ -385,6 +387,67 @@ function PaperPreviewButton({ examId }: { examId: string }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Highest scorer on a chosen subject, across every published result for it. */
+function TopPerformerBySubject({ subjects }: { subjects: Subject[] }) {
+  const [subjectId, setSubjectId] = useState("");
+  const [performer, setPerformer] = useState<TopPerformer | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!subjectId) {
+      setPerformer(null);
+      setChecked(false);
+      return;
+    }
+    setLoading(true);
+    setChecked(false);
+    api
+      .get<TopPerformer | null>(`/subjects/${subjectId}/top-performer`)
+      .then((data) => setPerformer(data))
+      .catch(() => setPerformer(null))
+      .finally(() => {
+        setLoading(false);
+        setChecked(true);
+      });
+  }, [subjectId]);
+
+  if (subjects.length === 0) return null;
+
+  return (
+    <Card>
+      <SectionTitle title="Top Performer by Subject" hint="Highest published score for a subject, across all its exams." />
+      <div className="flex flex-wrap items-center gap-3">
+        <Select className="w-64" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <option value="">Choose a subject…</option>
+          {subjects.map((subject) => (
+            <option key={subject.id} value={subject.id}>
+              {subject.code} — {subject.name}
+            </option>
+          ))}
+        </Select>
+
+        {loading && <Skeleton className="h-9 w-56 rounded-[8px]" />}
+
+        {!loading && checked && performer && (
+          <div className="flex items-center gap-2 rounded-[10px] border border-amber/30 bg-amber-soft/30 px-3.5 py-2">
+            <span className="text-[16px]">🏆</span>
+            <span className="text-[13px] text-ink">
+              <strong>{performer.candidate_name}</strong> — {performer.obtained_marks.toFixed(1)}/
+              {performer.total_marks.toFixed(1)} ({performer.percentage.toFixed(1)}%) on{" "}
+              {performer.exam_title}
+            </span>
+          </div>
+        )}
+
+        {!loading && checked && !performer && (
+          <span className="text-[13px] text-ink-muted">No published results for this subject yet.</span>
+        )}
+      </div>
+    </Card>
   );
 }
 

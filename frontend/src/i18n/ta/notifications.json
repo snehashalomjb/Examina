@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "கேமரா அணுகல் தேவை",
+  "microphone_access_required": "மைக்ரோஃபோன் அணுகல் தேவை",
+  "connection_unstable": "இணைய இணைப்பு நிலையற்றதாக உள்ளது",
+  "exam_submitted_successfully": "தேர்வு வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது",
+  "confirm_submit": "நீங்கள் நிச்சயமாக சமர்ப்பிக்க விரும்புகிறீர்களா?",
+  "cannot_return_question": "இந்த கேள்விக்குத் திரும்ப முடியாது",
+  "time_almost_over": "நேரம் கிட்டத்தட்ட முடிந்துவிட்டது",
+  "changes_saved": "மாற்றங்கள் சேமிக்கப்பட்டன",
+  "action_failed": "செயல் தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்."
+}

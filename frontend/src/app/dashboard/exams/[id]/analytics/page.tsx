@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -20,6 +21,7 @@ import { useRequireAuth } from "@/lib/auth";
 import type { Exam, ExamAnalytics } from "@/lib/types";
 
 export default function AnalyticsPage() {
+  const t = useTranslations("results");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const params = useParams<{ id: string }>();
   const examId = params.id;
@@ -65,7 +67,7 @@ export default function AnalyticsPage() {
             </Link>
             {exam?.exam_type === "corporate" && (
               <Link href={`/dashboard/exams/${examId}/ranking`}>
-                <Button size="sm">View Ranking</Button>
+                <Button size="sm">{t("viewRanking")}</Button>
               </Link>
             )}
           </div>
@@ -135,7 +137,7 @@ export default function AnalyticsPage() {
           {analytics.score_distribution.length > 0 && (
             <Card>
               <SectionTitle
-                title="Score Distribution"
+                title={t("scoreDistribution")}
                 hint={`${analytics.score_distribution.length} completed sessions`}
               />
               <ScoreHistogram scores={analytics.score_distribution} />
@@ -147,7 +149,7 @@ export default function AnalyticsPage() {
             {analytics.section_analytics.length > 0 && (
               <Card>
                 <SectionTitle
-                  title="Section-wise Performance"
+                  title={t("sectionWisePerformance")}
                   hint="Average scores per section across all candidates"
                 />
                 <ul className="space-y-4">
@@ -173,7 +175,7 @@ export default function AnalyticsPage() {
             {analytics.topic_performance.length > 0 && (
               <Card>
                 <SectionTitle
-                  title="Topic Performance"
+                  title={t("topicPerformance")}
                   hint="Average scores by question topic"
                 />
                 <ul className="space-y-3">
@@ -203,8 +205,8 @@ export default function AnalyticsPage() {
 
           {analytics.completed_sessions === 0 && (
             <EmptyState
-              title="No completed sessions yet"
-              body="Analytics will appear once candidates submit the exam."
+              title={t("noCompletedSessions")}
+              body={t("analyticsEmptyState")}
             />
           )}
         </>

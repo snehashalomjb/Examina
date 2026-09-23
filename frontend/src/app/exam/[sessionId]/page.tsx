@@ -17,6 +17,8 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { LiveBroadcaster } from "@/lib/liveBroadcast";
+import { LOCALE_NAMES, type Locale } from "@/lib/locale";
 import { ProctorEngine, type ProctorStatus } from "@/lib/proctor";
 import type { ExamSession, HeartbeatOut, PaperQuestion, SessionSection } from "@/lib/types";
 import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
@@ -43,6 +45,11 @@ export default function ExamRunner() {
   const [answers, setAnswers] = useState<Record<string, { options: string[]; text: string; imageUrl: string | null }>>({});
   const [reviewFlags, setReviewFlags] = useState<Set<string>>(new Set());
   const [warnings, setWarnings] = useState<string[]>([]);
+  /** Severity of the most recent event, driving the 🟢/🟡/🔴 status dot. */
+  const [lastSeverity, setLastSeverity] = useState<"info" | "warning" | "critical">("info");
+  /** Brief red outline around the content area on a high-risk event - not a permanent state. */
+  const [riskFlash, setRiskFlash] = useState(false);
+  const riskFlashTimer = useRef<number | null>(null);
   const [proctor, setProctor] = useState<ProctorStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -53,9 +60,12 @@ export default function ExamRunner() {
   /** False until the candidate has entered fullscreen once, so the gate can differ. */
   const [fullscreenEverEntered, setFullscreenEverEntered] = useState(false);
   const [clearTarget, setClearTarget] = useState<PaperQuestion | null>(null);
+  const [switchingLocale, setSwitchingLocale] = useState(false);
+  const [localeNotice, setLocaleNotice] = useState<string | null>(null);
 
   const examToken = useRef<string | null>(null);
   const engine = useRef<ProctorEngine | null>(null);
+  const broadcaster = useRef<LiveBroadcaster | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const saveTimers = useRef<Record<string, number>>({});
@@ -103,6 +113,35 @@ export default function ExamRunner() {
     })();
   }, [user, sessionId]);
 
+  /**
+   * Switch the displayed language mid-exam. Re-fetches the same frozen paper rendered
+   * in a different locale - question/option ids, marks, the timer, the session, and
+   * every saved answer are untouched: `answers` state (keyed by question_id) never gets
+   * cleared here, and the server's `_build_paper` merges the candidate's real answers
+   * back in regardless of locale. Only the displayed text changes.
+   */
+  const changeExamLocale = useCallback(
+    async (locale: string) => {
+      if (!sessionId || switchingLocale) return;
+      setSwitchingLocale(true);
+      try {
+        const data = await api.get<ExamSession>(`/sessions/${sessionId}?lang=${locale}`);
+        examToken.current = data.exam_token ?? examToken.current;
+        setSession(data);
+        setLocaleNotice(
+          data.locale !== locale
+            ? "Translation unavailable for this exam. Showing English."
+            : null,
+        );
+      } catch (err) {
+        toast(err instanceof ApiError ? err.message : "Could not switch language.", "rose");
+      } finally {
+        setSwitchingLocale(false);
+      }
+    },
+    [sessionId, switchingLocale],
+  );
+
   /* -------------------------------------------------------------- proctoring */
   useEffect(() => {
     if (!session || session.status !== "in_progress" || !examToken.current) return;
@@ -119,6 +158,13 @@ export default function ExamRunner() {
           setInFullscreen(status.inFullscreen);
         },
         onWarnings: (incoming) => setWarnings(incoming),
+        onEvent: (_type, severity) => {
+          setLastSeverity(severity);
+          if (severity !== "critical") return;
+          setRiskFlash(true);
+          if (riskFlashTimer.current) window.clearTimeout(riskFlashTimer.current);
+          riskFlashTimer.current = window.setTimeout(() => setRiskFlash(false), 2500);
+        },
         // Fires before the violation reaches the server, which is what makes the
         // ordering "answers first, then the event, then the server's decision".
         onFocusViolation: flushPendingSaves,
@@ -126,20 +172,41 @@ export default function ExamRunner() {
           setLockedReason(reason);
           setFinished(reason);
           toast(reason, "rose");
+          broadcaster.current?.stop();
+          broadcaster.current = null;
         },
         onTerminated: (reason) => {
           setLockedReason(reason);
           setFinished(reason);
           toast(reason, "rose");
+          broadcaster.current?.stop();
+          broadcaster.current = null;
         },
       },
     });
     engine.current = instance;
-    void instance.start(videoRef.current, canvasRef.current);
+    void instance.start(videoRef.current, canvasRef.current).then(() => {
+      // Broadcasting reuses the exact stream ProctorEngine already opened for vision -
+      // no second camera permission prompt, and nothing to send if the camera never
+      // started (a denied/unavailable camera just means no live tile for this session).
+      const stream = instance.getMediaStream();
+      if (stream && examToken.current) {
+        const live = new LiveBroadcaster({
+          sessionId: session.session_id,
+          examToken: examToken.current,
+          stream,
+        });
+        broadcaster.current = live;
+        live.start();
+      }
+    });
 
     return () => {
       void instance.flush().finally(() => instance.stop());
       engine.current = null;
+      broadcaster.current?.stop();
+      broadcaster.current = null;
+      if (riskFlashTimer.current) window.clearTimeout(riskFlashTimer.current);
     };
     // flushPendingSaves is stable via useCallback on persist, which only depends on the
     // session id - re-creating the engine on every answer edit would be a disaster.
@@ -169,6 +236,7 @@ export default function ExamRunner() {
         if (data.exam_token) {
           examToken.current = data.exam_token;
           engine.current?.setExamToken(data.exam_token);
+          broadcaster.current?.setExamToken(data.exam_token);
         }
         if (data.warnings.length) setWarnings(data.warnings);
         if (data.status !== "in_progress") {
@@ -234,6 +302,33 @@ export default function ExamRunner() {
     document.body.classList.add("exam-mode");
     return () => document.body.classList.remove("exam-mode");
   }, []);
+
+  /**
+   * Navigation lock while the exam is live: the backend is the real gate (any write
+   * against a closed/expired session 409s), but a candidate should never even see the
+   * dashboard flash behind the back button. Traps back/forward on this URL, and warns
+   * on refresh/close so an accidental reload doesn't feel like the exam vanished.
+   */
+  useEffect(() => {
+    if (!session || session.status !== "in_progress" || finished) return;
+
+    const trap = () => window.history.pushState(null, "", window.location.href);
+    trap();
+    const onPopState = () => {
+      trap();
+      toast("You can't leave the exam until it's submitted.", "amber");
+    };
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("popstate", onPopState);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [session, finished]);
 
   /* ---------------------------------------------------------------- saving */
   const persist = useCallback(
@@ -394,6 +489,8 @@ export default function ExamRunner() {
         { examToken: examToken.current },
       );
       engine.current?.stop();
+      broadcaster.current?.stop();
+      broadcaster.current = null;
       setFinished(auto ? "Your time expired and your paper was submitted." : result.message);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -424,6 +521,12 @@ export default function ExamRunner() {
     );
     return session.questions.filter((q) => activeQuestionIds.has(q.question_id));
   }, [session, activeSection]);
+
+  /* Tell the engine which question is on screen, so a proctoring event can be tied to it. */
+  useEffect(() => {
+    const q = visibleQuestions[current] ?? session?.questions[current];
+    engine.current?.setCurrentQuestionId(q?.question_id);
+  }, [current, visibleQuestions, session]);
 
   if (booting || (!session && !loadError)) return <Splash label="Loading your paper" />;
 
@@ -480,6 +583,18 @@ export default function ExamRunner() {
 
   return (
     <div className="flex h-screen flex-col bg-paper">
+      {/* Live camera - pinned to the top-left corner of the exam window itself, above
+          everything else, so it stays put across every question and never depends on
+          the palette sidebar being open. */}
+      <div className="pointer-events-none fixed left-3 top-16 z-40 w-28 sm:w-32">
+        <WebcamPreview
+          videoRef={videoRef}
+          canvasRef={canvasRef}
+          status={proctor}
+          enabled={session.proctor_config.webcam_enabled}
+        />
+      </div>
+
       {/* ------------------------------------------------- the fullscreen gate
        *
        * Covers the paper whenever fullscreen is required and not active. The button is
@@ -545,43 +660,65 @@ export default function ExamRunner() {
       )}
 
       {/* ------------------------------------------------------------ top bar */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-4 py-2.5 lg:px-6">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-2.5 lg:px-6"
+        style={{
+          background: "rgba(248,249,252,0.95)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+        }}>
+        {/* Accent top line */}
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent opacity-50" />
         <div className="flex min-w-0 items-center gap-3">
-          <Mark size={24} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
+            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))", border: "1px solid rgba(99,102,241,0.2)" }}>
+            <Mark size={18} />
+          </div>
           <div className="min-w-0">
-            <p className="truncate text-[13.5px] font-semibold tracking-tight text-ink">
+            <p className="truncate text-[13.5px] font-bold tracking-tight text-ink">
               {session.exam_title}
             </p>
-            <p className="text-[11.5px] text-ink-muted">
-              {answeredCount}/{session.questions.length} answered · {session.total_marks} marks
+            <p className="text-[11px] text-ink-muted">
+              {answeredCount}/{session.questions.length} answered
+              <span className="mx-1.5 opacity-40">·</span>
+              {session.total_marks} marks
             </p>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {session.available_languages.length > 1 && (
+            <ExamLanguageSelector
+              locale={session.locale}
+              languages={session.available_languages}
+              busy={switchingLocale}
+              onChange={changeExamLocale}
+            />
+          )}
           <SaveIndicator state={saveState} />
-          <ProctorPill status={proctor} enabled={session.proctor_config.webcam_enabled} />
+          <ProctorPill status={proctor} enabled={session.proctor_config.webcam_enabled} severity={lastSeverity} />
+          {/* Premium timer */}
           <div
             className={cx(
-              "rounded-[10px] border px-2 py-1 text-center tabular-nums sm:px-3 sm:py-1.5",
+              "rounded-[10px] border px-2.5 py-1.5 text-center tabular-nums transition-all duration-300 sm:px-3 sm:py-2",
               criticalTime
-                ? "animate-pulse border-rose/40 bg-rose-soft"
+                ? "border-rose/40 bg-rose-soft animate-[pulse-ring-alert_1.1s_ease-out_infinite]"
                 : lowTime
                   ? "border-amber/30 bg-amber-soft"
-                  : "border-line bg-sunken",
+                  : "border-accent/20 bg-accent-soft/30",
             )}
           >
-            <p className="text-[10px] uppercase tracking-wide text-ink-muted">Remaining</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">Time Left</p>
             <p
               className={cx(
-                "text-[16px] font-semibold leading-tight",
-                criticalTime ? "text-rose" : lowTime ? "text-amber" : "text-ink",
+                "text-[18px] font-bold leading-tight tabular-nums tracking-tight",
+                criticalTime ? "text-rose" : lowTime ? "text-amber" : "text-accent",
               )}
             >
               {formatDuration(remaining)}
             </p>
           </div>
-          <Button size="sm" onClick={() => setConfirming(true)}>
+          <Button size="sm" onClick={() => setConfirming(true)}
+            style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", border: "none", boxShadow: "0 2px 8px -2px rgba(79,70,229,0.4)" }}>
             Submit
           </Button>
         </div>
@@ -600,6 +737,11 @@ export default function ExamRunner() {
         />
       )}
 
+      {localeNotice && (
+        <div className="shrink-0 border-b border-amber/25 bg-amber-soft px-4 py-2 lg:px-6">
+          <p className="text-[12.5px] font-medium text-amber">{localeNotice}</p>
+        </div>
+      )}
       {warnings.length > 0 && (
         <div
           className={cx(
@@ -629,8 +771,15 @@ export default function ExamRunner() {
       )}
 
       {/* --------------------------------------------------------------- body */}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Palette + webcam */}
+      <div
+        className={cx(
+          "flex min-h-0 flex-1 flex-col lg:flex-row transition-shadow duration-300",
+          // A high-risk event outlines the content area briefly and fades on its own -
+          // the interface must never go permanently red, only flag the moment.
+          riskFlash && "ring-4 ring-inset ring-rose/70",
+        )}
+      >
+        {/* Palette */}
         <aside className="flex shrink-0 flex-col border-b border-line bg-surface p-3 lg:w-[228px] lg:border-b-0 lg:border-r lg:p-4">
           <div className="flex items-center justify-between gap-3 lg:block">
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted lg:mb-3">
@@ -670,16 +819,16 @@ export default function ExamRunner() {
                             : "Not answered"
                     }
                     className={cx(
-                      "relative flex h-9 items-center justify-center rounded-[8px] border text-[12.5px] font-medium transition",
+                      "btn-press relative flex h-9 items-center justify-center rounded-[8px] border text-[12.5px] font-medium transition-all duration-200",
                       isCurrent
-                        ? "border-accent bg-accent text-white"
+                        ? "border-accent bg-accent text-white shadow-[0_0_0_3px_rgba(79,70,229,0.18)] scale-[1.04]"
                         : done && flagged
-                          ? "border-amber/40 bg-amber-soft text-amber"
+                          ? "border-amber/40 bg-amber-soft text-amber hover:scale-[1.04]"
                           : done
-                            ? "border-mint/30 bg-mint-soft text-mint"
+                            ? "border-mint/30 bg-mint-soft text-mint hover:scale-[1.04]"
                             : flagged
-                              ? "border-amber/30 bg-surface text-amber"
-                              : "border-line bg-surface text-ink-muted hover:border-line-strong",
+                              ? "border-amber/30 bg-surface text-amber hover:scale-[1.04]"
+                              : "border-line bg-surface text-ink-muted hover:border-line-strong hover:scale-[1.04]",
                     )}
                   >
                     {flagged && (
@@ -700,16 +849,6 @@ export default function ExamRunner() {
               <Legend swatch="bg-amber-soft border border-amber/30" label="Marked for review" />
               <Legend swatch="bg-amber-soft border border-amber/40" label="Answered + review" icon="⚑" />
             </div>
-          </div>
-
-          {/* Webcam */}
-          <div className="mx-auto mt-3 w-32 lg:mx-0 lg:mt-auto lg:w-auto">
-            <WebcamPreview
-              videoRef={videoRef}
-              canvasRef={canvasRef}
-              status={proctor}
-              enabled={session.proctor_config.webcam_enabled}
-            />
           </div>
         </aside>
 
@@ -836,7 +975,6 @@ export default function ExamRunner() {
 
       {clearTarget && (
         <ConfirmClear
-          question={clearTarget}
           onCancel={() => setClearTarget(null)}
           onConfirm={() => void clearAnswer(clearTarget)}
         />
@@ -860,29 +998,35 @@ function SectionTabs({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2 lg:px-6">
+    <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-line px-4 py-2.5 lg:px-6"
+      style={{ background: "rgba(248,249,252,0.9)" }}>
       {sections.map((sec) => {
         const answered = sec.question_ids.filter((qid) => {
           const a = answers[qid];
           return a && (a.options.length > 0 || a.text.trim() || a.imageUrl);
         }).length;
         const isActive = sec.id === activeSection;
+        const pct = Math.round((answered / Math.max(sec.question_ids.length, 1)) * 100);
         return (
           <button
             key={sec.id}
             onClick={() => onSelect(sec.id)}
             className={cx(
-              "flex shrink-0 items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-[12.5px] font-medium transition",
+              "flex shrink-0 items-center gap-2 rounded-[9px] px-3 py-1.5 text-[12.5px] font-semibold transition-all duration-200",
               isActive
-                ? "bg-accent text-white"
+                ? "text-white shadow-sm"
                 : "text-ink-soft hover:bg-sunken hover:text-ink",
             )}
+            style={isActive ? {
+              background: "linear-gradient(135deg, #4f46e5, #6366f1)",
+              boxShadow: "0 2px 8px -2px rgba(79,70,229,0.35)",
+            } : {}}
           >
             {sec.name}
             <span
               className={cx(
-                "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                isActive ? "bg-white/20 text-white" : "bg-sunken text-ink-muted",
+                "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                isActive ? "bg-white/20 text-white" : pct === 100 ? "bg-green/15 text-green" : "bg-sunken text-ink-muted",
               )}
             >
               {answered}/{sec.question_ids.length}
@@ -1238,26 +1382,86 @@ function Legend({ swatch, label, icon }: { swatch: string; label: string; icon?:
 
 function SaveIndicator({ state }: { state: SaveState }) {
   const map = {
-    idle: { text: "Ready", tone: "text-ink-muted" },
-    saving: { text: "Saving…", tone: "text-accent-ink" },
-    saved: { text: "Saved", tone: "text-mint" },
-    error: { text: "Not saved", tone: "text-rose" },
+    idle: { text: "Ready", tone: "text-ink-muted", dot: "bg-ink-muted" },
+    saving: { text: "Saving…", tone: "text-accent-ink", dot: "bg-accent animate-pulse" },
+    saved: { text: "Saved", tone: "text-mint", dot: "bg-green" },
+    error: { text: "Not saved", tone: "text-rose", dot: "bg-rose" },
   } as const;
+  const current = map[state];
   return (
-    <span className={cx("hidden text-[12px] font-medium sm:inline", map[state].tone)}>
-      {map[state].text}
+    <span
+      key={state}
+      className={cx(
+        "hidden items-center gap-1.5 text-[12px] font-medium transition-opacity duration-300 sm:inline-flex animate-fade",
+        current.tone,
+      )}
+    >
+      <span aria-hidden className={cx("h-[6px] w-[6px] rounded-full", current.dot)} />
+      {current.text}
     </span>
   );
 }
 
-function ProctorPill({ status, enabled }: { status: ProctorStatus | null; enabled: boolean }) {
+/**
+ * The in-exam language selector. Only ever offers the languages the exam enabled (see
+ * `ExamSessionOut.available_languages`) - never the full app-wide language list, so a
+ * candidate never sees a language the examiner never translated anything into.
+ */
+function ExamLanguageSelector({
+  locale,
+  languages,
+  busy,
+  onChange,
+}: {
+  locale: string;
+  languages: string[];
+  busy: boolean;
+  onChange: (locale: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft">
+      <span aria-hidden="true">🌐</span>
+      <span className="sr-only">Language</span>
+      <select
+        aria-label="Exam language"
+        value={locale}
+        disabled={busy}
+        onChange={(e) => onChange(e.target.value)}
+        className="cursor-pointer border-0 bg-transparent pr-1 text-[12.5px] font-medium text-ink-soft outline-none disabled:opacity-50"
+      >
+        {languages.map((code) => (
+          <option key={code} value={code}>
+            {LOCALE_NAMES[code as Locale] ?? code}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+const SEVERITY_DOT_CLASS: Record<"info" | "warning" | "critical", string> = {
+  info: "status-dot status-dot-live",
+  warning: "status-dot status-dot-warn",
+  critical: "status-dot status-dot-alert is-pulsing",
+};
+
+function ProctorPill({
+  status,
+  enabled,
+  severity,
+}: {
+  status: ProctorStatus | null;
+  enabled: boolean;
+  severity: "info" | "warning" | "critical";
+}) {
+  const dot = <span aria-hidden className={cx(SEVERITY_DOT_CLASS[severity], "mr-1.5 align-middle")} />;
   if (!enabled) return <Badge>Proctoring off</Badge>;
-  if (!status || !status.cameraReady) return <Badge tone="rose">Camera off</Badge>;
-  if (status.phoneDetected) return <Badge tone="rose">Phone detected</Badge>;
-  if (status.faceCount > 1) return <Badge tone="rose">{status.faceCount} faces</Badge>;
-  if (!status.facePresent) return <Badge tone="amber">Face not visible</Badge>;
-  if (status.lookingAway) return <Badge tone="amber">Look at the screen</Badge>;
-  return <Badge tone="mint">Proctoring active</Badge>;
+  if (!status || !status.cameraReady) return <Badge tone="rose">{dot}Camera off</Badge>;
+  if (status.phoneDetected) return <Badge tone="rose">{dot}Phone detected</Badge>;
+  if (status.faceCount > 1) return <Badge tone="rose">{dot}{status.faceCount} faces</Badge>;
+  if (!status.facePresent) return <Badge tone="amber">{dot}Face not visible</Badge>;
+  if (status.lookingAway) return <Badge tone="amber">{dot}Look at the screen</Badge>;
+  return <Badge tone="mint">{dot}Proctoring active</Badge>;
 }
 
 function WebcamPreview({
@@ -1271,31 +1475,36 @@ function WebcamPreview({
   status: ProctorStatus | null;
   enabled: boolean;
 }) {
+  const live = enabled && Boolean(status?.cameraReady);
   return (
-    <div className="rounded-[11px] border border-line bg-sunken p-2">
-      <div className="relative overflow-hidden rounded-[8px] bg-ink/90">
+    <div className="w-full rounded-[11px] border border-line bg-sunken p-1.5 shadow-md">
+      <div className="relative overflow-hidden rounded-[9px] bg-ink/90">
         <video
           ref={videoRef}
           muted
           playsInline
-          className="h-[104px] w-full scale-x-[-1] object-cover"
+          className="h-[92px] w-full scale-x-[-1] object-cover sm:h-[104px]"
         />
         <canvas ref={canvasRef} className="hidden" />
         {!enabled && (
-          <div className="absolute inset-0 grid place-items-center text-[11px] text-white/70">
+          <div className="absolute inset-0 grid place-items-center text-[10px] text-white/70">
             Webcam not required
           </div>
         )}
+        {live && (
+          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
+            <span className="text-[9px] font-bold uppercase tracking-wide text-white">Live</span>
+          </div>
+        )}
+        {!live && enabled && (
+          <div className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
+            <span className="text-[9px] font-semibold text-white/80">
+              {status?.visionMode === "degraded" ? "Recording" : "Connecting…"}
+            </span>
+          </div>
+        )}
       </div>
-      <p className="mt-1.5 text-[11px] leading-tight text-ink-muted">
-        {status?.visionMode === "landmarks"
-          ? "Face and head position monitored"
-          : status?.visionMode === "degraded"
-            ? "Recording only — detection unavailable"
-            : enabled
-              ? "Waiting for camera…"
-              : "Behaviour monitoring only"}
-      </p>
     </div>
   );
 }
@@ -1557,11 +1766,9 @@ function ConfirmSubmit({
 }
 
 function ConfirmClear({
-  question,
   onCancel,
   onConfirm,
 }: {
-  question: PaperQuestion;
   onCancel: () => void;
   onConfirm: () => void;
 }) {

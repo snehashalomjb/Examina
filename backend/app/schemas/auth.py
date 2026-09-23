@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.db.models.enums import AccessStatus, LoginAccessStatus, UserRole
+from app.db.models.enums import AccessStatus, LoginAccessStatus, SUPPORTED_LOCALES, UserRole
 from app.schemas.common import ORMModel
 
 PASSWORD_MIN = 8
@@ -49,6 +49,16 @@ class UpdateProfileRequest(BaseModel):
 
     first_name: str = Field(..., min_length=1, max_length=80)
     last_name: str = Field(default="", max_length=80)
+    #: UI language, remembered server-side so it follows the user across devices.
+    #: Omitted leaves it unchanged - this endpoint also handles a plain name edit.
+    preferred_locale: str | None = None
+
+    @field_validator("preferred_locale")
+    @classmethod
+    def locale_supported(cls, value: str | None) -> str | None:
+        if value is not None and value not in SUPPORTED_LOCALES:
+            raise ValueError(f"Unsupported locale: {value}")
+        return value
 
 
 class LoginRequest(BaseModel):
@@ -76,6 +86,21 @@ class ResetPasswordRequest(BaseModel):
         return value
 
 
+class ChangePasswordRequest(BaseModel):
+    """Changing a known password while signed in - proves identity with the old one,
+    rather than a mailed reset token."""
+
+    current_password: str
+    new_password: str = Field(..., min_length=PASSWORD_MIN, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Password must contain at least one letter and one digit")
+        return value
+
+
 class UserOut(ORMModel):
     id: uuid.UUID
     email: EmailStr
@@ -88,6 +113,10 @@ class UserOut(ORMModel):
     created_at: datetime
     last_login_at: datetime | None = None
     access_note: str | None = None
+    #: Presigned, time-limited - not the object key itself. Not a plain column, so
+    #: endpoints set it after ``model_validate`` rather than expecting it from the ORM.
+    avatar_url: str | None = None
+    preferred_locale: str = "en"
 
 
 class TokenPair(BaseModel):

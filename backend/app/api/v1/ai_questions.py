@@ -20,6 +20,7 @@ from app.db.models import (
     DraftStatus,
     Exam,
     ExamQuestion,
+    ExamType,
     Question,
     QuestionOption,
     QuestionSource,
@@ -67,16 +68,17 @@ def _compose_instructions(payload: AiGenerateRequest) -> str | None:
     response_model=list[AiDraftOut],
     status_code=status.HTTP_201_CREATED,
 )
-def ai_generate(
-    payload: AiGenerateRequest, staff: CurrentStaff, db: DbSession
-) -> list[AiDraftOut]:
+def ai_generate(payload: AiGenerateRequest, staff: CurrentStaff, db: DbSession) -> list[AiDraftOut]:
     """Generate a batch of question drafts. None are published until an examiner approves.
 
     Each draft may succeed or fail independently - a partial batch is still useful and is
     stored so the examiner can see which prompts produced errors.
     """
-    if payload.subject_id and db.get(Subject, payload.subject_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    subject: Subject | None = None
+    if payload.subject_id:
+        subject = db.get(Subject, payload.subject_id)
+        if subject is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     saved: list[AiQuestionDraft] = []
     for question_type, share in payload.type_plan():
@@ -88,6 +90,7 @@ def ai_generate(
             count=share,
             extra_instructions=_compose_instructions(payload),
             source_text=payload.syllabus,
+            subject_name=subject.name if subject else None,
         )
         for item in raw_drafts:
             body = dict(item.get("payload", {}))
@@ -159,8 +162,11 @@ def ai_generate_from_pdf(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Upload a PDF file",
         )
-    if subject_id is not None and db.get(Subject, subject_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    subject: Subject | None = None
+    if subject_id is not None:
+        subject = db.get(Subject, subject_id)
+        if subject is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     data = file.file.read()
     if len(data) > MAX_PDF_BYTES:
@@ -184,6 +190,7 @@ def ai_generate_from_pdf(
         count=count,
         extra_instructions=extra_instructions,
         source_text=extracted.text,
+        subject_name=subject.name if subject else None,
     )
 
     filename = (file.filename or "upload.pdf")[:200]
@@ -247,11 +254,7 @@ def list_drafts(
     limit: int = Query(100, ge=1, le=500),
     mine: bool = False,
 ) -> list[AiDraftOut]:
-    stmt = (
-        select(AiQuestionDraft)
-        .order_by(AiQuestionDraft.created_at.desc())
-        .limit(limit)
-    )
+    stmt = select(AiQuestionDraft).order_by(AiQuestionDraft.created_at.desc()).limit(limit)
     if draft_status:
         stmt = stmt.where(AiQuestionDraft.status == draft_status)
     if mine:
@@ -293,7 +296,11 @@ def approve_draft(
         )
 
     exam = _resolve_exam(db, staff, payload.exam_id)
-    if exam is not None and draft.subject_id not in (None, exam.subject_id):
+    if (
+        exam is not None
+        and exam.exam_type is not ExamType.CORPORATE
+        and draft.subject_id not in (None, exam.subject_id)
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="This draft was generated for a different subject",
@@ -381,9 +388,7 @@ def approve_draft(
     db.flush()
     db.refresh(draft)
 
-    logger.info(
-        "%s approved AI draft %s → question %s", staff.email, draft_id, question.id
-    )
+    logger.info("%s approved AI draft %s → question %s", staff.email, draft_id, question.id)
     return _draft_out(draft)
 
 
@@ -428,6 +433,7 @@ def regenerate_draft(
             detail="This draft is already a question. Edit the question instead.",
         )
 
+    subject = db.get(Subject, draft.subject_id) if draft.subject_id else None
     instructions = payload.feedback or "Write a different question on the same material."
     generated = generate_questions(
         category=draft.category,
@@ -436,6 +442,7 @@ def regenerate_draft(
         question_type=draft.question_type,
         count=1,
         extra_instructions=instructions,
+        subject_name=subject.name if subject else None,
     )
     item = generated[0] if generated else {"payload": {}, "provider": "stub"}
 

@@ -2,6 +2,8 @@
 
 import { Hero } from "@/components/Hero";
 import { Alert, Card, SectionTitle } from "@/components/ui";
+import { IconAlert, IconHourglass } from "@/components/icons";
+import { useTranslations } from "next-intl";
 import type { AccessStatus, UserRole } from "@/lib/types";
 
 /**
@@ -35,6 +37,7 @@ export function AwaitingApproval({
   status: AccessStatus;
   note: string | null;
 }) {
+  const t = useTranslations("dashboard-detail");
   const revoked = status === "revoked";
   const noun = role === "examiner" ? "examiner" : "candidate";
 
@@ -51,7 +54,9 @@ export function AwaitingApproval({
 
       <Card className="max-w-2xl">
         <div className="flex items-start gap-4">
-          <div className="mt-0.5 h-9 w-9 shrink-0 rotate-12 rounded-[10px] border border-line-strong bg-sunken" />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent border border-accent/20">
+            {revoked ? <IconAlert size={22} className="text-rose" /> : <IconHourglass size={22} className="text-accent" />}
+          </div>
           <div>
             <p className="text-[14px] font-semibold text-ink">
               {revoked ? "What this means" : "What happens next"}
@@ -63,7 +68,7 @@ export function AwaitingApproval({
             </p>
             {note && (
               <div className="mt-4">
-                <Alert tone={revoked ? "rose" : "amber"} title="Administrator note">
+                <Alert tone={revoked ? "rose" : "amber"} title={t("admin_note_title")}>
                   {note}
                 </Alert>
               </div>
@@ -74,7 +79,7 @@ export function AwaitingApproval({
 
       <Card className="max-w-2xl">
         <SectionTitle
-          title="What you will be able to do"
+          title={t("awaiting_approval_heading")}
           hint={`Once an administrator approves your ${noun} account.`}
         />
         <ul className="space-y-2.5">

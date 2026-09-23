@@ -1,0 +1,12 @@
+{
+  "user_management": "వినియోగదారుల నిర్వహణ",
+  "candidate_management": "అభ్యర్థుల నిర్వహణ",
+  "examiner_management": "పరీక్షకుల నిర్వహణ",
+  "exam_management": "పరీక్షల నిర్వహణ",
+  "monitoring": "పర్యవేక్షణ",
+  "system_settings": "సిస్టమ్ సెట్టింగ్‌లు",
+  "audit_log": "ఆడిట్ లాగ్",
+  "approve": "ఆమోదించు",
+  "revoke": "రద్దు చేయి",
+  "reject": "తిరస్కరించు"
+}

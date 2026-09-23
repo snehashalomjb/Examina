@@ -160,7 +160,14 @@ export type ProctorEventType =
   | "camera_blocked"
   | "paste_attempt"
   | "copy_attempt"
-  | "devtools_open";
+  | "devtools_open"
+  | "right_click"
+  | "cut_attempt"
+  | "text_selection"
+  | "additional_person"
+  | "mic_disconnected"
+  | "network_lost"
+  | "headphones_manual";
 
 export interface User {
   id: string;
@@ -174,6 +181,8 @@ export interface User {
   created_at: string;
   last_login_at: string | null;
   access_note: string | null;
+  avatar_url: string | null;
+  preferred_locale: string;
 }
 
 export interface AdminUser extends User {
@@ -240,6 +249,8 @@ export interface Option {
   image_url?: string | null;
   order_index: number;
   is_correct?: boolean;
+  /** Per-locale text already on file, keyed by locale ("en" included). Examiner view only. */
+  translations?: Record<string, string>;
 }
 
 export interface Question {
@@ -276,6 +287,17 @@ export interface Question {
   /** Examiner view only - for numerical and fill_blank this IS the answer key. */
   spec?: QuestionSpec | null;
   options: Option[];
+  /** Per-locale {body, model_answer, explanation} already on file, keyed by locale
+   * ("en" included). Examiner view only. */
+  translations?: Record<string, { body?: string; model_answer?: string; explanation?: string }>;
+}
+
+/** A preview of what "Generate Translations" would produce - never auto-saved. */
+export interface GeneratedTranslations {
+  translations: Record<string, { body?: string; explanation?: string }>;
+  options: Record<string, Record<string, string>>;
+  provider: "stub" | "openai" | string;
+  skipped_existing: string[];
 }
 
 // ------------------------------------------------------------- paper preview
@@ -315,6 +337,10 @@ export interface PaperPreviewResult {
 export interface PoolEntry {
   question_id: string;
   order_index: number;
+  subject_id: string;
+  subject_name: string;
+  /** The section this question was chosen for, or null if any section may draw it. */
+  section_id: string | null;
   /** Per-exam marks override. Null means "use the question's own marks". */
   marks_override: number | null;
   effective_marks: number;
@@ -335,6 +361,9 @@ export interface PoolStats {
   total_marks: number;
   by_type: Record<string, number>;
   by_difficulty: Record<string, number>;
+  /** Keyed by subject name — "Java: 5, Python: 5" — meaningful once a corporate pool
+   * mixes subjects; present but a single entry for a single-subject pool. */
+  by_subject: Record<string, number>;
 }
 
 export interface ExamPool {
@@ -360,6 +389,50 @@ export interface SelectionRule {
   count: number;
   category?: QuestionCategory | null;
   topic?: string | null;
+  /** Narrow to one subject — "Python MCQ 10" alongside "SQL MCQ 10" in one paper. */
+  subject_id?: string | null;
+  /** Match-any tag narrowing. */
+  tags?: string[] | null;
+}
+
+// -------------------------------------------------------- duplicate detection
+
+export interface DuplicateMatch {
+  id: string;
+  body: string;
+}
+
+export interface DuplicateCheckResult {
+  matches: DuplicateMatch[];
+}
+
+// ------------------------------------------------------------- exam blueprint
+//
+// One row of "Python | MCQ | Medium | 10". The server turns each into a section with a
+// matching selection rule and pulls every matching bank question into the pool.
+
+export interface BlueprintRow {
+  title: string;
+  subject_id?: string | null;
+  category?: QuestionCategory | null;
+  question_type: QuestionType;
+  difficulty?: Difficulty | null;
+  topic?: string | null;
+  tags?: string[] | null;
+  count: number;
+}
+
+export interface BlueprintRowResult {
+  title: string;
+  requested: number;
+  matched: number;
+  added: number;
+  section_id: string;
+}
+
+export interface BlueprintResult {
+  rows: BlueprintRowResult[];
+  pool: ExamPool;
 }
 
 // ---------------------------------------------------------------- sections
@@ -390,6 +463,9 @@ export interface Exam {
   starts_at: string;
   ends_at: string;
   status: ExamStatus;
+  /** "draft" | "scheduled" | "live" | "completed" | "archived" - derived from `status`
+   * plus the start/end window, never stored. */
+  effective_status: "draft" | "scheduled" | "live" | "completed" | "archived";
   randomize: boolean;
   shuffle_options: boolean;
   negative_marking: boolean;
@@ -417,6 +493,8 @@ export interface Exam {
   job_role: string | null;
   // Sections
   sections: ExamSection[];
+  /** Language codes the candidate's selector offers for this exam. Always leads "en". */
+  languages: string[];
 }
 
 // ---------------------------------------------------------------- templates
@@ -470,6 +548,18 @@ export interface RankingRow {
   is_flagged: boolean;
   result_id: string | null;
   session_id: string | null;
+  published: boolean;
+  needs_integrity_review: boolean;
+  integrity_verdict: string;
+  pending_review_count: number;
+}
+
+export interface TopPerformer {
+  candidate_name: string;
+  exam_title: string;
+  obtained_marks: number;
+  total_marks: number;
+  percentage: number;
 }
 
 export interface ShortlistDecision {
@@ -530,6 +620,9 @@ export interface ImportedRow {
   /** 1-based including the header, so it matches the row number in Excel. */
   row_number: number;
   body: string;
+  /** Resolved from the row's own "Subject" cell, or the import's default subject. */
+  subject_id: string | null;
+  subject_name: string | null;
   question_type: QuestionType;
   difficulty: Difficulty;
   category: QuestionCategory;
@@ -558,6 +651,10 @@ export interface ImportParseResult {
   invalid: number;
   duplicates: number;
   rows: ImportedRow[];
+  /** Every worksheet name, for an .xlsx/.xlsm with more than one. Empty otherwise. */
+  sheet_names: string[];
+  /** Which sheet `rows` was actually read from. */
+  sheet_name: string | null;
 }
 
 export interface ImportResult {
@@ -708,6 +805,11 @@ export interface ExamSession {
   exam_token: string | null;
   /** Ordered sections for section-navigation tabs. Empty on single-section papers. */
   sections: SessionSection[];
+  /** The locale this paper was rendered in - what the language selector should show
+   * as selected right now. */
+  locale: string;
+  /** Language codes this exam's selector may switch to. Always leads "en". */
+  available_languages: string[];
 }
 
 export interface CandidateExamCard {
@@ -741,6 +843,8 @@ export interface CandidateExamCard {
   sections_count?: number;
   has_coding?: boolean;
   proctor_config?: ProctorConfig;
+  /** Language codes this exam's selector may switch to. Always leads "en". */
+  available_languages?: string[];
 }
 
 export interface HeartbeatOut {
@@ -777,6 +881,8 @@ export interface ProctorEvent {
   server_received_at: string;
   duration_ms: number | null;
   weight: number;
+  confidence: number | null;
+  question_id: string | null;
   metadata: Record<string, unknown> | null;
   snapshot_url: string | null;
 }
@@ -944,9 +1050,40 @@ export interface AdminStats {
   questions: number;
   exams: number;
   published_exams: number;
+  /** Published and inside its start/end window right now. */
+  live_exams: number;
+  /** Published, but its window has already ended. */
+  completed_exams: number;
   live_sessions: number;
   flagged_sessions: number;
   pending_grading: number;
+}
+
+export interface LiveExamRow {
+  exam_id: string;
+  exam_title: string;
+  examiner_name: string;
+  candidate_count: number;
+  active_count: number;
+  flagged_count: number;
+  time_remaining_str: string;
+}
+
+export interface ComponentHealth {
+  /** "checked" = a real probe ran this request. "configured" = not independently
+   * measurable, only reports whether the feature is wired up. */
+  basis: "checked" | "configured";
+  status: string;
+  detail?: string | null;
+}
+
+export interface SystemHealth {
+  api: ComponentHealth;
+  database: ComponentHealth;
+  storage: ComponentHealth;
+  websocket: ComponentHealth;
+  ai_proctoring: ComponentHealth;
+  authentication: ComponentHealth;
 }
 
 export interface ExaminerStats {

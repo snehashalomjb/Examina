@@ -118,12 +118,16 @@ def severity_for(event_type: ProctorEventType) -> ProctorSeverity:
         ProctorEventType.CAMERA_BLOCKED,
         ProctorEventType.DEVTOOLS_OPEN,
         ProctorEventType.PHONE_DETECTED,
+        ProctorEventType.ADDITIONAL_PERSON,
     }
     warning = {
         ProctorEventType.TAB_SWITCH,
         ProctorEventType.FULLSCREEN_EXIT,
         ProctorEventType.PASTE_ATTEMPT,
         ProctorEventType.FACE_MISSING,
+        ProctorEventType.CUT_ATTEMPT,
+        ProctorEventType.MIC_DISCONNECTED,
+        ProctorEventType.NETWORK_LOST,
     }
     if event_type in critical:
         return ProctorSeverity.CRITICAL

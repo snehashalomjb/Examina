@@ -42,6 +42,13 @@ from app.db.models.login_access import LoginAccessRequest
 from app.db.models.proctor import ProctorEvent
 from app.db.models.question import Question, QuestionOption, Subject
 from app.db.models.recruitment import CandidateShortlist, ExamTemplate
+from app.db.models.translations import (
+    ExamSectionTranslation,
+    ExamTranslation,
+    OptionTranslation,
+    QuestionTranslation,
+    SubjectTranslation,
+)
 from app.db.models.user import User
 
 __all__ = [
@@ -66,9 +73,11 @@ __all__ = [
     "ExamEnrollment",
     "ExamQuestion",
     "ExamSection",
+    "ExamSectionTranslation",
     "ExamSession",
     "ExamStatus",
     "ExamTemplate",
+    "ExamTranslation",
     "ExamType",
     "GradeStatus",
     "IntegrityVerdict",
@@ -77,16 +86,19 @@ __all__ = [
     "ProctorEvent",
     "ProctorEventType",
     "ProctorSeverity",
+    "OptionTranslation",
     "Question",
     "QuestionCategory",
     "QuestionOption",
     "QuestionSource",
     "QuestionStatus",
+    "QuestionTranslation",
     "QuestionType",
     "Result",
     "SessionStatus",
     "ShortlistStatus",
     "Subject",
+    "SubjectTranslation",
     "User",
     "UserRole",
 ]

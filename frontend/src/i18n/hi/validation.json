@@ -1,0 +1,7 @@
+{
+  "required_field": "यह फ़ील्ड आवश्यक है",
+  "invalid_email": "एक मान्य ईमेल पता दर्ज करें",
+  "password_too_short": "पासवर्ड कम से कम 8 वर्णों का होना चाहिए",
+  "passwords_mismatch": "पासवर्ड मेल नहीं खाते",
+  "invalid_value": "यह मान मान्य नहीं है"
+}

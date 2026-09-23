@@ -26,6 +26,8 @@ class PaperEntry:
     question_id: uuid.UUID
     option_order: list[uuid.UUID] = field(default_factory=list)
     marks: float = 1.0
+    #: Which section this entry belongs to, or None for an exam with no sections.
+    section_id: uuid.UUID | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -62,11 +64,77 @@ def _matches(eq: ExamQuestion, rule: dict) -> bool:
             return False
         if question.topic.strip().casefold() != topic.strip().casefold():
             return False
+    if rule.get("subject_id") and str(question.subject_id) != rule["subject_id"]:
+        return False
+    tags = rule.get("tags")
+    if tags and not (set(question.tags or []) & set(tags)):
+        return False
     return True
 
 
-def _pool_matching(exam_questions: list[ExamQuestion], rule: dict) -> list[ExamQuestion]:
-    return [eq for eq in exam_questions if _matches(eq, rule)]
+def _pool_matching(
+    exam_questions: list[ExamQuestion], rule: dict, section_id: uuid.UUID | None = None
+) -> list[ExamQuestion]:
+    """Questions a rule may draw, honouring what the examiner pinned where.
+
+    A question pinned to a section belongs to that section alone: it must not turn up in
+    a different section's questions just because the type and difficulty happen to fit.
+    An unpinned question is free for whichever section's rules match it, which is how the
+    pool has always behaved and what every exam built before pinning existed relies on.
+    """
+    return [
+        eq
+        for eq in exam_questions
+        if _matches(eq, rule) and eq.section_id in (None, section_id)
+    ]
+
+
+def _sections_for(exam: Exam) -> list[tuple[uuid.UUID | None, list[dict]]]:
+    """The exam as ``(section_id, rules)`` pairs, in the order candidates will see them.
+
+    An exam with no sections yields a single implicit one carrying ``exam.selection_rules``
+    - the shape every single-section exam has always had, on the same code path.
+    """
+    if not exam.sections:
+        return [(None, normalise_selection_rules(exam.selection_rules))]
+
+    pairs: list[tuple[uuid.UUID | None, list[dict]]] = []
+    for section in sorted(exam.sections, key=lambda s: s.order_index):
+        rules = normalise_selection_rules(section.selection_rules)
+        if rules:
+            pairs.append((section.id, rules))
+    # Every section was empty, so fall back rather than build a paper with no questions.
+    return pairs or [(None, normalise_selection_rules(exam.selection_rules))]
+
+
+def _draw(
+    pool: list[ExamQuestion],
+    count: int,
+    section_id: uuid.UUID | None,
+    rng: random.Random | None,
+) -> list[ExamQuestion]:
+    """Take ``count`` questions, pinned ones first.
+
+    A question the examiner chose *for this section* is not a candidate for a random
+    draw - choosing it was the decision. So pinned questions are taken in pool order
+    until the rule is satisfied, and only the remainder is sampled. Both halves are
+    sorted by question id first so the order the database happened to return rows in can
+    never influence a paper.
+    """
+    pinned = sorted(
+        (eq for eq in pool if eq.section_id == section_id and section_id is not None),
+        key=lambda eq: (eq.order_index, str(eq.question_id)),
+    )
+    free = sorted(
+        (eq for eq in pool if eq.section_id is None),
+        key=lambda eq: str(eq.question_id),
+    )
+
+    taken = pinned[:count]
+    shortfall = count - len(taken)
+    if shortfall > 0:
+        taken += rng.sample(free, shortfall) if rng else free[:shortfall]
+    return taken
 
 
 def _rule_label(rule: dict) -> str:
@@ -105,26 +173,30 @@ def check_pool_satisfies_rules(exam: Exam) -> list[str]:
     """
     problems: list[str] = []
     try:
-        rules = normalise_selection_rules(exam.selection_rules)
+        sections = _sections_for(exam)
     except ValidationError as exc:
         return [str(exc)]
 
+    names = {s.id: s.name for s in exam.sections}
     used: set[uuid.UUID] = set()
-    for rule in _ordered_rules(rules):
-        available = [
-            eq
-            for eq in _pool_matching(exam.exam_questions, rule)
-            if eq.question_id not in used
-        ]
-        if len(available) < rule["count"]:
-            problems.append(
-                f"Need {rule['count']} {_rule_label(rule)} question(s), "
-                f"pool only has {len(available)} left"
-            )
-            continue
-        # Reserve deterministically so the next rule sees a realistic remainder.
-        for eq in sorted(available, key=lambda e: str(e.question_id))[: rule["count"]]:
-            used.add(eq.question_id)
+
+    for section_id, rules in sections:
+        where = f" in {names[section_id]}" if section_id in names else ""
+        for rule in _ordered_rules(rules):
+            available = [
+                eq
+                for eq in _pool_matching(exam.exam_questions, rule, section_id)
+                if eq.question_id not in used
+            ]
+            if len(available) < rule["count"]:
+                problems.append(
+                    f"Need {rule['count']} {_rule_label(rule)} question(s){where}, "
+                    f"pool only has {len(available)} left"
+                )
+                continue
+            # Reserve deterministically so the next rule sees a realistic remainder.
+            for eq in _draw(available, rule["count"], section_id, None):
+                used.add(eq.question_id)
     return problems
 
 
@@ -133,49 +205,54 @@ def generate_paper(*, exam: Exam, candidate_id: uuid.UUID) -> tuple[str, list[Pa
     seed = compute_seed(exam_id=exam.id, candidate_id=candidate_id, salt=exam.paper_salt)
     rng = random.Random(seed)
 
-    rules = normalise_selection_rules(exam.selection_rules)
-
-    chosen: list[ExamQuestion] = []
+    chosen: list[tuple[uuid.UUID | None, ExamQuestion]] = []
     used: set[uuid.UUID] = set()
 
-    for rule in _ordered_rules(rules):
-        pool = [
-            eq
-            for eq in _pool_matching(exam.exam_questions, rule)
-            if eq.question_id not in used
-        ]
-        if len(pool) < rule["count"]:
-            raise ValidationError(
-                f"Question pool cannot satisfy the rule for {_rule_label(rule)}: "
-                f"need {rule['count']}, have {len(pool)}"
-            )
+    for section_id, rules in _sections_for(exam):
+        drawn: list[ExamQuestion] = []
+        for rule in _ordered_rules(rules):
+            pool = [
+                eq
+                for eq in _pool_matching(exam.exam_questions, rule, section_id)
+                if eq.question_id not in used
+            ]
+            if len(pool) < rule["count"]:
+                raise ValidationError(
+                    f"Question pool cannot satisfy the rule for {_rule_label(rule)}: "
+                    f"need {rule['count']}, have {len(pool)}"
+                )
 
-        # Sort by a stable key first so the pool order out of the DB cannot leak in.
-        pool.sort(key=lambda eq: str(eq.question_id))
-        picked = rng.sample(pool, rule["count"]) if exam.randomize else pool[: rule["count"]]
-        for eq in picked:
-            used.add(eq.question_id)
-        chosen.extend(picked)
+            picked = _draw(pool, rule["count"], section_id, rng if exam.randomize else None)
+            for eq in picked:
+                used.add(eq.question_id)
+            drawn.extend(picked)
 
-    if exam.randomize:
-        rng.shuffle(chosen)
-    else:
-        chosen.sort(key=lambda eq: (eq.order_index, str(eq.question_id)))
+        # Shuffle within the section, never across it. A candidate sees Section A's
+        # questions then Section B's; randomisation decides the order inside each, not
+        # whether a Section B question can appear under Section A's heading.
+        if exam.randomize:
+            rng.shuffle(drawn)
+        else:
+            drawn.sort(key=lambda eq: (eq.order_index, str(eq.question_id)))
+        chosen.extend((section_id, eq) for eq in drawn)
 
     entries: list[PaperEntry] = []
-    for eq in chosen:
+    for section_id, eq in chosen:
         option_ids = [o.id for o in sorted(eq.question.options, key=lambda o: o.order_index)]
-        if (
-            exam.shuffle_options
-            and exam.randomize
-            and eq.question.question_type in {QuestionType.MCQ, QuestionType.MULTI_SELECT}
-        ):
+        # Option order is its own setting, deliberately not gated on ``randomize``:
+        # shuffling which questions appear and shuffling A/B/C/D answer different
+        # worries, and an examiner who turns one on has not asked for the other.
+        if exam.shuffle_options and eq.question.question_type in {
+            QuestionType.MCQ,
+            QuestionType.MULTI_SELECT,
+        }:
             rng.shuffle(option_ids)
         entries.append(
             PaperEntry(
                 question_id=eq.question_id,
                 option_order=option_ids,
                 marks=eq.effective_marks,
+                section_id=section_id,
             )
         )
 

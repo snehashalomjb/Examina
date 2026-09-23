@@ -17,190 +17,16 @@ from typing import Any
 from app.core.config import settings
 from app.core.logging_config import get_logger
 from app.db.models.enums import Difficulty, QuestionCategory, QuestionType
+from app.services.ai_stub_templates import (
+    CODING_TEMPLATES,
+    FILL_BLANK_TEMPLATES,
+    MCQ_TEMPLATES,
+    NUMERICAL_TEMPLATES,
+    SHORT_ANSWER_TEMPLATES,
+    TRUE_FALSE_TEMPLATES,
+)
 
 logger = get_logger("ai_generator")
-
-# ---------------------------------------------------------------------------
-# Stub question templates — realistic enough to exercise the full review flow
-# ---------------------------------------------------------------------------
-
-_MCQ_TEMPLATES: dict[str, list[dict[str, Any]]] = {
-    "technical": [
-        {
-            "body": "Which of the following correctly describes the concept of polymorphism in OOP?",
-            "options": [
-                {"text": "The ability of a class to inherit from multiple base classes", "is_correct": False},
-                {"text": "The ability of different objects to respond to the same interface in their own way", "is_correct": True},
-                {"text": "The process of hiding implementation details from the user", "is_correct": False},
-                {"text": "A mechanism for allocating memory at runtime", "is_correct": False},
-            ],
-            "explanation": "Polymorphism allows objects of different types to be treated through a common interface, each responding according to its own implementation.",
-        },
-        {
-            "body": "What is the time complexity of searching for an element in a balanced Binary Search Tree?",
-            "options": [
-                {"text": "O(1)", "is_correct": False},
-                {"text": "O(log n)", "is_correct": True},
-                {"text": "O(n)", "is_correct": False},
-                {"text": "O(n log n)", "is_correct": False},
-            ],
-            "explanation": "A balanced BST has height log(n), so search, insert and delete all run in O(log n).",
-        },
-        {
-            "body": "Which SQL clause is used to filter records after grouping?",
-            "options": [
-                {"text": "WHERE", "is_correct": False},
-                {"text": "FILTER", "is_correct": False},
-                {"text": "HAVING", "is_correct": True},
-                {"text": "GROUP FILTER", "is_correct": False},
-            ],
-            "explanation": "HAVING filters groups produced by GROUP BY, whereas WHERE filters individual rows before grouping.",
-        },
-    ],
-    "aptitude": [
-        {
-            "body": "A train travels 360 km in 4 hours. What is its speed in km/h?",
-            "options": [
-                {"text": "80 km/h", "is_correct": False},
-                {"text": "90 km/h", "is_correct": True},
-                {"text": "100 km/h", "is_correct": False},
-                {"text": "72 km/h", "is_correct": False},
-            ],
-            "explanation": "Speed = Distance / Time = 360 / 4 = 90 km/h.",
-        },
-        {
-            "body": "If 8 workers complete a job in 12 days, how many days would 6 workers take to complete the same job?",
-            "options": [
-                {"text": "14 days", "is_correct": False},
-                {"text": "16 days", "is_correct": True},
-                {"text": "18 days", "is_correct": False},
-                {"text": "10 days", "is_correct": False},
-            ],
-            "explanation": "Workers × Days = constant. 8×12 = 96. 96/6 = 16 days.",
-        },
-    ],
-    "verbal_ability": [
-        {
-            "body": "Choose the word most similar in meaning to 'Perspicacious'.",
-            "options": [
-                {"text": "Dull", "is_correct": False},
-                {"text": "Shrewd", "is_correct": True},
-                {"text": "Timid", "is_correct": False},
-                {"text": "Verbose", "is_correct": False},
-            ],
-            "explanation": "Perspicacious means having a ready insight into things; shrewd is the closest synonym.",
-        },
-    ],
-    "logical_reasoning": [
-        {
-            "body": "In a series 2, 6, 18, 54, ___, what is the next number?",
-            "options": [
-                {"text": "108", "is_correct": False},
-                {"text": "162", "is_correct": True},
-                {"text": "216", "is_correct": False},
-                {"text": "81", "is_correct": False},
-            ],
-            "explanation": "Each term is multiplied by 3: 54 × 3 = 162.",
-        },
-    ],
-    "academic": [
-        {
-            "body": "Which of the following is NOT a supervised learning algorithm?",
-            "options": [
-                {"text": "Linear Regression", "is_correct": False},
-                {"text": "K-Means Clustering", "is_correct": True},
-                {"text": "Decision Tree", "is_correct": False},
-                {"text": "Support Vector Machine", "is_correct": False},
-            ],
-            "explanation": "K-Means is an unsupervised clustering algorithm; the others are supervised.",
-        },
-    ],
-    "coding": [
-        {
-            "body": "What is the output of the following Python code?\n\n```python\nprint(type([]) is list)\n```",
-            "options": [
-                {"text": "True", "is_correct": True},
-                {"text": "False", "is_correct": False},
-                {"text": "TypeError", "is_correct": False},
-                {"text": "None", "is_correct": False},
-            ],
-            "explanation": "`type([])` returns `<class 'list'>` which `is list` evaluates to True.",
-        },
-    ],
-}
-
-_FILL_BLANK_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "body": "The process of converting source code into machine code is called ___.",
-        "spec": {"kind": "fill_blank", "accepted_answers": ["compilation", "compiling"], "case_sensitive": False},
-        "explanation": "Compilation translates high-level source code into machine-executable code.",
-    },
-    {
-        "body": "In SQL, the ___ statement is used to retrieve data from a database.",
-        "spec": {"kind": "fill_blank", "accepted_answers": ["SELECT", "select"], "case_sensitive": False},
-        "explanation": "SELECT is the primary DML statement for querying data.",
-    },
-]
-
-_NUMERICAL_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "body": "What is the value of 2^10?",
-        "spec": {"kind": "numerical", "answer": 1024, "tolerance": 0},
-        "explanation": "2^10 = 1024.",
-    },
-    {
-        "body": "A rectangle has length 12 cm and width 8 cm. What is its area in cm²?",
-        "spec": {"kind": "numerical", "answer": 96, "tolerance": 0},
-        "explanation": "Area = length × width = 12 × 8 = 96 cm².",
-    },
-]
-
-_TRUE_FALSE_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "body": "Python is a statically typed programming language.",
-        "options": [
-            {"text": "True", "is_correct": False},
-            {"text": "False", "is_correct": True},
-        ],
-        "explanation": "Python is dynamically typed — variable types are determined at runtime.",
-    },
-    {
-        "body": "In a stack, the last element inserted is the first one to be removed.",
-        "options": [
-            {"text": "True", "is_correct": True},
-            {"text": "False", "is_correct": False},
-        ],
-        "explanation": "Stack follows LIFO (Last In, First Out) order.",
-    },
-]
-
-_SHORT_ANSWER_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "body": "In one or two sentences, explain what a primary key is in a relational database.",
-        "model_answer": "A primary key is a column (or combination of columns) that uniquely identifies each row in a table. It must be unique and cannot contain NULL values.",
-        "explanation": "Primary keys enforce entity integrity in relational databases.",
-    },
-]
-
-_CODING_TEMPLATES: list[dict[str, Any]] = [
-    {
-        "body": "Write a function `reverse_string(s: str) -> str` that returns the reverse of the input string.",
-        "spec": {
-            "kind": "coding",
-            "languages": ["python", "java", "cpp", "javascript"],
-            "default_language": "python",
-            "input_format": "A single string s (1 ≤ len(s) ≤ 1000).",
-            "output_format": "The reversed string.",
-            "constraints": "No built-in reverse functions.",
-            "sample_cases": [
-                {"input": "hello", "output": "olleh"},
-                {"input": "abcde", "output": "edcba"},
-            ],
-        },
-        "model_answer": "def reverse_string(s: str) -> str:\n    return s[::-1]",
-        "explanation": "Python slicing with step -1 reverses the string in O(n) time and space.",
-    },
-]
 
 
 def _pick_template(question_type: QuestionType, category: QuestionCategory) -> dict[str, Any]:
@@ -208,18 +34,18 @@ def _pick_template(question_type: QuestionType, category: QuestionCategory) -> d
     cat_key = category.value
 
     if question_type is QuestionType.MCQ or question_type is QuestionType.MULTI_SELECT:
-        pool = _MCQ_TEMPLATES.get(cat_key, _MCQ_TEMPLATES["technical"])
+        pool = MCQ_TEMPLATES.get(cat_key, MCQ_TEMPLATES["technical"])
         return random.choice(pool)
     if question_type is QuestionType.TRUE_FALSE:
-        return random.choice(_TRUE_FALSE_TEMPLATES)
+        return random.choice(TRUE_FALSE_TEMPLATES)
     if question_type is QuestionType.FILL_BLANK:
-        return random.choice(_FILL_BLANK_TEMPLATES)
+        return random.choice(FILL_BLANK_TEMPLATES)
     if question_type is QuestionType.NUMERICAL:
-        return random.choice(_NUMERICAL_TEMPLATES)
+        return random.choice(NUMERICAL_TEMPLATES)
     if question_type is QuestionType.SHORT_ANSWER:
-        return random.choice(_SHORT_ANSWER_TEMPLATES)
+        return random.choice(SHORT_ANSWER_TEMPLATES)
     if question_type is QuestionType.CODING:
-        return random.choice(_CODING_TEMPLATES)
+        return random.choice(CODING_TEMPLATES)
     # Fallback for long_answer, image_upload, passage
     return {
         "body": f"[AI Stub] Describe an important concept related to {category.value}.",
@@ -238,6 +64,7 @@ def _generate_stub(
     difficulty: Difficulty,
     question_type: QuestionType,
     count: int,
+    subject_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Generate `count` stub drafts without any network call."""
     drafts: list[dict[str, Any]] = []
@@ -259,7 +86,13 @@ def _generate_stub(
             "model_answer": template.get("model_answer"),
             "spec": template.get("spec"),
             "options": template.get("options", []),
-            "tags": [category.value, question_type.value] + ([topic] if topic else []),
+            # Subject is tagged even offline, so a subject-scoped request is at least
+            # traceable back to it - the stub has no prompt to steer with, but the tag
+            # keeps a reviewer from mistaking a generic template for one written for
+            # this subject.
+            "tags": [category.value, question_type.value]
+            + ([topic] if topic else [])
+            + ([subject_name] if subject_name else []),
         }
         drafts.append({"payload": payload, "provider": "stub", "model": "smart-assess-stub-v1"})
     return drafts
@@ -273,17 +106,25 @@ def _generate_with_llm(
     count: int,
     extra_instructions: str | None,
     source_text: str | None = None,
+    subject_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Call an LLM to generate questions. Falls back to stub on any error."""
     provider = settings.GRADER_PROVIDER
     try:
         if provider == "openai" and settings.OPENAI_API_KEY:
             return _openai_generate(
-                category, topic, difficulty, question_type, count, extra_instructions, source_text
+                category,
+                topic,
+                difficulty,
+                question_type,
+                count,
+                extra_instructions,
+                source_text,
+                subject_name,
             )
     except Exception as exc:
         logger.warning("LLM generation failed (%s), falling back to stub: %s", provider, exc)
-    return _generate_stub(category, topic, difficulty, question_type, count)
+    return _generate_stub(category, topic, difficulty, question_type, count, subject_name)
 
 
 def _build_prompt(
@@ -294,7 +135,13 @@ def _build_prompt(
     count: int,
     extra_instructions: str | None,
     source_text: str | None = None,
+    subject_name: str | None = None,
 ) -> str:
+    # The subject is what actually scopes a question to a syllabus - "Data Structures"
+    # means something different asked for a Databases exam than for an Algorithms one.
+    # Folded into the same sentence as the topic so the model reads them as one ask
+    # rather than two competing constraints.
+    subject_str = f" for the subject '{subject_name}'" if subject_name else ""
     topic_str = f" on the topic '{topic}'" if topic else ""
     extra = f"\n\nExtra instructions: {extra_instructions}" if extra_instructions else ""
     # Uploaded source material is fenced and framed as reference text only. A PDF an
@@ -308,7 +155,14 @@ def _build_prompt(
         if source_text
         else ""
     )
-    return f"""Generate {count} {difficulty.value}-difficulty {question_type.value} question(s) for the {category.value} category{topic_str}.
+    # Hoisted out of the triple-quoted block purely for line length: the two fragments
+    # concatenate to exactly the sentence that used to sit on one line, because the
+    # prompt text itself must not change.
+    opening = (
+        f"Generate {count} {difficulty.value}-difficulty {question_type.value} "
+        f"question(s) for the {category.value} category{subject_str}{topic_str}."
+    )
+    return f"""{opening}
 
 Return a JSON array. Each element must have these fields:
 - body: the question text (string)
@@ -331,12 +185,20 @@ def _openai_generate(
     count: int,
     extra_instructions: str | None,
     source_text: str | None = None,
+    subject_name: str | None = None,
 ) -> list[dict[str, Any]]:
     import openai  # type: ignore[import]
 
     client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
     prompt = _build_prompt(
-        category, topic, difficulty, question_type, count, extra_instructions, source_text
+        category,
+        topic,
+        difficulty,
+        question_type,
+        count,
+        extra_instructions,
+        source_text,
+        subject_name,
     )
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -347,7 +209,16 @@ def _openai_generate(
     data = json.loads(content)
     items = data if isinstance(data, list) else data.get("questions", [data])
     return [
-        {"payload": {**item, "category": category.value, "topic": topic, "difficulty": difficulty.value}, "provider": "openai", "model": "gpt-4o"}
+        {
+            "payload": {
+                **item,
+                "category": category.value,
+                "topic": topic,
+                "difficulty": difficulty.value,
+            },
+            "provider": "openai",
+            "model": "gpt-4o",
+        }
         for item in items
     ]
 
@@ -365,6 +236,7 @@ def generate_questions(
     count: int,
     extra_instructions: str | None = None,
     source_text: str | None = None,
+    subject_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Entry point called by the API route.
 
@@ -376,18 +248,30 @@ def generate_questions(
     so a stub run marks every draft ``source_grounded: false`` and the review UI says so
     plainly: an examiner must never mistake a canned template for a question drawn from
     their own document.
+
+    ``subject_name`` scopes what gets asked about. Without it, the request is only
+    "medium-difficulty MCQs about Normalisation" with no notion of which course that
+    belongs to; passed through, it enters the prompt so a Databases subject and an
+    Algorithms subject genuinely produce different questions on the same topic name.
     """
     provider = settings.GRADER_PROVIDER
     if provider == "stub" or not settings.OPENAI_API_KEY:
         logger.info("Using stub AI generator (%d questions)", count)
-        drafts = _generate_stub(category, topic, difficulty, question_type, count)
+        drafts = _generate_stub(category, topic, difficulty, question_type, count, subject_name)
         if source_text:
             for draft in drafts:
                 draft["payload"]["source_grounded"] = False
         return drafts
 
     drafts = _generate_with_llm(
-        category, topic, difficulty, question_type, count, extra_instructions, source_text
+        category,
+        topic,
+        difficulty,
+        question_type,
+        count,
+        extra_instructions,
+        source_text,
+        subject_name,
     )
     if source_text:
         for draft in drafts:

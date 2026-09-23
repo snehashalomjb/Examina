@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -23,6 +24,7 @@ import { useRequireAuth } from "@/lib/auth";
 import type { CandidateAttempt, CandidateRow } from "@/lib/types";
 
 export default function CandidatesPage() {
+  const t = useTranslations("dashboard-detail");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [search, setSearch] = useState("");
@@ -32,6 +34,7 @@ export default function CandidatesPage() {
   const [attempts, setAttempts] = useState<CandidateAttempt[]>([]);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const query = search.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
@@ -94,6 +97,22 @@ export default function CandidatesPage() {
     }
   }
 
+  async function downloadReport(attempt: CandidateAttempt) {
+    if (!attempt.result_id) return;
+    setDownloading(attempt.result_id);
+    try {
+      const safeName = open ? open.full_name.replace(/\s+/g, "_") : "candidate";
+      await api.download(
+        `/results/${attempt.result_id}/pdf?simple=true`,
+        `report_${safeName}.pdf`,
+      );
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not download the report", "rose");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -107,11 +126,11 @@ export default function CandidatesPage() {
 
       <Card>
         <div className="mb-4 max-w-sm">
-          <Field label="Search">
+          <Field label={t("field_search")}>
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name or email"
+              placeholder={t("placeholder_name_or_email")}
             />
           </Field>
         </div>
@@ -129,12 +148,12 @@ export default function CandidatesPage() {
             <table className="w-full min-w-[720px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-muted">
-                  <th className="pb-2 pr-3 font-medium">Candidate</th>
-                  <th className="pb-2 pr-3 font-medium">Attempts</th>
-                  <th className="pb-2 pr-3 font-medium">Completed</th>
-                  <th className="pb-2 pr-3 font-medium">Average</th>
-                  <th className="pb-2 pr-3 font-medium">Flags</th>
-                  <th className="pb-2 pr-3 font-medium">Last seen</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_candidate")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_attempts")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_completed")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_average")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_flags")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("header_last_seen")}</th>
                   <th className="pb-2 text-right font-medium"></th>
                 </tr>
               </thead>
@@ -262,6 +281,16 @@ export default function CandidatesPage() {
                               Result
                             </Button>
                           </Link>
+                        )}
+                        {attempt.published && attempt.result_id && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={downloading === attempt.result_id}
+                            onClick={() => void downloadReport(attempt)}
+                          >
+                            Download Report
+                          </Button>
                         )}
                         {canPublish(attempt) && (
                           <Button

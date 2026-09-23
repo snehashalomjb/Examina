@@ -10,7 +10,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentStaff, DbSession
@@ -19,15 +19,21 @@ from app.db.models import (
     Answer,
     CandidateShortlist,
     Exam,
-    ExamSection,
     ExamSession,
     ExamType,
     Result,
     SessionStatus,
-    User,
+    Subject,
     UserRole,
 )
-from app.schemas.recruitment import RankingRow, SectionScore, ShortlistBulkCreate, ShortlistOut
+from app.schemas.recruitment import (
+    RankingRow,
+    SectionScore,
+    ShortlistBulkCreate,
+    ShortlistOut,
+    TopPerformer,
+)
+from app.services import exam_engine
 
 router = APIRouter(tags=["recruitment"])
 logger = get_logger("recruitment")
@@ -51,7 +57,13 @@ def exam_ranking(
     db: DbSession,
     limit: int = Query(500, ge=1, le=2000),
 ) -> list[RankingRow]:
-    """Full candidate ranking for a corporate exam, with section-wise breakdown."""
+    """Per-candidate scores for any exam: marks, accuracy, time, proctoring flags.
+
+    "Ranking" is the corporate name for this; an academic examiner reading the same
+    table calls it "results". Both want the same thing - who sat it, what they scored,
+    who got flagged - so both get it. Shortlisting stays corporate-only below: deciding
+    to hire is a corporate action, but seeing a candidate's score is not.
+    """
     exam = db.scalar(
         select(Exam)
         .where(Exam.id == exam_id)
@@ -59,7 +71,6 @@ def exam_ranking(
     )
     if exam is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
-    _require_corporate(exam)
 
     # Load completed sessions + results
     sessions = list(
@@ -88,7 +99,6 @@ def exam_ranking(
 
     # Section names for breakdown
     sections = sorted(exam.sections, key=lambda s: s.order_index)
-    section_by_id = {s.id: s for s in sections}
 
     rows: list[RankingRow] = []
     for session in sessions:
@@ -164,6 +174,10 @@ def exam_ranking(
                 is_flagged=session.is_flagged,
                 result_id=result.id,
                 session_id=session.id,
+                published=result.published,
+                needs_integrity_review=exam_engine.needs_integrity_review(session),
+                integrity_verdict=session.integrity_verdict.value,
+                pending_review_count=result.pending_review_count,
             )
         )
 
@@ -253,3 +267,45 @@ def upsert_shortlists(
         exam_id,
     )
     return [ShortlistOut.model_validate(r) for r in results]
+
+
+# ----------------------------------------------------------- top performer
+
+
+@router.get("/subjects/{subject_id}/top-performer", response_model=TopPerformer | None)
+def subject_top_performer(
+    subject_id: uuid.UUID,
+    staff: CurrentStaff,
+    db: DbSession,
+) -> TopPerformer | None:
+    """Who scored highest across every exam on this subject - published results only.
+
+    An examiner sees only their own exams' best score, same scoping as the rest of the
+    dashboard; an admin sees the platform-wide best.
+    """
+    subject = db.get(Subject, subject_id)
+    if subject is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+
+    stmt = (
+        select(Result)
+        .join(ExamSession, ExamSession.id == Result.session_id)
+        .join(Exam, Exam.id == ExamSession.exam_id)
+        .where(Exam.subject_id == subject_id, Result.published.is_(True))
+        .options(selectinload(Result.session).selectinload(ExamSession.candidate), selectinload(Result.session).selectinload(ExamSession.exam))
+        .order_by(Result.percentage.desc())
+    )
+    if staff.role is UserRole.EXAMINER:
+        stmt = stmt.where(Exam.created_by_id == staff.id)
+
+    best = db.scalars(stmt).first()
+    if best is None:
+        return None
+
+    return TopPerformer(
+        candidate_name=best.session.candidate.full_name,
+        exam_title=best.session.exam.title,
+        obtained_marks=best.obtained_marks,
+        total_marks=best.total_marks,
+        percentage=best.percentage,
+    )

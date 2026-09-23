@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Badge, Card, cx } from "@/components/ui";
+import { Badge, cx } from "@/components/ui";
 
 export type ExamCategoryType = "academic" | "corporate";
 

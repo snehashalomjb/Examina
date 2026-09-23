@@ -1,0 +1,23 @@
+{
+  "profile_title": "ಪ್ರೊಫೈಲ್",
+  "profile_subtitle": "ವೇದಿಕೆ ಹೊಂದಿರುವಂತೆ ನಿಮ್ಮ ಖಾತೆ.",
+  "details_card": "ವಿವರಗಳು",
+  "access_card": "ಪ್ರವೇಶ",
+  "first_name_placeholder": "ನಿಮ್ಮ ಮೊದಲ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
+  "last_name_placeholder": "ನಿಮ್ಮ ಕೊನೆಯ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
+  "email_label": "ಇಮೇಲ್",
+  "role_label": "ಪಾತ್ರ",
+  "change_password_title": "ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಯಿಸಿ",
+  "change_password_hint": "ನಿಮ್ಮ ಪ್ರಸ್ತುತ ಪಾಸ್‌ವರ್ಡ್ ನಮೂದಿಸಿ, ನಂತರ ಹೊಸದನ್ನು ಎರಡು ಬಾರಿ ನಮೂದಿಸಿ.",
+  "current_password": "ಪ್ರಸ್ತುತ ಪಾಸ್‌ವರ್ಡ್",
+  "new_password": "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್",
+  "confirm_password": "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ದೃಢೀಕರಿಸಿ",
+  "settings_title": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+  "settings_subtitle": "ನಿಮ್ಮ ಪಾಸ್‌ವರ್ಡ್ ಮತ್ತು ಸೆಷನ್.",
+  "session_title": "ಸೆಷನ್",
+  "session_hint": "ಸೈನ್ ಔಟ್ ಮಾಡುವುದರಿಂದ ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಇರುವ ಟೋಕನ್‌ಗಳು ಅಳಿಸಲ್ಪಡುತ್ತವೆ.",
+  "sign_out": "ಸೈನ್ ಔಟ್",
+  "password_updated": "ಪಾಸ್‌ವರ್ಡ್ ಅನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಯಿಸಲಾಗಿದೆ",
+  "profile_updated": "ಪ್ರೊಫೈಲ್ ಅನ್ನು ಯಶಸ್ವಿಯಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ",
+  "settingsChangePasswordHint": "ಕನಿಷ್ಠ 8 ಅಕ್ಷರಗಳು, ಒಂದು ಅಕ್ಷರ ಮತ್ತು ಒಂದು ಅಂಕಿಯೊಂದಿಗೆ."
+}

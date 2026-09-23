@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Header, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentCandidate, CurrentStaff, CurrentUser, DbSession
 from app.core.storage import presigned_url
-from app.services import exam_engine
-from app.services.pdf_generator import generate_result_pdf
 from app.db.models import (
     Answer,
     Exam,
@@ -20,6 +18,7 @@ from app.db.models import (
     ExamStatus,
     GradeStatus,
     Question,
+    QuestionOption,
     QuestionType,
     Result,
     SessionStatus,
@@ -30,45 +29,80 @@ from app.db.models import (
 from app.db.models.enums import OBJECTIVE_TYPES
 from app.schemas.admin import ExaminerStats
 from app.schemas.exam_session import QuestionResult, ResultDetail, ResultOut
+from app.services import exam_engine
+from app.services.i18n import resolve_locale, translated_field
+from app.services.pdf_generator import generate_candidate_report_pdf, generate_result_pdf
 
 router = APIRouter(tags=["results"])
 
 
-def _answer_text(answer: Answer, question: Question) -> str | None:
+def _viewer_locale(user: CurrentUser, lang: str | None, accept_language: str | None) -> str:
+    return resolve_locale(
+        query_lang=lang, user_locale=user.preferred_locale, accept_language=accept_language
+    )
+
+
+def _answer_text(answer: Answer, question: Question, locale: str) -> str | None:
     if question.question_type in OBJECTIVE_TYPES:
         selected = set(answer.selected_option_ids or [])
         if not selected:
             return None
-        chosen = [o.text for o in question.options if str(o.id) in selected]
+        chosen = [
+            translated_field(o.text, o.translations, locale, "text")
+            for o in question.options
+            if str(o.id) in selected
+        ]
         return ", ".join(chosen) if chosen else None
     if question.question_type is QuestionType.IMAGE_UPLOAD:
         return presigned_url(answer.image_object_key)
     return answer.text_answer
 
 
-def _correct_text(question: Question) -> str | None:
+def _correct_text(question: Question, locale: str) -> str | None:
     if question.question_type in OBJECTIVE_TYPES:
-        return ", ".join(o.text for o in question.options if o.is_correct) or None
+        return (
+            ", ".join(
+                translated_field(o.text, o.translations, locale, "text")
+                for o in question.options
+                if o.is_correct
+            )
+            or None
+        )
+    # Deliberately the base (English) model answer, never a translated one - it is
+    # graded against and reviewed by examiners as the canonical text, same invariant as
+    # the grading prompt in app.services.grading.openai.
     return question.model_answer
 
 
-def _result_out(result: Result, session: ExamSession) -> ResultOut:
+def _result_out(result: Result, session: ExamSession, locale: str = "en") -> ResultOut:
     """Serialise a result with enough context for the number to mean something.
 
     A bare percentage on a dashboard row is unreadable - the candidate needs to know
     which paper it was and what counted as a pass.
     """
     out = ResultOut.model_validate(result)
-    out.exam_title = session.exam.title
-    out.subject_name = session.exam.subject.name if session.exam.subject else None
+    out.exam_title = translated_field(
+        session.exam.title, session.exam.translations, locale, "title"
+    )
+    out.subject_name = (
+        translated_field(session.exam.subject.name, session.exam.subject.translations, locale, "name")
+        if session.exam.subject
+        else None
+    )
     out.passing_percentage = session.exam.passing_percentage
     out.passed = exam_engine.passed(result.percentage, session.exam)
     return out
 
 
 @router.get("/my/results", response_model=list[ResultOut])
-def my_results(candidate: CurrentCandidate, db: DbSession) -> list[ResultOut]:
+def my_results(
+    candidate: CurrentCandidate,
+    db: DbSession,
+    lang: str | None = None,
+    accept_language: str | None = Header(default=None),
+) -> list[ResultOut]:
     """Only published results. An unpublished score is not a result yet."""
+    locale = _viewer_locale(candidate, lang, accept_language)
     results = db.scalars(
         select(Result)
         .join(ExamSession, ExamSession.id == Result.session_id)
@@ -77,19 +111,28 @@ def my_results(candidate: CurrentCandidate, db: DbSession) -> list[ResultOut]:
             selectinload(Result.session)
             .selectinload(ExamSession.exam)
             .selectinload(Exam.subject)
+            .selectinload(Subject.translations),
+            selectinload(Result.session).selectinload(ExamSession.exam).selectinload(Exam.translations),
         )
         .order_by(Result.published_at.desc().nullslast())
     )
-    return [_result_out(r, r.session) for r in results]
+    return [_result_out(r, r.session, locale) for r in results]
 
 
 @router.get("/results/{result_id}", response_model=ResultDetail)
-def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> ResultDetail:
+def result_detail(
+    result_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    lang: str | None = None,
+    accept_language: str | None = Header(default=None),
+) -> ResultDetail:
     """Question-level feedback.
 
     A candidate sees this only for their own published result; staff see any result at any
     time, published or not.
     """
+    locale = _viewer_locale(user, lang, accept_language)
     result = db.scalar(
         select(Result)
         .where(Result.id == result_id)
@@ -97,8 +140,17 @@ def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Res
             selectinload(Result.session)
             .selectinload(ExamSession.answers)
             .selectinload(Answer.question)
-            .selectinload(Question.options),
-            selectinload(Result.session).selectinload(ExamSession.exam).selectinload(Exam.subject),
+            .selectinload(Question.options)
+            .selectinload(QuestionOption.translations),
+            selectinload(Result.session)
+            .selectinload(ExamSession.answers)
+            .selectinload(Answer.question)
+            .selectinload(Question.translations),
+            selectinload(Result.session)
+            .selectinload(ExamSession.exam)
+            .selectinload(Exam.subject)
+            .selectinload(Subject.translations),
+            selectinload(Result.session).selectinload(ExamSession.exam).selectinload(Exam.translations),
             selectinload(Result.session).selectinload(ExamSession.candidate),
             selectinload(Result.session)
             .selectinload(ExamSession.answers)
@@ -133,6 +185,7 @@ def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Res
         db.scalars(
             select(ExamSectionModel)
             .where(ExamSectionModel.exam_id == exam.id)
+            .options(selectinload(ExamSectionModel.translations))
             .order_by(ExamSectionModel.order_index)
         )
     )
@@ -148,7 +201,7 @@ def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Res
     # Per-section accumulators
     section_acc: dict[uuid.UUID, dict] = {
         s.id: {
-            "name": s.name,
+            "name": translated_field(s.name, s.translations, locale, "name"),
             "total_marks": 0.0,
             "obtained_marks": 0.0,
             "correct": 0,
@@ -185,14 +238,14 @@ def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Res
         questions.append(
             QuestionResult(
                 question_id=question.id,
-                body=question.body,
+                body=translated_field(question.body, question.translations, locale, "body"),
                 question_type=question.question_type,
                 marks=answer.max_marks,
                 awarded_marks=answer.awarded_marks,
                 grade_status=answer.grade_status,
                 is_correct=is_correct,
-                your_answer=_answer_text(answer, question),
-                correct_answer=_correct_text(question),
+                your_answer=_answer_text(answer, question, locale),
+                correct_answer=_correct_text(question, locale),
                 examiner_comment=answer.examiner_comment,
                 section_name=sec_name,
                 # Candidates see the justification only once a human has signed the score
@@ -248,8 +301,10 @@ def result_detail(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Res
 
     return ResultDetail(
         result=ResultOut.model_validate(result),
-        exam_title=exam.title,
-        subject_name=exam.subject.name,
+        exam_title=translated_field(exam.title, exam.translations, locale, "title"),
+        subject_name=translated_field(
+            exam.subject.name, exam.subject.translations, locale, "name"
+        ),
         candidate_name=session.candidate.full_name,
         submitted_at=session.submitted_at,
         questions=questions,
@@ -415,9 +470,33 @@ def candidate_attempts(candidate_id: uuid.UUID, staff: CurrentStaff, db: DbSessi
 
 
 @router.get("/results/{result_id}/pdf")
-def result_pdf(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Response:
-    """Generates and downloads the certified PDF scorecard for a result."""
+def result_pdf(
+    result_id: uuid.UUID,
+    user: CurrentUser,
+    db: DbSession,
+    simple: bool = Query(False),
+) -> Response:
+    """Downloads a result as a PDF.
+
+    `simple=true` gives the short candidate report (name, exam, subject, marks,
+    percentage, status, subject-wise split) instead of the full certified scorecard -
+    the one-candidate download an examiner picks from an exam's candidate list.
+    """
     detail = result_detail(result_id=result_id, user=user, db=db)
+    safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in detail.exam_title)[:30]
+
+    if simple:
+        pdf_bytes = generate_candidate_report_pdf(detail)
+        filename = f"report_{safe_title}_{detail.result.id}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+            },
+        )
+
     session = db.scalar(
         select(ExamSession)
         .where(ExamSession.id == detail.result.session_id)
@@ -426,7 +505,6 @@ def result_pdf(result_id: uuid.UUID, user: CurrentUser, db: DbSession) -> Respon
     email = session.candidate.email if session and session.candidate else None
 
     pdf_bytes = generate_result_pdf(detail, candidate_email=email)
-    safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in detail.exam_title)[:30]
     filename = f"scorecard_{safe_title}_{detail.result.id}.pdf"
 
     return Response(

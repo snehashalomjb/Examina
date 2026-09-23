@@ -75,6 +75,11 @@ class ExamSessionOut(BaseModel):
     exam_token: str | None = None
     #: Ordered sections for the section-navigation tabs. Empty on single-section papers.
     sections: list[SessionSection] = Field(default_factory=list)
+    #: The locale this paper was rendered in - what the language selector should show
+    #: as selected right now.
+    locale: str = "en"
+    #: Language codes this exam's selector may switch to. Always leads with "en".
+    available_languages: list[str] = Field(default_factory=lambda: ["en"])
 
 
 class AnswerSave(BaseModel):
@@ -224,3 +229,5 @@ class CandidateExamCard(BaseModel):
     sections_count: int = 0
     has_coding: bool = False
     proctor_config: dict = Field(default_factory=dict)
+    #: Language codes this exam's selector may switch to. Always leads with "en".
+    available_languages: list[str] = Field(default_factory=lambda: ["en"])

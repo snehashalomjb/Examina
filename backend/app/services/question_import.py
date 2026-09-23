@@ -37,6 +37,7 @@ from app.services.validators import OptionDraft, ValidationError, validate_quest
 COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
     "body": ("question", "question text", "body", "text", "problem", "statement"),
     "question_type": ("type", "question type", "qtype", "kind"),
+    "subject": ("subject", "subject code", "subject name", "course"),
     "difficulty": ("difficulty", "level"),
     "topic": ("topic", "subtopic", "unit", "chapter"),
     "category": ("category", "section", "shelf"),
@@ -64,9 +65,11 @@ TYPE_ALIASES: dict[str, QuestionType] = {
     "single select": QuestionType.MCQ,
     "multiple choice": QuestionType.MCQ,
     "multi select": QuestionType.MULTI_SELECT,
+    "multiple select": QuestionType.MULTI_SELECT,
     "multi": QuestionType.MULTI_SELECT,
     "multiselect": QuestionType.MULTI_SELECT,
     "multiple answer": QuestionType.MULTI_SELECT,
+    "multiple answers": QuestionType.MULTI_SELECT,
     "true false": QuestionType.TRUE_FALSE,
     "true/false": QuestionType.TRUE_FALSE,
     "truefalse": QuestionType.TRUE_FALSE,
@@ -117,6 +120,16 @@ class ParsedRow:
     #: 1-based, counting the header, so it matches what the examiner sees in Excel.
     row_number: int
     body: str = ""
+    #: The raw text of a "Subject" cell, exactly as typed - "" when the column is
+    #: absent or the cell is blank, in which case the row takes the import's default
+    #: subject. Resolving this to a real ``Subject`` id needs the database, so it
+    #: happens one layer up in the API, not here.
+    subject_text: str = ""
+    #: Filled in by the API once ``subject_text`` (or the import's default) has been
+    #: resolved against the database. ``None`` until then, and still ``None`` if the
+    #: text named a subject that does not exist - see ``problems`` for that case.
+    subject_id: Any | None = None
+    subject_name: str | None = None
     question_type: QuestionType = QuestionType.MCQ
     difficulty: Difficulty = Difficulty.MEDIUM
     category: QuestionCategory = QuestionCategory.ACADEMIC
@@ -217,7 +230,7 @@ def _parse_type(text: str) -> QuestionType | None:
 
 
 def _parse_correct_letters(text: str) -> list[str]:
-    """"B", "b", "A,C", "A and C", "2" all name options.
+    """ "B", "b", "A,C", "A and C", "2" all name options.
 
     Numbers are accepted because plenty of question banks are written with 1-based
     option numbers, and rejecting those would fail files that are perfectly clear.
@@ -234,6 +247,30 @@ def _parse_correct_letters(text: str) -> list[str]:
     return list(dict.fromkeys(found))
 
 
+def _match_answer_letters(answer_text: str, cells: list[str]) -> list[str]:
+    """Letters an answer names, including by quoting the option's own text.
+
+    A document that writes "Answer: Python" rather than "Answer: A" is naming the
+    option, not the letter - matched here against the option cells so it resolves the
+    same way a lettered answer would.
+    """
+    letters = _parse_correct_letters(answer_text)
+    if letters or not answer_text:
+        return letters
+    found: list[str] = []
+    for token in re.split(r"[,;]|\band\b", answer_text):
+        token = token.strip().casefold()
+        if not token:
+            continue
+        for index, cell in enumerate(cells):
+            if cell and cell.strip().casefold() == token:
+                letter = chr(65 + index)
+                if letter not in found:
+                    found.append(letter)
+                break
+    return found
+
+
 def _row_to_question(
     row_number: int,
     row: list[str],
@@ -245,6 +282,8 @@ def _row_to_question(
     parsed.body = _cell(row, fields.get("body"))
     if not parsed.body:
         parsed.problems.append("The question text is empty.")
+
+    parsed.subject_text = _cell(row, fields.get("subject"))
 
     type_text = _cell(row, fields.get("question_type"))
     question_type = _parse_type(type_text)
@@ -320,9 +359,7 @@ def _row_to_question(
             if not correct_text:
                 parsed.problems.append("No correct answer is given.")
             elif not letters:
-                parsed.problems.append(
-                    f"'{correct_text}' does not name any of the options."
-                )
+                parsed.problems.append(f"'{correct_text}' does not name any of the options.")
             elif not any(o.is_correct for o in parsed.options):
                 parsed.problems.append(
                     f"The answer '{correct_text}' points at an option that is empty."
@@ -400,10 +437,57 @@ def _rows_from_csv(data: bytes) -> list[list[str]]:
         dialect: Any = csv.Sniffer().sniff(sample, delimiters=",;\t|")
     except csv.Error:
         dialect = csv.excel  # a single-column file sniffs as nothing; comma is fine
-    return [list(row) for row in csv.reader(io.StringIO(text), dialect) if any(row)]
+
+    try:
+        # A blank row is kept, not dropped. ``parse_questions`` skips it when it walks
+        # the rows, but it does so by position - drop it here instead and every row
+        # number reported after it would be off by one from what the examiner sees in
+        # their own spreadsheet.
+        return [list(row) for row in csv.reader(io.StringIO(text), dialect)]
+    except csv.Error as exc:
+        # latin-1 decodes any byte string, so a binary file that is not really CSV at
+        # all - a renamed image, a corrupted upload - sails past the decode step above
+        # and only trips here, mid-read, on a stray control character the reader
+        # cannot make sense of as a field. That is a bad file, not a server fault.
+        raise ImportError_("That file could not be read as CSV.") from exc
 
 
-def _rows_from_xlsx(data: bytes) -> list[list[str]]:
+def xlsx_sheet_names(data: bytes) -> list[str]:
+    """Every worksheet name in the workbook, in order. Empty on anything unreadable."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:  # pragma: no cover - dependency is declared
+        return []
+    try:
+        workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception:
+        return []
+    names = list(workbook.sheetnames)
+    workbook.close()
+    return names
+
+
+def xlsx_active_sheet_name(data: bytes) -> str | None:
+    """Which sheet gets read when the examiner has not chosen one.
+
+    Not necessarily ``sheetnames[0]`` - a workbook remembers whichever tab was on
+    screen when it was last saved, which is what ``workbook.active`` reports.
+    """
+    try:
+        from openpyxl import load_workbook
+    except ImportError:  # pragma: no cover - dependency is declared
+        return None
+    try:
+        workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception:
+        return None
+    sheet = workbook.active
+    name = sheet.title if sheet is not None else None
+    workbook.close()
+    return name
+
+
+def _rows_from_xlsx(data: bytes, sheet_name: str | None = None) -> list[list[str]]:
     try:
         from openpyxl import load_workbook
     except ImportError as exc:  # pragma: no cover - dependency is declared
@@ -414,22 +498,44 @@ def _rows_from_xlsx(data: bytes) -> list[list[str]]:
     except Exception as exc:
         raise ImportError_("That file could not be opened as a spreadsheet.") from exc
 
-    sheet = workbook.active
+    # A workbook with several worksheets is common for a bank organised one subject per
+    # tab. Without a name, the active sheet is used - whichever was on screen when the
+    # file was saved - same as before this could be picked explicitly.
+    if sheet_name is not None:
+        if sheet_name not in workbook.sheetnames:
+            workbook.close()
+            raise ImportError_(f"This workbook has no sheet named '{sheet_name}'.")
+        sheet = workbook[sheet_name]
+    else:
+        sheet = workbook.active
     if sheet is None:
+        workbook.close()
         raise ImportError_("That workbook has no sheets.")
     rows = [
         ["" if cell is None else str(cell) for cell in row]
         for row in sheet.iter_rows(values_only=True)
     ]
     workbook.close()
-    return [row for row in rows if any(cell.strip() for cell in row)]
+    # A blank row is kept, not dropped, so the row number reported for everything
+    # after it still matches the row the examiner sees in Excel - the same reasoning
+    # as the CSV reader just above.
+    return rows
+
+
+def _same_header(a: list[str], b: list[str]) -> bool:
+    return [_normalise_header(x) for x in a] == [_normalise_header(x) for x in b]
 
 
 def _rows_from_docx(data: bytes) -> list[list[str]]:
-    """Read a Word document's first table, or fall back to numbered paragraphs.
+    """Read every table in a Word document, or fall back to numbered paragraphs.
 
     Examiners write Word question papers both ways, and a table is unambiguous where
-    prose is not, so a table wins whenever the document has one.
+    prose is not, so tables win whenever the document has any. A question bank split
+    into several sections often comes as one table per section (Single Choice, then
+    True/False, then Multiple Choice) - reading only the first would silently drop
+    every section after it, so every table's data rows are collected, and a repeated
+    header row in a later table is recognised and skipped rather than imported as a
+    question.
     """
     try:
         import docx
@@ -441,20 +547,66 @@ def _rows_from_docx(data: bytes) -> list[list[str]]:
     except Exception as exc:
         raise ImportError_("That file could not be opened as a Word document.") from exc
 
+    header: list[str] | None = None
+    data_rows: list[list[str]] = []
     for table in document.tables:
-        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-        rows = [row for row in rows if any(row)]
-        if len(rows) >= 2:
-            return rows
+        table_rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
+        if len(table_rows) < 2:
+            continue
+        if header is None:
+            header = table_rows[0]
+            data_rows.extend(table_rows[1:])
+        elif _same_header(table_rows[0], header):
+            data_rows.extend(table_rows[1:])
+        else:
+            data_rows.extend(table_rows)
+
+    if header is not None:
+        return [header, *data_rows]
 
     return _rows_from_prose([p.text for p in document.paragraphs])
 
+
+#: Bullet/checkbox glyphs examiners paste in front of a line - stripped before any of
+#: the patterns below try to match, so "☑ A. Data collection" is read the same as
+#: "A. Data collection".
+_BULLET_PREFIX = re.compile(r"^[\s•●○◦‣▪✓✔☑☒☐➤►\-–—\*]+")
 
 #: "1. What is X?" / "Q3) What is X?" - the numbering examiners actually type.
 QUESTION_START = re.compile(r"^\s*(?:q(?:uestion)?\s*)?(\d{1,3})\s*[\.\):]\s*(.+)$", re.IGNORECASE)
 #: "A. Learning from data" / "(b) Removing data" / "C) ..." - optionally starred correct.
 OPTION_LINE = re.compile(r"^\s*\(?([a-fA-F])\)?\s*[\.\):]?\s*(.+?)\s*(\*)?\s*$")
-ANSWER_LINE = re.compile(r"^\s*(?:answer|ans|correct)\s*[:\-]\s*(.+)$", re.IGNORECASE)
+#: A True/False option written without a letter at all - just the word on its own line,
+#: which is how a True/False question is commonly laid out ("True" / "False", one per
+#: line) rather than "A. True" / "B. False".
+BARE_TRUE_FALSE_LINE = re.compile(r"^(true|false)\s*(\*)?$", re.IGNORECASE)
+#: "Section B — True/False (Medium)" - a heading, not a question. Its type/difficulty
+#: apply to every question under it until the next heading, but the heading text itself
+#: must never end up inside a question body.
+SECTION_HEADING = re.compile(r"^section\s+[a-z0-9]+\s*[-—–:]\s*(.+)$", re.IGNORECASE)
+#: Longer phrases first - "Correct Answer: B" must not fall through the "correct"
+#: alternative half-matched, leaving "Answer: B" unconsumed for OPTION_LINE to
+#: mistake for an option lettered "A" through "F".
+ANSWER_LINE = re.compile(
+    r"^\s*(?:correct\s*answer|correct\s*option|answer|ans|correct)\s*[:\-]\s*(.+)$",
+    re.IGNORECASE,
+)
+#: "Subject: Java" / "Marks: 2" / "Negative Marks: 0.5" - the metadata lines an examiner
+#: types under a question in a Word paper. Matched before the "continuation line"
+#: fallback so they are read as fields, not appended onto the question body. A line may
+#: carry more than one of these separated by "|" - "Type: True/False | Difficulty:
+#: Medium" is a single line, not two - so callers split on "|" before matching this.
+META_LINE = re.compile(
+    r"^\s*(type|subject|topic|difficulty|marks|negative\s*marks)\s*[:\-]\s*(.+)$", re.IGNORECASE
+)
+_META_COLUMN = {
+    "type": "Type",
+    "subject": "Subject",
+    "topic": "Topic",
+    "difficulty": "Difficulty",
+    "marks": "Marks",
+    "negativemarks": "Negative Marks",
+}
 
 
 def _rows_from_prose(lines: list[str]) -> list[list[str]]:
@@ -474,47 +626,132 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
         "Option E",
         "Option F",
         "Correct",
+        "Subject",
+        "Topic",
+        "Difficulty",
+        "Marks",
+        "Negative Marks",
     ]
     rows: list[list[str]] = [header]
 
     body: str | None = None
     options: list[tuple[str, str, bool]] = []
     answer = ""
+    meta: dict[str, str] = {}
+    saw_bare_true = False
+    saw_bare_false = False
+    #: Set by a "Section X — <Type> (<Difficulty>)" heading and carried forward to
+    #: every question under it, until the next heading changes it. A question's own
+    #: explicit "Type:"/"Difficulty:" line always wins over these.
+    section_type: QuestionType | None = None
+    section_difficulty: str = ""
+    #: The section state as it was when the *current* question started - a heading
+    #: that appears between a question's last line and the next question's number must
+    #: not be applied retroactively to the question just finished, only to the one
+    #: about to begin.
+    active_section_type: QuestionType | None = None
+    active_section_difficulty: str = ""
 
     def flush() -> None:
-        nonlocal body, options, answer
+        nonlocal body, options, answer, meta, saw_bare_true, saw_bare_false
         if body is None:
             return
         cells = [""] * 6
-        starred = ""
+        starred: list[str] = []
         for letter, text, is_correct in options:
             index = ord(letter.upper()) - 65
             if 0 <= index < 6:
                 cells[index] = text
                 if is_correct:
-                    starred = letter.upper()
+                    starred.append(letter.upper())
+
+        # How many options are actually marked correct - from an inline "*" on the
+        # option line, from the answer line naming more than one letter ("Answer: A, B,
+        # C"), or from an answer written as the options' own text ("Answer: Python").
+        # Whichever the document actually used.
+        matched_letters = _match_answer_letters(answer, cells)
+        correct_count = len(starred) or len(matched_letters)
+
+        # The declared "Type:" is free text an examiner typed, and free text is wrong
+        # sometimes - "Multiple Choice" used loosely for a question with several correct
+        # options is the case actually seen in the wild. The actual count of correct
+        # options is ground truth, so it wins when the two disagree: more than one
+        # correct option can never be a single-choice question, whatever the label
+        # above it says.
+        declared = _parse_type(meta.get("Type", "")) or active_section_type
+        no_lettered_options = not any(cells)
+        looks_true_false = (
+            saw_bare_true
+            or saw_bare_false
+            or (no_lettered_options and _normalise_header(answer) in {"true", "false"})
+        )
+        if declared is QuestionType.TRUE_FALSE or (declared is None and looks_true_false):
+            resolved = "true_false"
+        elif correct_count > 1:
+            resolved = "multi_select"
+        elif declared is not None:
+            resolved = declared.value
+        else:
+            resolved = "mcq" if any(cells) else "short_answer"
+
+        correct_cell = ",".join(starred) if starred else (",".join(matched_letters) or answer)
+
         rows.append(
             [
                 body,
-                "mcq" if any(cells) else "short_answer",
+                resolved,
                 *cells,
-                answer or starred,
+                correct_cell,
+                meta.get("Subject", ""),
+                meta.get("Topic", ""),
+                meta.get("Difficulty", "") or active_section_difficulty,
+                meta.get("Marks", ""),
+                meta.get("Negative Marks", ""),
             ]
         )
-        body, options, answer = None, [], ""
+        body, options, answer, meta = None, [], "", {}
+        saw_bare_true, saw_bare_false = False, False
 
     for line in lines:
-        text = line.strip()
-        if not text:
+        raw = line.strip()
+        if not raw:
             continue
+        text = _BULLET_PREFIX.sub("", raw).strip() or raw
 
         start = QUESTION_START.match(text)
         if start:
             flush()
             body = start.group(2).strip()
+            active_section_type, active_section_difficulty = section_type, section_difficulty
+            continue
+
+        heading = SECTION_HEADING.match(text)
+        if heading:
+            descriptor = heading.group(1).strip()
+            without_parens = re.sub(r"\(.*?\)", "", descriptor).strip()
+            found_type = _parse_type(without_parens)
+            if found_type is not None:
+                section_type = found_type
+            found_difficulty = re.search(r"easy|medium|hard", descriptor, re.IGNORECASE)
+            if found_difficulty:
+                section_difficulty = found_difficulty.group(0).lower()
             continue
 
         if body is None:
+            continue
+
+        # A line may bundle several "Key: value" fields separated by "|" - match each
+        # segment on its own, since META_LINE's value would otherwise swallow the rest
+        # of the line as one field's text.
+        segments = [s.strip() for s in text.split("|")] if "|" in text else [text]
+        meta_matches = [(seg, META_LINE.match(seg)) for seg in segments]
+        if any(match for _, match in meta_matches):
+            for _, found_meta in meta_matches:
+                if not found_meta:
+                    continue
+                key = _META_COLUMN.get(re.sub(r"\s+", "", found_meta.group(1)).lower())
+                if key:
+                    meta[key] = found_meta.group(2).strip()
             continue
 
         found_answer = ANSWER_LINE.match(text)
@@ -522,20 +759,58 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
             answer = found_answer.group(1).strip()
             continue
 
+        bare_tf = BARE_TRUE_FALSE_LINE.match(text)
+        if bare_tf:
+            if bare_tf.group(1).lower() == "true":
+                saw_bare_true = True
+            else:
+                saw_bare_false = True
+            continue
+
         option = OPTION_LINE.match(text)
         if option and len(text) < 400:
             options.append((option.group(1), option.group(2).strip(), bool(option.group(3))))
             continue
 
-        # A continuation line - part of the question, wrapped.
-        body = f"{body} {text}".strip()
+        # A continuation line - part of the question, wrapped. Kept from the raw,
+        # un-stripped text so a body that genuinely starts with a dash is not mangled.
+        body = f"{body} {raw}".strip()
 
     flush()
     return rows
 
 
-#: Extension -> reader. PDF import already has its own AI-backed route, which reads a
-#: syllabus rather than a formatted question table, so it is deliberately not here.
+def _rows_from_pdf(data: bytes) -> list[list[str]]:
+    """Read a PDF the same way as a Word paper: numbered questions, options, answers.
+
+    A PDF containing an actual question table is imported directly, same as a DOCX. A
+    PDF that turns out to hold no questions - a syllabus, a topic list - is refused
+    with a message pointing at AI Generate, which is what reads that kind of document.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover - dependency is declared
+        raise ImportError_("PDF support is not installed on the server.") from exc
+
+    try:
+        reader = PdfReader(io.BytesIO(data))
+    except Exception as exc:
+        raise ImportError_("That file could not be opened as a PDF.") from exc
+
+    lines: list[str] = []
+    for page in reader.pages:
+        lines.extend((page.extract_text() or "").splitlines())
+
+    rows = _rows_from_prose(lines)
+    if len(rows) < 2:
+        raise ImportError_(
+            "No questions were found in this PDF. If it's a syllabus rather than a "
+            "question paper, use AI Generate instead."
+        )
+    return rows
+
+
+#: Extension -> reader.
 READERS = {
     "csv": _rows_from_csv,
     "tsv": _rows_from_csv,
@@ -543,20 +818,31 @@ READERS = {
     "xlsx": _rows_from_xlsx,
     "xlsm": _rows_from_xlsx,
     "docx": _rows_from_docx,
+    "pdf": _rows_from_pdf,
 }
 
 
-def parse_questions(*, filename: str, data: bytes) -> list[ParsedRow]:
-    """Read a file into rows. Raises ``ImportError_`` only when nothing can be read."""
+def parse_questions(
+    *, filename: str, data: bytes, sheet_name: str | None = None
+) -> list[ParsedRow]:
+    """Read a file into rows. Raises ``ImportError_`` only when nothing can be read.
+
+    ``sheet_name`` is meaningful only for a workbook with more than one worksheet;
+    ignored for every other format.
+    """
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     reader = READERS.get(extension)
     if reader is None:
         raise ImportError_(
             f"'{extension or filename}' is not a format we can import. "
-            "Use CSV, Excel (.xlsx) or Word (.docx)."
+            "Use CSV, Excel (.xlsx), Word (.docx) or PDF."
         )
 
-    rows = reader(data)
+    rows = (
+        reader(data, sheet_name)  # type: ignore[call-arg]
+        if extension in ("xlsx", "xlsm")
+        else reader(data)
+    )
     if len(rows) < 2:
         raise ImportError_(
             "That file has a header but no question rows." if rows else "That file is empty."
@@ -599,6 +885,7 @@ def fingerprint(body: str) -> str:
 TEMPLATE_HEADER = [
     "Question",
     "Type",
+    "Subject",
     "Difficulty",
     "Topic",
     "Marks",
@@ -613,10 +900,16 @@ TEMPLATE_HEADER = [
     "Tags",
 ]
 
+#: "Subject" is optional. Left blank, a row takes whatever subject the import screen
+#: has selected - the single-subject case every earlier template covered. Filled in,
+#: it names the subject this row belongs to by its exact code or name, which is what
+#: lets one file seed a multi-subject exam (Aptitude + Java + Python + SQL in one
+#: import) rather than one file per subject.
 TEMPLATE_ROWS = [
     [
         "What is supervised learning?",
         "mcq",
+        "Machine Learning",
         "medium",
         "Machine Learning",
         "2",
@@ -633,6 +926,7 @@ TEMPLATE_ROWS = [
     [
         "State two limitations of gradient descent.",
         "short_answer",
+        "Machine Learning",
         "hard",
         "Optimisation",
         "5",
@@ -649,6 +943,7 @@ TEMPLATE_ROWS = [
     [
         "Backpropagation computes gradients by the chain rule.",
         "true_false",
+        "",
         "easy",
         "Neural Networks",
         "1",

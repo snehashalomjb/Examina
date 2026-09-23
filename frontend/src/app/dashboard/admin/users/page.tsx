@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Hero } from "@/components/Hero";
@@ -11,6 +13,7 @@ import {
   EmptyState,
   Field,
   Input,
+  Modal,
   SectionTitle,
   Select,
   Skeleton,
@@ -29,14 +32,19 @@ const ACCESS_TONE: Record<AccessStatus, "mint" | "amber" | "rose"> = {
 };
 
 export default function AccessControlPage() {
+  const t = useTranslations("dashboard-detail");
   const { user } = useRequireAuth(["admin"]);
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "">(
+    () => (searchParams.get("role") as UserRole | null) ?? "",
+  );
   const [statusFilter, setStatusFilter] = useState<AccessStatus | "">("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [resetting, setResetting] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
     const query = new URLSearchParams();
@@ -107,17 +115,17 @@ export default function AccessControlPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name or email"
+                placeholder={t("name_or_email_placeholder")}
               />
             </Field>
           </div>
           <div className="w-[170px]">
             <Field label="Role">
               <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as UserRole | "")}>
-                <option value="">All roles</option>
-                <option value="candidate">Candidate</option>
-                <option value="examiner">Examiner</option>
-                <option value="admin">Admin</option>
+                <option value="">{t("all_roles")}</option>
+                <option value="candidate">{t("candidate")}</option>
+                <option value="examiner">{t("examiner")}</option>
+                <option value="admin">{t("admin")}</option>
               </Select>
             </Field>
           </div>
@@ -127,10 +135,10 @@ export default function AccessControlPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as AccessStatus | "")}
               >
-                <option value="">Any status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="revoked">Revoked</option>
+                <option value="">{t("any_status")}</option>
+                <option value="pending">{t("pending")}</option>
+                <option value="approved">{t("approved")}</option>
+                <option value="revoked">{t("revoked")}</option>
               </Select>
             </Field>
           </div>
@@ -149,12 +157,12 @@ export default function AccessControlPage() {
             <table className="w-full min-w-[760px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-muted">
-                  <th className="pb-2 pr-3 font-medium">User</th>
-                  <th className="pb-2 pr-3 font-medium">Role</th>
-                  <th className="pb-2 pr-3 font-medium">Access</th>
-                  <th className="pb-2 pr-3 font-medium">Activity</th>
-                  <th className="pb-2 pr-3 font-medium">Last seen</th>
-                  <th className="pb-2 text-right font-medium">Actions</th>
+                  <th className="pb-2 pr-3 font-medium">{t("table_user")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("table_role")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("table_access")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("table_activity")}</th>
+                  <th className="pb-2 pr-3 font-medium">{t("table_last_seen")}</th>
+                  <th className="pb-2 text-right font-medium">{t("table_actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -202,6 +210,11 @@ export default function AccessControlPage() {
                             </Button>
                           )}
                           {!self && (
+                            <Button size="sm" variant="ghost" onClick={() => setResetting(row)}>
+                              Reset password
+                            </Button>
+                          )}
+                          {!self && (
                             <Button
                               size="sm"
                               variant="ghost"
@@ -220,7 +233,74 @@ export default function AccessControlPage() {
           </div>
         )}
       </Card>
+
+      <ResetPasswordModal target={resetting} onClose={() => setResetting(null)} />
     </div>
+  );
+}
+
+function ResetPasswordModal({
+  target,
+  onClose,
+}: {
+  target: AdminUser | null;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPassword("");
+    setError(null);
+  }, [target]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!target) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(`/admin/users/${target.id}/reset-password`, { new_password: password });
+      toast(`Password reset for ${target.full_name}`, "mint");
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not reset the password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal open={Boolean(target)} onClose={onClose} title="Reset password" size="sm">
+      {target && (
+        <form onSubmit={submit} className="space-y-4">
+          <p className="text-[13px] text-ink-muted">
+            Set a new password for <strong className="text-ink">{target.full_name}</strong> (
+            {target.email}). They are not notified — share the new password with them yourself.
+          </p>
+          <Field label="New password" hint="At least 8 characters, with a letter and a digit.">
+            <Input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              autoFocus
+            />
+          </Field>
+          {error && <Alert tone="rose">{error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={busy}>
+              Reset password
+            </Button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
 

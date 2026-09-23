@@ -1,0 +1,23 @@
+{
+  "profile_title": "Profile",
+  "profile_subtitle": "Your account as the platform holds it.",
+  "details_card": "Details",
+  "access_card": "Access",
+  "first_name_placeholder": "Enter your first name",
+  "last_name_placeholder": "Enter your last name",
+  "email_label": "Email",
+  "role_label": "Role",
+  "change_password_title": "Change password",
+  "change_password_hint": "Enter your current password, then a new one twice.",
+  "current_password": "Current password",
+  "new_password": "New password",
+  "confirm_password": "Confirm new password",
+  "settings_title": "Settings",
+  "settings_subtitle": "Your password and session.",
+  "session_title": "Session",
+  "session_hint": "Signing out clears the tokens held in this browser.",
+  "sign_out": "Sign out",
+  "password_updated": "Password changed successfully",
+  "profile_updated": "Profile updated successfully",
+  "settingsChangePasswordHint": "At least 8 characters, with a letter and a digit."
+}

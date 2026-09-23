@@ -49,7 +49,14 @@ class ProctorEvent(UUIDPrimaryKeyMixin, Base):
     server_received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     duration_ms: Mapped[int | None] = mapped_column()
     weight: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    # e.g. {"face_count": 2, "yaw": -34.2, "confidence": 0.91}
+    # The detector's own confidence (0-1), when the event came from a scored model
+    # (phone/object detection) rather than a binary browser signal (tab switch, paste).
+    confidence: Mapped[float | None] = mapped_column(Float)
+    # The question on screen when the event fired, if the candidate had one open.
+    question_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("questions.id", ondelete="SET NULL")
+    )
+    # e.g. {"face_count": 2, "yaw": -34.2}
     event_metadata: Mapped[dict[str, Any] | None] = mapped_column("metadata", JSONB)
     snapshot_object_key: Mapped[str | None] = mapped_column(String(512))
 

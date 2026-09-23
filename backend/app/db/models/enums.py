@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import enum
 
+#: UI/content locales the platform can render or store translated text in. A plain
+#: tuple + CHECK constraint (see the translation tables) rather than a Postgres ENUM,
+#: so adding a language later is a constraint swap, not an ``ALTER TYPE``.
+SUPPORTED_LOCALES: tuple[str, ...] = ("en", "te", "hi", "ta", "ml", "kn")
+DEFAULT_LOCALE = "en"
+
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
@@ -42,12 +48,12 @@ class QuestionType(str, enum.Enum):
     MULTI_SELECT = "multi_select"
     SHORT_ANSWER = "short_answer"
     LONG_ANSWER = "long_answer"
-    IMAGE_UPLOAD = "image_upload"
     TRUE_FALSE = "true_false"
     FILL_BLANK = "fill_blank"
     NUMERICAL = "numerical"
     PASSAGE = "passage"
     CODING = "coding"
+    SQL = "sql"
 
 
 #: Scored by comparing selected option ids against the key. No human needed.
@@ -62,8 +68,8 @@ RESPONSE_TYPES = {QuestionType.FILL_BLANK, QuestionType.NUMERICAL}
 SUBJECTIVE_TYPES = {
     QuestionType.SHORT_ANSWER,
     QuestionType.LONG_ANSWER,
-    QuestionType.IMAGE_UPLOAD,
     QuestionType.CODING,
+    QuestionType.SQL,
 }
 
 #: Carries no answer of its own. A passage is a container: the candidate reads it and
@@ -77,7 +83,7 @@ AUTO_SCORED_TYPES = OBJECTIVE_TYPES | RESPONSE_TYPES
 OPTION_BEARING_TYPES = {QuestionType.MCQ, QuestionType.MULTI_SELECT, QuestionType.TRUE_FALSE}
 
 #: Types whose answer is free prose, and therefore word-countable.
-TEXT_ANSWER_TYPES = {QuestionType.SHORT_ANSWER, QuestionType.LONG_ANSWER}
+TEXT_ANSWER_TYPES = {QuestionType.SHORT_ANSWER, QuestionType.LONG_ANSWER, QuestionType.SQL}
 
 
 class ExamType(str, enum.Enum):
@@ -208,6 +214,16 @@ class ProctorEventType(str, enum.Enum):
     PASTE_ATTEMPT = "paste_attempt"
     COPY_ATTEMPT = "copy_attempt"
     DEVTOOLS_OPEN = "devtools_open"
+    RIGHT_CLICK = "right_click"
+    CUT_ATTEMPT = "cut_attempt"
+    TEXT_SELECTION = "text_selection"
+    ADDITIONAL_PERSON = "additional_person"
+    MIC_DISCONNECTED = "mic_disconnected"
+    NETWORK_LOST = "network_lost"
+    #: Never auto-detected - MediaPipe has no headphone class. An examiner raises this
+    #: by hand from the review screen; it always carries weight 0 so it can never move
+    #: the suspicion score or the auto-submit ladder on its own.
+    HEADPHONES_MANUAL = "headphones_manual"
 
 
 class ProctorSeverity(str, enum.Enum):

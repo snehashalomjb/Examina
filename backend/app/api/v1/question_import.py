@@ -15,7 +15,15 @@ from sqlalchemy import select
 
 from app.core.deps import CurrentStaff, DbSession
 from app.core.logging_config import get_logger
-from app.db.models import Exam, ExamQuestion, Question, QuestionOption, QuestionSource, Subject
+from app.db.models import (
+    Exam,
+    ExamQuestion,
+    ExamType,
+    Question,
+    QuestionOption,
+    QuestionSource,
+    Subject,
+)
 from app.db.models.enums import UserRole
 from app.schemas.question_import import (
     ImportCommit,
@@ -29,6 +37,8 @@ from app.services.question_import import (
     fingerprint,
     parse_questions,
     template_csv,
+    xlsx_active_sheet_name,
+    xlsx_sheet_names,
 )
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
@@ -69,6 +79,7 @@ async def parse_import(
     db: DbSession,
     file: UploadFile = File(...),
     subject_id: uuid.UUID | None = Form(default=None),
+    sheet_name: str | None = Form(default=None),
 ) -> ImportParseOut:
     """Read a file and report what is in it, without writing anything.
 
@@ -86,32 +97,69 @@ async def parse_import(
             detail=f"That file is larger than {MAX_IMPORT_BYTES // (1024 * 1024)} MB.",
         )
 
+    filename = file.filename or "upload"
+    sheet_names = (
+        xlsx_sheet_names(data) if filename.lower().rsplit(".", 1)[-1] in ("xlsx", "xlsm") else []
+    )
+
     try:
-        rows = parse_questions(filename=file.filename or "upload", data=data)
+        rows = parse_questions(filename=filename, data=data, sheet_name=sheet_name)
     except ImportError_ as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
-    # Duplicate detection against the bank the questions would land in. Restricted to
-    # one subject because the same wording across two subjects is usually coincidence.
-    if subject_id is not None:
-        existing = {
-            fingerprint(body): body
+    # A row may name its own subject - "Aptitude + Java + Python in one file" is the
+    # whole point of the column. Every subject in the database is loaded once and
+    # matched by code or name, case-insensitively; a row whose text matches none of
+    # them is a validation error on that row, not a silent fallback to the default.
+    subjects_by_key = {
+        key: subj
+        for subj in db.scalars(select(Subject))
+        for key in (subj.code.strip().casefold(), subj.name.strip().casefold())
+    }
+    default_subject = db.get(Subject, subject_id) if subject_id else None
+
+    for row in rows:
+        text = row.subject_text.strip()
+        if not text:
+            if default_subject is not None:
+                row.subject_id = default_subject.id
+                row.subject_name = default_subject.name
+            continue
+        match = subjects_by_key.get(text.casefold())
+        if match is None:
+            row.problems.append(f"Unknown subject '{text}'.")
+            continue
+        row.subject_id = match.id
+        row.subject_name = match.name
+
+    # Duplicate detection against the bank the questions would land in, per row's own
+    # subject - the same wording in two different subjects is usually coincidence, but
+    # the same wording twice in the same subject almost never is.
+    subject_ids = {row.subject_id for row in rows if row.subject_id is not None}
+    existing_by_subject: dict[uuid.UUID, set[str]] = {}
+    for sid in subject_ids:
+        existing_by_subject[sid] = {
+            fingerprint(body)
             for body in db.scalars(
                 select(Question.body).where(
-                    Question.subject_id == subject_id, Question.origin_exam_id.is_(None)
+                    Question.subject_id == sid, Question.origin_exam_id.is_(None)
                 )
             )
         }
-        for row in rows:
-            if row.duplicate_of is None and fingerprint(row.body) in existing:
+    for row in rows:
+        sid = row.subject_id
+        if row.duplicate_of is None and sid is not None:
+            if fingerprint(row.body) in existing_by_subject.get(sid, set()):
                 row.duplicate_of = "the question bank"
 
     out_rows = [
         ImportedRow(
             row_number=row.row_number,
             body=row.body,
+            subject_id=row.subject_id,
+            subject_name=row.subject_name,
             question_type=row.question_type,
             difficulty=row.difficulty,
             category=row.category,
@@ -145,6 +193,12 @@ async def parse_import(
         invalid=sum(1 for r in out_rows if r.problems),
         duplicates=sum(1 for r in out_rows if r.duplicate_of),
         rows=out_rows,
+        sheet_names=sheet_names,
+        # The sheet actually read: the one the examiner picked, or - the first time,
+        # before they have picked anything - whichever tab was active when the
+        # workbook was saved. Echoing back the request's own (possibly null) value
+        # here would tell the picker nothing about what it is looking at.
+        sheet_name=(sheet_name or xlsx_active_sheet_name(data)) if sheet_names else None,
     )
 
 
@@ -201,18 +255,44 @@ def commit_import(payload: ImportCommit, staff: CurrentStaff, db: DbSession) -> 
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     exam = _resolve_exam(db, staff, payload.exam_id)
-    if exam is not None and exam.subject_id != payload.subject_id:
+    # An academic paper is one subject, so a row that disagrees with the exam's
+    # subject is refused, same as every other way into that pool. A corporate
+    # assessment is legitimately built from several skill domains in one sitting -
+    # "Technical Assessment" drawing Java, Python, SQL, DBMS and Aptitude - so a row
+    # is free to name its own subject there, and does not have to match the exam's.
+    mixed_subjects_allowed = exam is not None and exam.exam_type is ExamType.CORPORATE
+    if exam is not None and not mixed_subjects_allowed and exam.subject_id != payload.subject_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The import's subject must match the exam's subject",
         )
+
+    row_subject_ids = {row.subject_id for row in payload.rows if row.subject_id is not None}
+    if row_subject_ids:
+        known = {s.id for s in db.scalars(select(Subject).where(Subject.id.in_(row_subject_ids)))}
+        missing = row_subject_ids - known
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"{len(missing)} row(s) name a subject that no longer exists",
+            )
+        if exam is not None and not mixed_subjects_allowed:
+            off_subject = row_subject_ids - {payload.subject_id}
+            if off_subject:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This exam accepts one subject; some rows named a different "
+                        "one. Only a corporate assessment can mix subjects."
+                    ),
+                )
 
     created: list[Question] = []
     errors: list[dict] = []
 
     for row in payload.rows:
         try:
-            question = _build_question(row, payload.subject_id, staff, exam)
+            question = _build_question(row, row.subject_id or payload.subject_id, staff, exam)
         except ValidationError as exc:
             errors.append({"row_number": row.row_number, "error": str(exc)})
             continue
@@ -231,15 +311,11 @@ def commit_import(payload: ImportCommit, staff: CurrentStaff, db: DbSession) -> 
         start = (next_index + 1) if next_index is not None else 0
         for offset, question in enumerate(created):
             db.add(
-                ExamQuestion(
-                    exam_id=exam.id, question_id=question.id, order_index=start + offset
-                )
+                ExamQuestion(exam_id=exam.id, question_id=question.id, order_index=start + offset)
             )
         db.flush()
 
-    logger.info(
-        "%s imported %d question(s), %d refused", staff.email, len(created), len(errors)
-    )
+    logger.info("%s imported %d question(s), %d refused", staff.email, len(created), len(errors))
     return ImportResult(
         created=len(created),
         failed=len(errors),

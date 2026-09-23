@@ -251,3 +251,28 @@ def authenticate_ws(db: Session, *, access_token: str, exam_token: str) -> ExamS
     if session is None or session.candidate_id != user.id:
         raise WebSocketAuthError("Exam session not found")
     return session
+
+
+def authenticate_staff_ws(db: Session, *, access_token: str) -> User:
+    """Resolve an examiner/admin watching a live session over a WebSocket handshake.
+
+    Same reasoning as :func:`authenticate_ws` - the browser WebSocket API cannot send an
+    ``Authorization`` header, so the access token rides in ``Sec-WebSocket-Protocol``
+    instead - just gated to staff rather than to the candidate who owns the session.
+    """
+    claims = decode_token(access_token)
+    if not claims or claims.get("typ") != TOKEN_TYPE_ACCESS:
+        raise WebSocketAuthError("Invalid or expired token")
+    try:
+        user_id = uuid.UUID(claims["sub"])
+    except (KeyError, ValueError) as exc:
+        raise WebSocketAuthError("Malformed token") from exc
+
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise WebSocketAuthError("User no longer active")
+    if user.role not in (UserRole.EXAMINER, UserRole.ADMIN):
+        raise WebSocketAuthError("Only an examiner or administrator may watch a live session")
+    if user.role is UserRole.EXAMINER and user.access_status is not AccessStatus.APPROVED:
+        raise WebSocketAuthError("Your account is awaiting administrator approval")
+    return user

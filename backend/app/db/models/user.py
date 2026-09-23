@@ -6,12 +6,12 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.db.models.enums import AccessStatus, UserRole
+from app.db.models.enums import DEFAULT_LOCALE, SUPPORTED_LOCALES, AccessStatus, UserRole
 
 if TYPE_CHECKING:
     from app.db.models.enrollment import ExamEnrollment
@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "preferred_locale IN (" + ", ".join(f"'{loc}'" for loc in SUPPORTED_LOCALES) + ")",
+            name="locale_supported",
+        ),
+    )
 
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -53,6 +59,16 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     access_note: Mapped[str | None] = mapped_column(Text)
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    #: Object-store key for an uploaded profile picture. Private by default - served to
+    #: the owner as a presigned URL, the same pattern as proctoring snapshots.
+    avatar_object_key: Mapped[str | None] = mapped_column(String(512))
+
+    #: UI language, remembered across devices once logged in. localStorage carries it
+    #: pre-login; this is the source of truth afterwards. See ``app.services.i18n``.
+    preferred_locale: Mapped[str] = mapped_column(
+        String(5), nullable=False, default=DEFAULT_LOCALE, server_default=DEFAULT_LOCALE
+    )
 
     access_changed_by: Mapped[User | None] = relationship(
         remote_side="User.id", foreign_keys=[access_changed_by_id]

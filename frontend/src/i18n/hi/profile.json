@@ -1,0 +1,23 @@
+{
+  "profile_title": "प्रोफ़ाइल",
+  "profile_subtitle": "आपका खाता, जैसा प्लेटफ़ॉर्म पर दर्ज है।",
+  "details_card": "विवरण",
+  "access_card": "पहुंच",
+  "first_name_placeholder": "अपना पहला नाम दर्ज करें",
+  "last_name_placeholder": "अपना अंतिम नाम दर्ज करें",
+  "email_label": "ईमेल",
+  "role_label": "भूमिका",
+  "change_password_title": "पासवर्ड बदलें",
+  "change_password_hint": "अपना वर्तमान पासवर्ड दर्ज करें, फिर नया पासवर्ड दो बार।",
+  "current_password": "वर्तमान पासवर्ड",
+  "new_password": "नया पासवर्ड",
+  "confirm_password": "नए पासवर्ड की पुष्टि करें",
+  "settings_title": "सेटिंग्स",
+  "settings_subtitle": "आपका पासवर्ड और सत्र।",
+  "session_title": "सत्र",
+  "session_hint": "साइन आउट करने से इस ब्राउज़र में रखे गए टोकन साफ़ हो जाते हैं।",
+  "sign_out": "साइन आउट करें",
+  "password_updated": "पासवर्ड सफलतापूर्वक बदला गया",
+  "profile_updated": "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई",
+  "settingsChangePasswordHint": "कम से कम 8 वर्ण, जिसमें एक अक्षर और एक अंक हो।"
+}

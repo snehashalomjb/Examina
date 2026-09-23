@@ -1,0 +1,12 @@
+{
+  "user_management": "ಬಳಕೆದಾರ ನಿರ್ವಹಣೆ",
+  "candidate_management": "ಅಭ್ಯರ್ಥಿ ನಿರ್ವಹಣೆ",
+  "examiner_management": "ಪರೀಕ್ಷಕರ ನಿರ್ವಹಣೆ",
+  "exam_management": "ಪರೀಕ್ಷಾ ನಿರ್ವಹಣೆ",
+  "monitoring": "ಮೇಲ್ವಿಚಾರಣೆ",
+  "system_settings": "ಸಿಸ್ಟಮ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+  "audit_log": "ಆಡಿಟ್ ಲಾಗ್",
+  "approve": "ಅನುಮೋದಿಸಿ",
+  "revoke": "ಹಿಂತೆಗೆದುಕೊಳ್ಳಿ",
+  "reject": "ತಿರಸ್ಕರಿಸಿ"
+}

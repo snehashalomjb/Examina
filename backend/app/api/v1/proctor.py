@@ -327,12 +327,52 @@ def review_session(session_id: uuid.UUID, staff: CurrentStaff, db: DbSession) ->
                 server_received_at=e.server_received_at,
                 duration_ms=e.duration_ms,
                 weight=e.weight,
+                confidence=e.confidence,
+                question_id=e.question_id,
                 metadata=e.event_metadata,
                 snapshot_url=presigned_url(e.snapshot_object_key),
             )
             for e in events
         ],
     )
+
+
+@router.post("/proctoring/sessions/{session_id}/flag-headphones", response_model=ProctorReview)
+def flag_headphones(
+    session_id: uuid.UUID,
+    staff: CurrentStaff,
+    db: DbSession,
+    note: str | None = Query(default=None),
+) -> ProctorReview:
+    """Record that a reviewer spotted headphones/earphones while watching the evidence.
+
+    There is no model for this - MediaPipe's object detector has no headphone class - so
+    it is never auto-detected. It is logged with weight 0 so it can never move the
+    suspicion score or the auto-submit ladder on its own; it exists purely as a note on
+    the timeline for whoever rules on the sitting next.
+    """
+    session = exam_engine.load_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    db.add(
+        ProctorEvent(
+            session_id=session.id,
+            event_type=ProctorEventType.HEADPHONES_MANUAL,
+            severity=severity_for(ProctorEventType.HEADPHONES_MANUAL),
+            occurred_at=exam_engine.now(),
+            server_received_at=exam_engine.now(),
+            weight=0.0,
+            event_metadata=(
+                {"flagged_by": staff.email, "note": note}
+                if note
+                else {"flagged_by": staff.email}
+            ),
+        )
+    )
+    db.flush()
+    logger.info("%s manually flagged headphones on session %s", staff.email, session_id)
+    return review_session(session_id, staff, db)
 
 
 @router.post("/proctoring/sessions/{session_id}/integrity", response_model=ProctorReview)

@@ -227,6 +227,17 @@ class TestFiltering:
             difficulty="medium",
             marks=1,
         )
+        _create(
+            client,
+            headers,
+            subject_id=subject.id,
+            body="A question tagged for OOP and classes.",
+            category="technical",
+            topic="OOP",
+            difficulty="medium",
+            marks=1,
+            tags=["Python", "OOP", "Classes"],
+        )
 
     def _list(self, client, headers, **params):
         response = client.get(f"{API}/questions", params=params, headers=headers)
@@ -263,7 +274,64 @@ class TestFiltering:
     def test_topics_endpoint_lists_what_is_in_use(self, client, headers):
         response = client.get(f"{API}/questions/topics", headers=headers)
         assert response.status_code == 200, response.text
-        assert {"Python", "Percentages", "Blood Relations"} <= set(response.json())
+        assert {"Python", "Percentages", "Blood Relations", "OOP"} <= set(response.json())
+
+    def test_tags_endpoint_lists_what_is_in_use(self, client, headers):
+        response = client.get(f"{API}/questions/tags", headers=headers)
+        assert response.status_code == 200, response.text
+        assert {"Python", "OOP", "Classes"} <= set(response.json())
+
+    def test_filter_by_tag(self, client, headers):
+        rows = self._list(client, headers, tags=["OOP"])
+        assert rows and all("OOP" in (r["tags"] or []) for r in rows)
+
+    def test_filter_by_tag_matches_any(self, client, headers):
+        # "Classes" only exists on the OOP question; asking for either tag should still
+        # only surface that one row, not every tagged-or-untagged question in the bank.
+        rows = self._list(client, headers, tags=["Classes", "does-not-exist"])
+        assert len(rows) == 1
+        assert rows[0]["tags"] == ["Python", "OOP", "Classes"]
+
+
+class TestDuplicateCheck:
+    def test_flags_an_identical_body_in_the_same_subject(self, client, headers, subject):
+        _create(client, headers, subject_id=subject.id, body="What is 2 + 2?")
+
+        response = client.post(
+            f"{API}/questions/check-duplicate",
+            json={"subject_id": str(subject.id), "body": "  what is 2 + 2?  "},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        matches = response.json()["matches"]
+        assert len(matches) == 1
+        assert matches[0]["body"] == "What is 2 + 2?"
+
+    def test_no_match_for_genuinely_new_wording(self, client, headers, subject):
+        _create(client, headers, subject_id=subject.id, body="What is 2 + 2?")
+
+        response = client.post(
+            f"{API}/questions/check-duplicate",
+            json={"subject_id": str(subject.id), "body": "What is the capital of France?"},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["matches"] == []
+
+    def test_excludes_the_question_being_edited(self, client, headers, subject):
+        created = _create(client, headers, subject_id=subject.id, body="What is 2 + 2?").json()
+
+        response = client.post(
+            f"{API}/questions/check-duplicate",
+            json={
+                "subject_id": str(subject.id),
+                "body": "What is 2 + 2?",
+                "exclude_question_id": created["id"],
+            },
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["matches"] == []
 
 
 class TestPassageChildrenAreNotLoose:

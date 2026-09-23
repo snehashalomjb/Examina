@@ -13,7 +13,8 @@
  * is_correct, no model_answer, no spec beyond the candidate-safe projection.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -28,6 +29,7 @@ import {
   toast,
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { LOCALE_NAMES, SUPPORTED_LOCALES, type Locale } from "@/lib/locale";
 import {
   CATEGORY_LABEL,
   CONTAINER_TYPES,
@@ -35,6 +37,7 @@ import {
   QUESTION_TYPE_LABEL,
   type CodingLanguage,
   type Difficulty,
+  type GeneratedTranslations,
   type Question,
   type QuestionCategory,
   type QuestionImage,
@@ -42,6 +45,10 @@ import {
   type QuestionType,
   type Subject,
 } from "@/lib/types";
+
+//: Every locale the platform supports, except English - English is the master text
+//: authored above, never a "translation" of itself.
+const TRANSLATABLE_LOCALES = SUPPORTED_LOCALES.filter((l) => l !== "en") as Locale[];
 
 const CODING_LANGUAGES: CodingLanguage[] = ["python", "java", "cpp", "javascript"];
 const LANGUAGE_LABEL: Record<CodingLanguage, string> = {
@@ -57,6 +64,8 @@ type ImageFormat = (typeof IMAGE_FORMATS)[number];
 interface DraftOption {
   text: string;
   is_correct: boolean;
+  /** Per-locale translated text, keyed by locale (never "en" - see `text` above). */
+  translations: Record<string, string>;
 }
 
 interface SampleCase {
@@ -78,6 +87,16 @@ export interface QuestionEditorProps {
   lockedSubjectId?: string;
   /** Pre-selected type, e.g. when a section says it wants short answers. */
   initialType?: QuestionType;
+  /**
+   * Starting content for a NEW question - a worked example the examiner is adapting.
+   *
+   * Distinct from `question` on purpose: a seed prefills the form but the save is still
+   * a POST. Passing an example as `question` would make the editor believe it is editing
+   * something that exists, and PATCH an id that was never real.
+   */
+  seed?: Partial<Question> | null;
+  /** Pre-selected difficulty, e.g. the section rule this question is being written for. */
+  initialDifficulty?: Difficulty;
   onSaved?: (question: Question) => void;
   onCancel?: () => void;
   /** Keep the form open and cleared after a save, for authoring several in a row. */
@@ -85,22 +104,35 @@ export interface QuestionEditorProps {
 }
 
 /** Blank slate, or the question being edited unpacked back into form state. */
-function initialOptions(question: Question | null | undefined, type: QuestionType): DraftOption[] {
-  if (question && question.options.length) {
-    return question.options.map((o) => ({ text: o.text, is_correct: Boolean(o.is_correct) }));
+function initialOptions(
+  question: Partial<Question> | null | undefined,
+  type: QuestionType,
+): DraftOption[] {
+  if (question?.options?.length) {
+    return question.options.map((o) => ({
+      text: o.text,
+      is_correct: Boolean(o.is_correct),
+      translations: stripEnglish(o.translations),
+    }));
   }
   if (type === "true_false") {
     return [
-      { text: "True", is_correct: true },
-      { text: "False", is_correct: false },
+      { text: "True", is_correct: true, translations: {} },
+      { text: "False", is_correct: false, translations: {} },
     ];
   }
   return [
-    { text: "", is_correct: true },
-    { text: "", is_correct: false },
-    { text: "", is_correct: false },
-    { text: "", is_correct: false },
+    { text: "", is_correct: true, translations: {} },
+    { text: "", is_correct: false, translations: {} },
+    { text: "", is_correct: false, translations: {} },
+    { text: "", is_correct: false, translations: {} },
   ];
+}
+
+function stripEnglish(map: Record<string, string> | undefined): Record<string, string> {
+  if (!map) return {};
+  const { en: _en, ...rest } = map;
+  return rest;
 }
 
 export function QuestionEditor({
@@ -109,46 +141,180 @@ export function QuestionEditor({
   examId,
   lockedSubjectId,
   initialType,
+  seed = null,
+  initialDifficulty,
   onSaved,
   onCancel,
   stayOpen = false,
 }: QuestionEditorProps) {
+  const t = useTranslations("question");
   const editing = question !== null;
-  const spec = (question?.spec ?? {}) as Record<string, unknown>;
+  /** What the form starts from. Only `question` decides whether the save is an edit. */
+  const source = question ?? seed;
+  const spec = (source?.spec ?? {}) as Record<string, unknown>;
 
-  const [chosenSubjectId, setChosenSubjectId] = useState(question?.subject_id ?? "");
+  const [chosenSubjectId, setChosenSubjectId] = useState(source?.subject_id ?? "");
   const subjectId = lockedSubjectId || chosenSubjectId || subjects[0]?.id || "";
 
   const [type, setType] = useState<QuestionType>(
-    question?.question_type ?? initialType ?? "mcq",
+    source?.question_type ?? initialType ?? "mcq",
   );
-  const [category, setCategory] = useState<QuestionCategory>(question?.category ?? "academic");
-  const [topic, setTopic] = useState(question?.topic ?? "");
-  const [difficulty, setDifficulty] = useState<Difficulty>(question?.difficulty ?? "medium");
-  const [body, setBody] = useState(question?.body ?? "");
-  const [modelAnswer, setModelAnswer] = useState(question?.model_answer ?? "");
-  const [explanation, setExplanation] = useState(question?.explanation ?? "");
-  const [marks, setMarks] = useState(String(question?.marks ?? 2));
-  const [negative, setNegative] = useState(String(question?.negative_marks ?? 0));
-  const [minWords, setMinWords] = useState(question?.min_words ? String(question.min_words) : "");
-  const [maxWords, setMaxWords] = useState(question?.max_words ? String(question.max_words) : "");
-  const [tags, setTags] = useState((question?.tags ?? []).join(", "));
+  const [category, setCategory] = useState<QuestionCategory>(source?.category ?? "academic");
+  const [topic, setTopic] = useState(source?.topic ?? "");
+  const [difficulty, setDifficulty] = useState<Difficulty>(
+    source?.difficulty ?? initialDifficulty ?? "medium",
+  );
+  const [body, setBody] = useState(source?.body ?? "");
+  const [modelAnswer, setModelAnswer] = useState(source?.model_answer ?? "");
+  const [explanation, setExplanation] = useState(source?.explanation ?? "");
+  const [marks, setMarks] = useState(String(source?.marks ?? 2));
+  const [negative, setNegative] = useState(String(source?.negative_marks ?? 0));
+  const [minWords, setMinWords] = useState(source?.min_words ? String(source.min_words) : "");
+  const [maxWords, setMaxWords] = useState(source?.max_words ? String(source.max_words) : "");
+  const [tagList, setTagList] = useState<string[]>(source?.tags ?? []);
+  const [tagInput, setTagInput] = useState("");
+  const [knownTags, setKnownTags] = useState<string[]>([]);
+  const [duplicateMatches, setDuplicateMatches] = useState<{ id: string; body: string }[]>([]);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<string[]>("/questions/tags")
+      .then(setKnownTags)
+      .catch(() => setKnownTags([])); // a missing tag list only costs autocomplete
+  }, []);
+
+  function addTag(raw: string) {
+    const value = raw.trim();
+    if (!value || tagList.includes(value)) return;
+    setTagList((prev) => [...prev, value]);
+    setTagInput("");
+  }
+
+  function removeTag(value: string) {
+    setTagList((prev) => prev.filter((t) => t !== value));
+  }
+
+  // Non-blocking heads-up, not a gate: an examiner may genuinely want a near-duplicate
+  // (a harder variant of the same question), so this only informs, never disables Save.
+  useEffect(() => {
+    if (!subjectId || body.trim().length < 8) {
+      setDuplicateMatches([]);
+      return;
+    }
+    setCheckingDuplicate(true);
+    const timer = window.setTimeout(() => {
+      api
+        .post<{ matches: { id: string; body: string }[] }>("/questions/check-duplicate", {
+          subject_id: subjectId,
+          body: body.trim(),
+          exclude_question_id: question?.id ?? null,
+        })
+        .then((res) => setDuplicateMatches(res.matches))
+        .catch(() => setDuplicateMatches([]))
+        .finally(() => setCheckingDuplicate(false));
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [body, subjectId, question?.id]);
   const [image, setImage] = useState<QuestionImage | null>(
-    question?.image_key
+    source?.image_key
       ? {
-          image_key: question.image_key,
-          image_url: question.image_url ?? null,
-          thumbnail_url: question.image_url ?? null,
+          image_key: source.image_key,
+          image_url: source.image_url ?? null,
+          thumbnail_url: source.image_url ?? null,
         }
       : null,
   );
   const [options, setOptions] = useState<DraftOption[]>(
-    initialOptions(question, question?.question_type ?? initialType ?? "mcq"),
+    initialOptions(source, source?.question_type ?? initialType ?? "mcq"),
   );
+
+  // --- translations. English above stays the master; these are optional per-locale
+  //     overrides, entered by hand or via "Generate Translations" (which only fills the
+  //     form - nothing is saved until the question itself is saved).
+  const existingQuestionTranslations = (question?.translations ?? {}) as Record<
+    string,
+    { body?: string; explanation?: string }
+  >;
+  const [selectedLocales, setSelectedLocales] = useState<Locale[]>(
+    () =>
+      TRANSLATABLE_LOCALES.filter(
+        (l) => existingQuestionTranslations[l] || question?.options?.some((o) => o.translations?.[l]),
+      ),
+  );
+  const [qTranslations, setQTranslations] = useState<
+    Record<string, { body: string; explanation: string }>
+  >(() => {
+    const out: Record<string, { body: string; explanation: string }> = {};
+    for (const l of TRANSLATABLE_LOCALES) {
+      const t = existingQuestionTranslations[l];
+      out[l] = { body: t?.body ?? "", explanation: t?.explanation ?? "" };
+    }
+    return out;
+  });
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generateNotice, setGenerateNotice] = useState<string | null>(null);
+
+  function toggleLocale(locale: Locale) {
+    setSelectedLocales((current) =>
+      current.includes(locale) ? current.filter((l) => l !== locale) : [...current, locale],
+    );
+  }
+
+  function setOptionTranslation(index: number, locale: Locale, text: string) {
+    setOptions((current) =>
+      current.map((o, i) =>
+        i === index ? { ...o, translations: { ...o.translations, [locale]: text } } : o,
+      ),
+    );
+  }
+
+  async function generateTranslations() {
+    if (!question) return; // needs a saved question id - see the disabled hint in the UI
+    setGenerating(true);
+    setGenerateError(null);
+    setGenerateNotice(null);
+    try {
+      const targets = selectedLocales.length ? selectedLocales : TRANSLATABLE_LOCALES;
+      const result = await api.post<GeneratedTranslations>(
+        `/questions/${question.id}/generate-translations`,
+        { locales: targets, overwrite_existing: true },
+      );
+      setQTranslations((current) => {
+        const next = { ...current };
+        for (const [locale, fields] of Object.entries(result.translations)) {
+          next[locale] = { body: fields.body ?? "", explanation: fields.explanation ?? "" };
+        }
+        return next;
+      });
+      setOptions((current) =>
+        current.map((o, i) => {
+          const optionId = question.options[i]?.id;
+          if (!optionId) return o;
+          const perLocale = result.options[optionId];
+          if (!perLocale) return o;
+          return { ...o, translations: { ...o.translations, ...perLocale } };
+        }),
+      );
+      setSelectedLocales((current) => Array.from(new Set([...current, ...targets])));
+      setGenerateNotice(
+        result.provider === "stub"
+          ? "No translation model is configured, so this only copied the English text — edit each field by hand before saving."
+          : "Generated. Review and edit before saving — nothing is saved yet.",
+      );
+    } catch (err) {
+      setGenerateError(
+        err instanceof ApiError ? err.message : "Could not generate translations. Try again.",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   // --- rubric. Stored as JSON on the question; edited here as key points and a
   //     free-text scheme, because that is how examiners actually write one.
-  const rubricSource = (question?.rubric ?? {}) as Record<string, unknown>;
+  const rubricSource = (source?.rubric ?? {}) as Record<string, unknown>;
   const [keyPoints, setKeyPoints] = useState(
     Array.isArray(rubricSource.key_points) ? (rubricSource.key_points as string[]).join("\n") : "",
   );
@@ -198,7 +364,7 @@ export function QuestionEditor({
     typeof spec.instructions === "string" ? spec.instructions : "",
   );
 
-  const [saveToBank, setSaveToBank] = useState(!question?.exam_only);
+  const [saveToBank, setSaveToBank] = useState(!source?.exam_only);
   const [busy, setBusy] = useState<"save" | "save-add" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -263,15 +429,15 @@ export function QuestionEditor({
     setType(next);
     if (next === "true_false") {
       setOptions([
-        { text: "True", is_correct: true },
-        { text: "False", is_correct: false },
+        { text: "True", is_correct: true, translations: {} },
+        { text: "False", is_correct: false, translations: {} },
       ]);
     } else if (OPTION_BEARING_TYPES.includes(next) && options.length < 4) {
       setOptions([
-        { text: "", is_correct: true },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
-        { text: "", is_correct: false },
+        { text: "", is_correct: true, translations: {} },
+        { text: "", is_correct: false, translations: {} },
+        { text: "", is_correct: false, translations: {} },
+        { text: "", is_correct: false, translations: {} },
       ]);
     }
     if (CONTAINER_TYPES.includes(next)) {
@@ -371,7 +537,8 @@ export function QuestionEditor({
     setExplanation("");
     setMinWords("");
     setMaxWords("");
-    setTags("");
+    setTagList([]);
+    setTagInput("");
     setImage(null);
     setKeyPoints("");
     setRubricNotes("");
@@ -386,6 +553,35 @@ export function QuestionEditor({
     setPassageText("");
     setUploadInstructions("");
     setOptions(initialOptions(null, type));
+    setSelectedLocales([]);
+    setQTranslations(Object.fromEntries(TRANSLATABLE_LOCALES.map((l) => [l, { body: "", explanation: "" }])));
+    setGenerateNotice(null);
+    setGenerateError(null);
+  }
+
+  function buildQuestionTranslationsPayload(): Record<string, Record<string, string>> | undefined {
+    if (!selectedLocales.length) return undefined;
+    const out: Record<string, Record<string, string>> = {};
+    for (const locale of selectedLocales) {
+      const fields: Record<string, string> = {};
+      const t = qTranslations[locale];
+      if (t?.body.trim()) fields.body = t.body.trim();
+      if (t?.explanation.trim()) fields.explanation = t.explanation.trim();
+      if (Object.keys(fields).length) out[locale] = fields;
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
+
+  function buildOptionTranslationsPayload(
+    option: DraftOption,
+  ): Record<string, Record<string, string>> | undefined {
+    if (!selectedLocales.length) return undefined;
+    const out: Record<string, Record<string, string>> = {};
+    for (const locale of selectedLocales) {
+      const text = option.translations[locale]?.trim();
+      if (text) out[locale] = { text };
+    }
+    return Object.keys(out).length ? out : undefined;
   }
 
   async function save(addToExam: boolean) {
@@ -410,10 +606,7 @@ export function QuestionEditor({
       rubric: buildRubric(),
       image_key: image?.image_key ?? null,
       spec: buildSpec(),
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
+      tags: tagList,
       min_words: needsModelAnswer && minWords ? Number(minWords) : null,
       max_words: needsModelAnswer && maxWords ? Number(maxWords) : null,
       options: objective
@@ -423,8 +616,10 @@ export function QuestionEditor({
               text: option.text.trim(),
               is_correct: option.is_correct,
               order_index: index,
+              translations: buildOptionTranslationsPayload(option),
             }))
         : [],
+      translations: buildQuestionTranslationsPayload(),
     };
 
     try {
@@ -460,7 +655,7 @@ export function QuestionEditor({
 
   if (subjects.length === 0) {
     return (
-      <Alert tone="amber" title="Create a subject first">
+      <Alert tone="amber" title={t("create_subject_first_title")}>
         Every question belongs to a subject. Add one before writing questions.
       </Alert>
     );
@@ -505,9 +700,9 @@ export function QuestionEditor({
         </Field>
         <Field label="Difficulty">
           <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="easy">{t("difficulty_easy")}</option>
+            <option value="medium">{t("difficulty_medium")}</option>
+            <option value="hard">{t("difficulty_hard")}</option>
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
@@ -550,16 +745,50 @@ export function QuestionEditor({
           <Input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="Free text"
+            placeholder={t("placeholder_free_text")}
             maxLength={120}
           />
         </Field>
-        <Field label="Tags" hint="Comma separated. Used for searching the bank.">
-          <Input
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="unit-3, revision"
-          />
+        <Field label="Tags" hint="Used for searching the bank and for blueprint rules.">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-surface p-1.5">
+            {tagList.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 rounded-[6px] bg-purple-50 px-2 py-0.5 text-[12px] font-medium text-purple-700"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  aria-label={`Remove tag ${tag}`}
+                  className="text-purple-700/70 hover:text-purple-700"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <input
+              list="question-tag-suggestions"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  addTag(tagInput);
+                } else if (e.key === "Backspace" && !tagInput && tagList.length) {
+                  removeTag(tagList[tagList.length - 1]);
+                }
+              }}
+              onBlur={() => addTag(tagInput)}
+              placeholder={tagList.length ? "" : t("placeholder_tags")}
+              className="min-w-[100px] flex-1 border-0 bg-transparent px-1 py-0.5 text-[13px] outline-none"
+            />
+            <datalist id="question-tag-suggestions">
+              {knownTags.filter((tag) => !tagList.includes(tag)).map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
+          </div>
         </Field>
       </div>
 
@@ -580,6 +809,20 @@ export function QuestionEditor({
           }
         />
       </Field>
+
+      {checkingDuplicate && (
+        <p className="text-[12px] text-ink-muted">Checking the bank for a similar question…</p>
+      )}
+      {duplicateMatches.length > 0 && (
+        <Alert tone="amber">
+          This looks like a question already in the bank:{" "}
+          <span className="font-medium">
+            &ldquo;{duplicateMatches[0].body.slice(0, 120)}
+            {duplicateMatches[0].body.length > 120 ? "…" : ""}&rdquo;
+          </span>
+          . Saving is still fine if this one is meant to be different.
+        </Alert>
+      )}
 
       <Field label="Figure" hint="Optional. Shown above the question during the exam.">
         <div className="flex flex-wrap items-center gap-3">
@@ -621,7 +864,7 @@ export function QuestionEditor({
           }
           onSetCorrect={setCorrect}
           onRemove={(index) => setOptions((c) => c.filter((_, i) => i !== index))}
-          onAdd={() => setOptions((c) => [...c, { text: "", is_correct: false }])}
+          onAdd={() => setOptions((c) => [...c, { text: "", is_correct: false, translations: {} }])}
         />
       )}
 
@@ -634,7 +877,7 @@ export function QuestionEditor({
               step="any"
               value={numericAnswer}
               onChange={(e) => setNumericAnswer(e.target.value)}
-              placeholder="9.81"
+              placeholder={t("placeholder_numeric")}
             />
           </Field>
           <Field label="Tolerance" hint="Plus or minus. An answer this far out still scores.">
@@ -647,7 +890,7 @@ export function QuestionEditor({
             />
           </Field>
           <Field label="Unit" hint="Shown to the candidate, never marked.">
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m/s²" />
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={t("placeholder_unit")} />
           </Field>
         </div>
       )}
@@ -690,7 +933,7 @@ export function QuestionEditor({
                 value={inputFormat}
                 onChange={(e) => setInputFormat(e.target.value)}
                 rows={2}
-                placeholder="A single integer n."
+                placeholder={t("placeholder_input_format")}
               />
             </Field>
             <Field label="Output format" required>
@@ -698,7 +941,7 @@ export function QuestionEditor({
                 value={outputFormat}
                 onChange={(e) => setOutputFormat(e.target.value)}
                 rows={2}
-                placeholder="The nth Fibonacci number."
+                placeholder={t("placeholder_output_format")}
               />
             </Field>
           </div>
@@ -706,7 +949,7 @@ export function QuestionEditor({
             <Input
               value={constraints}
               onChange={(e) => setConstraints(e.target.value)}
-              placeholder="1 <= n <= 40"
+              placeholder={t("placeholder_constraints")}
             />
           </Field>
           <div>
@@ -727,7 +970,7 @@ export function QuestionEditor({
                         c.map((s, i) => (i === index ? { ...s, input: e.target.value } : s)),
                       )
                     }
-                    placeholder={index === 0 ? "Sample input" : `Input ${index + 1}`}
+                    placeholder={index === 0 ? t("placeholder_sample_input") : `Input ${index + 1}`}
                   />
                   <Textarea
                     rows={2}
@@ -737,7 +980,7 @@ export function QuestionEditor({
                         c.map((s, i) => (i === index ? { ...s, output: e.target.value } : s)),
                       )
                     }
-                    placeholder={index === 0 ? "Sample output" : `Output ${index + 1}`}
+                    placeholder={index === 0 ? t("placeholder_output") : `Output ${index + 1}`}
                   />
                   {sampleCases.length > 1 && (
                     <Button
@@ -771,7 +1014,7 @@ export function QuestionEditor({
             value={passageText}
             onChange={(e) => setPassageText(e.target.value)}
             rows={8}
-            placeholder="The full extract or case study."
+            placeholder={t("placeholder_passage")}
           />
         </Field>
       )}
@@ -783,7 +1026,7 @@ export function QuestionEditor({
               value={uploadInstructions}
               onChange={(e) => setUploadInstructions(e.target.value)}
               rows={2}
-              placeholder="Write your working on paper, then photograph the whole page."
+              placeholder={t("placeholder_upload_instructions")}
             />
           </Field>
           <Field label="Allowed formats">
@@ -816,7 +1059,7 @@ export function QuestionEditor({
               value={modelAnswer}
               onChange={(e) => setModelAnswer(e.target.value)}
               rows={4}
-              placeholder="Describe what a full-mark answer contains."
+              placeholder={t("placeholder_model_answer")}
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -846,7 +1089,7 @@ export function QuestionEditor({
                   step="10"
                   value={minWords}
                   onChange={(e) => setMinWords(e.target.value)}
-                  placeholder="No minimum"
+                  placeholder={t("placeholder_min_words")}
                 />
               </Field>
               <Field label="Maximum words" hint="Enforced — a longer answer is refused.">
@@ -856,7 +1099,7 @@ export function QuestionEditor({
                   step="10"
                   value={maxWords}
                   onChange={(e) => setMaxWords(e.target.value)}
-                  placeholder="No limit"
+                  placeholder={t("placeholder_max_words")}
                 />
               </Field>
             </div>
@@ -869,16 +1112,37 @@ export function QuestionEditor({
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
           rows={2}
-          placeholder="Why the correct answer is correct."
+          placeholder={t("placeholder_explanation")}
         />
       </Field>
 
+      {/* -------------------------------------------------------------- translations */}
+      <TranslationsPanel
+        selectedLocales={selectedLocales}
+        onToggleLocale={toggleLocale}
+        qTranslations={qTranslations}
+        onChangeQuestionField={(locale, field, value) =>
+          setQTranslations((current) => ({
+            ...current,
+            [locale]: { ...current[locale], [field]: value },
+          }))
+        }
+        options={options}
+        onChangeOptionTranslation={setOptionTranslation}
+        objective={objective}
+        canGenerate={editing}
+        generating={generating}
+        onGenerate={() => void generateTranslations()}
+        generateError={generateError}
+        generateNotice={generateNotice}
+      />
+
       {/* --------------------------------------------------------------- save block */}
       {problems.length > 0 && (
-        <Alert tone="amber" title="Not ready to save">
+        <Alert tone="amber" title={t("alert_not_ready_to_save")}>
           <ul className="list-inside list-disc space-y-0.5">
-            {problems.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {problems.map((problem, index) => (
+              <li key={index}>{problem}</li>
             ))}
           </ul>
         </Alert>
@@ -956,6 +1220,7 @@ function OptionsAndKey({
   onRemove: (index: number) => void;
   onAdd: () => void;
 }) {
+  const t = useTranslations("question");
   const letters = options.map((_, i) => String.fromCharCode(65 + i));
   const chosen = options
     .map((option, index) => (option.is_correct ? letters[index] : null))
@@ -964,7 +1229,7 @@ function OptionsAndKey({
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 text-[13px] font-medium text-ink-soft">Options</p>
+        <p className="mb-2 text-[13px] font-medium text-ink-soft">{t("label_options")}</p>
         <div className="space-y-2">
           {options.map((option, index) => (
             <div key={index} className="flex items-center gap-2">
@@ -994,7 +1259,7 @@ function OptionsAndKey({
 
       <div className="rounded-[12px] border border-accent-border bg-accent-soft/40 p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-semibold text-ink">Correct answer</p>
+          <p className="text-[13px] font-semibold text-ink">{t("label_correct_answer")}</p>
           <Badge tone="accent">examiner only</Badge>
           <span className="text-[12px] text-ink-muted">
             {singleAnswer ? "Select the correct option." : "Select every correct option."}
@@ -1038,6 +1303,125 @@ function OptionsAndKey({
             : "Nothing marked correct yet — the question cannot be saved until you choose."}
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Which languages this question has (or will have) translated text for, and the
+ * editable fields for each one chosen. English above is always the master; nothing
+ * here is machine-generated without the examiner clicking "Generate Translations" and
+ * reviewing the result first - see `generateTranslations` in the parent.
+ */
+function TranslationsPanel({
+  selectedLocales,
+  onToggleLocale,
+  qTranslations,
+  onChangeQuestionField,
+  options,
+  onChangeOptionTranslation,
+  objective,
+  canGenerate,
+  generating,
+  onGenerate,
+  generateError,
+  generateNotice,
+}: {
+  selectedLocales: Locale[];
+  onToggleLocale: (locale: Locale) => void;
+  qTranslations: Record<string, { body: string; explanation: string }>;
+  onChangeQuestionField: (locale: Locale, field: "body" | "explanation", value: string) => void;
+  options: DraftOption[];
+  onChangeOptionTranslation: (index: number, locale: Locale, text: string) => void;
+  objective: boolean;
+  canGenerate: boolean;
+  generating: boolean;
+  onGenerate: () => void;
+  generateError: string | null;
+  generateNotice: string | null;
+}) {
+  const letters = options.map((_, i) => String.fromCharCode(65 + i));
+  return (
+    <div className="space-y-4 rounded-[12px] border border-line bg-sunken/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[13px] font-semibold text-ink">Available Translations</p>
+          <p className="text-[12px] text-ink-muted">
+            English above is the master version. Check a language to add or edit its text.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          loading={generating}
+          disabled={!canGenerate || generating}
+          onClick={onGenerate}
+          title={canGenerate ? undefined : "Save the question first, then generate translations."}
+        >
+          Generate Translations
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <label className="flex items-center gap-1.5 text-[13px] text-ink-soft opacity-60">
+          <input type="checkbox" checked disabled className="h-4 w-4 rounded border-line-strong" />
+          English
+        </label>
+        {TRANSLATABLE_LOCALES.map((locale) => (
+          <label key={locale} className="flex items-center gap-1.5 text-[13px] text-ink-soft">
+            <input
+              type="checkbox"
+              checked={selectedLocales.includes(locale)}
+              onChange={() => onToggleLocale(locale)}
+              className="h-4 w-4 rounded border-line-strong"
+            />
+            {LOCALE_NAMES[locale]}
+          </label>
+        ))}
+      </div>
+
+      {generateError && <Alert tone="rose">{generateError}</Alert>}
+      {generateNotice && <Alert tone="amber">{generateNotice}</Alert>}
+
+      {selectedLocales.map((locale) => (
+        <div key={locale} className="space-y-3 rounded-[10px] border border-line bg-surface p-3">
+          <p className="text-[12.5px] font-semibold text-ink">{LOCALE_NAMES[locale]}</p>
+          <Field label="Question">
+            <Textarea
+              value={qTranslations[locale]?.body ?? ""}
+              onChange={(e) => onChangeQuestionField(locale, "body", e.target.value)}
+              rows={2}
+              placeholder="Leave blank to fall back to English"
+            />
+          </Field>
+          {objective && (
+            <div className="space-y-1.5">
+              <p className="text-[12px] font-medium text-ink-soft">Options</p>
+              {options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-line-strong bg-sunken text-[11px] font-semibold text-ink-soft">
+                    {letters[index]}
+                  </span>
+                  <Input
+                    value={option.translations[locale] ?? ""}
+                    onChange={(e) => onChangeOptionTranslation(index, locale, e.target.value)}
+                    placeholder={option.text || `Option ${letters[index]}`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <Field label="Explanation">
+            <Textarea
+              value={qTranslations[locale]?.explanation ?? ""}
+              onChange={(e) => onChangeQuestionField(locale, "explanation", e.target.value)}
+              rows={2}
+              placeholder="Leave blank to fall back to English"
+            />
+          </Field>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1092,7 +1476,8 @@ export function QuestionEditorCard(props: QuestionEditorProps & { title?: string
 
 /** Re-exported so callers can label a question's provenance without importing twice. */
 export function SourceBadge({ source }: { source: QuestionSource }) {
-  if (source === "ai_generated") return <Badge tone="purple">AI generated</Badge>;
-  if (source === "imported") return <Badge tone="amber">Imported</Badge>;
+  const t = useTranslations("question");
+  if (source === "ai_generated") return <Badge tone="purple">{t("badge_ai_generated")}</Badge>;
+  if (source === "imported") return <Badge tone="amber">{t("badge_imported")}</Badge>;
   return null;
 }

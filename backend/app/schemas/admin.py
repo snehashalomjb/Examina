@@ -5,10 +5,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.db.models.enums import AccessStatus, LoginAccessStatus, UserRole
-from app.schemas.auth import UserOut
+from app.schemas.auth import PASSWORD_MIN, UserOut
 
 
 class UserAdminOut(UserOut):
@@ -26,6 +26,23 @@ class AdminUserCreate(BaseModel):
     access_status: AccessStatus = AccessStatus.APPROVED
 
 
+class AdminSetPasswordRequest(BaseModel):
+    """An administrator setting someone else's password directly.
+
+    Distinct from ``ChangePasswordRequest``: there is no current password to prove,
+    because the acting user is an admin, not the account owner.
+    """
+
+    new_password: str = Field(..., min_length=PASSWORD_MIN, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        if not any(c.isalpha() for c in value) or not any(c.isdigit() for c in value):
+            raise ValueError("Password must contain at least one letter and one digit")
+        return value
+
+
 class AdminStats(BaseModel):
     total_users: int
     candidates: int
@@ -36,6 +53,12 @@ class AdminStats(BaseModel):
     questions: int
     exams: int
     published_exams: int
+    #: Published and inside its start/end window right now - see
+    #: ``app.services.exam_status``. Distinct from ``live_sessions`` below, which counts
+    #: candidate sittings, not exams.
+    live_exams: int
+    #: Published, but its window has already ended.
+    completed_exams: int
     live_sessions: int
     flagged_sessions: int
     pending_grading: int
@@ -87,3 +110,22 @@ class RecentActivity(BaseModel):
     message: str
     at: datetime
     severity: str = "info"
+
+
+class ComponentHealth(BaseModel):
+    #: "checked" - a real probe ran this request. "configured" - not independently
+    #: measurable from here, so this only reports whether the feature is wired up at
+    #: all, and is labelled differently in the UI so it is never confused with a live
+    #: health check.
+    basis: str
+    status: str
+    detail: str | None = None
+
+
+class SystemHealth(BaseModel):
+    api: ComponentHealth
+    database: ComponentHealth
+    storage: ComponentHealth
+    websocket: ComponentHealth
+    ai_proctoring: ComponentHealth
+    authentication: ComponentHealth

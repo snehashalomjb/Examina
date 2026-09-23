@@ -114,6 +114,14 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
   }
 
   async function generate() {
+    if (!effectiveSubject) {
+      // Subject is what actually scopes what gets asked - without it the prompt has no
+      // notion of which course "Normalisation" belongs to, and the draft ends up
+      // untethered from any syllabus. The wizard never hits this: it locks the subject
+      // to the exam's before this component ever mounts.
+      setError("Choose a subject — questions are generated for it, not in the abstract.");
+      return;
+    }
     if (!types.length) {
       setError("Pick at least one question type.");
       return;
@@ -215,9 +223,9 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
 
         <div className="grid gap-4 sm:grid-cols-3">
           {!subjectId && (
-            <Field label="Subject">
+            <Field label="Subject" required hint="Questions are generated for this subject's syllabus.">
               <Select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)}>
-                <option value="">Not tied to a subject</option>
+                <option value="">Choose a subject…</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} — {s.name}
@@ -335,7 +343,11 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
         )}
 
         <div className="mt-4 flex justify-end">
-          <Button loading={generating} onClick={() => void generate()}>
+          <Button
+            loading={generating}
+            disabled={!effectiveSubject}
+            onClick={() => void generate()}
+          >
             Generate questions
           </Button>
         </div>
@@ -452,6 +464,29 @@ function DraftCard({
   const payload = draft.payload as DraftPayload;
   const [feedback, setFeedback] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [duplicateOf, setDuplicateOf] = useState<string | null>(null);
+
+  // A generated draft can land on wording already in the bank - the model has no memory
+  // of what's already there. Non-blocking: it only tells the examiner, never withholds
+  // the approve button, the same as the manual-authoring check this mirrors.
+  useEffect(() => {
+    const body = payload.body;
+    if (!draft.subject_id || !body || body.trim().length < 8) return;
+    let cancelled = false;
+    api
+      .post<{ matches: { id: string; body: string }[] }>("/questions/check-duplicate", {
+        subject_id: draft.subject_id,
+        body: body.trim(),
+      })
+      .then((res) => {
+        if (!cancelled) setDuplicateOf(res.matches[0]?.body ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.id]);
 
   if (draft.error) {
     return (
@@ -526,6 +561,13 @@ function DraftCard({
               {draft.model ? ` · ${draft.model}` : ""}
             </span>
           </div>
+
+          {duplicateOf && (
+            <p className="mt-2 rounded-[8px] border border-amber/25 bg-amber-soft px-2.5 py-1.5 text-[12px] text-amber-ink">
+              ⚠ Looks like a question already in the bank: &ldquo;{duplicateOf.slice(0, 100)}
+              {duplicateOf.length > 100 ? "…" : ""}&rdquo;
+            </p>
+          )}
 
           {payload.source_grounded === false && (
             <p className="mt-2 text-[12px] text-amber-ink">

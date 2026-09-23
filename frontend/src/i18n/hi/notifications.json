@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "कैमरा एक्सेस आवश्यक है",
+  "microphone_access_required": "माइक्रोफ़ोन एक्सेस आवश्यक है",
+  "connection_unstable": "इंटरनेट कनेक्शन अस्थिर है",
+  "exam_submitted_successfully": "परीक्षा सफलतापूर्वक जमा की गई",
+  "confirm_submit": "क्या आप वाकई जमा करना चाहते हैं?",
+  "cannot_return_question": "आप इस प्रश्न पर वापस नहीं लौट सकते",
+  "time_almost_over": "समय लगभग समाप्त हो गया है",
+  "changes_saved": "परिवर्तन सहेजे गए",
+  "action_failed": "कार्रवाई विफल रही। कृपया पुनः प्रयास करें।"
+}

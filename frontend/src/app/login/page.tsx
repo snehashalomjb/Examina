@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { Brand } from "@/components/LowPoly";
 import { Splash } from "@/components/Splash";
 import {
@@ -21,19 +23,12 @@ import type { UserRole } from "@/lib/types";
 
 type Mode = "signin" | "register" | "forgot";
 
-const TABS: { key: Mode; label: string }[] = [
-  { key: "signin", label: "Sign in" },
-  { key: "register", label: "Create account" },
-];
-
 /** Self-registration is candidate or examiner. Admin accounts are made by an admin. */
 type RegisterRole = Exclude<UserRole, "admin">;
 
 type FieldKey = "fullName" | "password" | "confirmPassword";
 type FieldErrors = Partial<Record<FieldKey, string | undefined>>;
 
-const PASSWORD_HINT = "At least 8 characters, with a letter and a digit.";
-const MISMATCH_MESSAGE = "Passwords do not match.";
 /** The same rule the API enforces, checked here so the round trip is not needed. */
 const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
@@ -43,20 +38,19 @@ function splitName(fullName: string): { first_name: string; last_name: string } 
   return { first_name: parts[0] ?? "", last_name: parts.slice(1).join(" ") };
 }
 
-function validateRegistration(input: {
-  fullName: string;
-  password: string;
-  confirmPassword: string;
-}): FieldErrors {
+function validateRegistration(
+  input: { fullName: string; password: string; confirmPassword: string },
+  tv: (key: string) => string,
+): FieldErrors {
   const errors: FieldErrors = {};
 
-  if (!input.fullName.trim()) errors.fullName = "Enter your full name.";
-  if (!PASSWORD_RULE.test(input.password)) errors.password = PASSWORD_HINT;
+  if (!input.fullName.trim()) errors.fullName = tv("required_field");
+  if (!PASSWORD_RULE.test(input.password)) errors.password = tv("password_too_short");
 
   if (!input.confirmPassword) {
-    errors.confirmPassword = "Re-enter your password to confirm it.";
+    errors.confirmPassword = tv("required_field");
   } else if (input.password !== input.confirmPassword) {
-    errors.confirmPassword = MISMATCH_MESSAGE;
+    errors.confirmPassword = tv("passwords_mismatch");
   }
 
   return errors;
@@ -78,7 +72,7 @@ function PasswordInput({
         type="button"
         onClick={onToggle}
         aria-label={visible ? "Hide password" : "Show password"}
-        className="absolute inset-y-0 right-1.5 my-auto h-7 rounded-[7px] px-2 text-[12px] font-medium text-ink-muted transition hover:bg-sunken hover:text-ink"
+        className="absolute inset-y-0 right-1.5 my-auto h-7 rounded-[7px] px-2.5 text-[12px] font-semibold text-ink-muted transition hover:bg-sunken hover:text-ink"
       >
         {visible ? "Hide" : "Show"}
       </button>
@@ -89,6 +83,14 @@ function PasswordInput({
 export default function LoginPage() {
   const { user, loginAccess, booting, signIn, register } = useAuth();
   const router = useRouter();
+  const t = useTranslations("auth");
+  const tv = useTranslations("validation");
+  const tc = useTranslations("common");
+
+  const TABS: { key: Mode; label: string }[] = [
+    { key: "signin", label: t("login_button") },
+    { key: "register", label: t("register_button") },
+  ];
 
   const [mode, setMode] = useState<Mode>("signin");
   const [busy, setBusy] = useState(false);
@@ -112,18 +114,16 @@ export default function LoginPage() {
 
   if (booting) return <Splash />;
 
-  // Mismatch is reported as soon as the second box has something in it, so the
-  // candidate does not have to press the button to find out.
+  // Mismatch is reported as soon as the second box has something in it
   const confirmError =
     fieldErrors.confirmPassword ??
-    (confirmPassword && password !== confirmPassword ? MISMATCH_MESSAGE : undefined);
+    (confirmPassword && password !== confirmPassword ? tv("passwords_mismatch") : undefined);
 
   function switchMode(next: Mode) {
     setMode(next);
     setError(null);
     setNotice(null);
     setFieldErrors({});
-    // Leaving a form empties it, so neither form ever opens holding stale input.
     setEmail("");
     setPassword("");
     setConfirmPassword("");
@@ -148,8 +148,6 @@ export default function LoginPage() {
         const pair = await signIn(email.trim().toLowerCase(), password);
 
         if (pair.user.role === "candidate") {
-          // An approved candidate is greeted before the dashboard; anyone still waiting
-          // (or refused) goes straight to the page that explains why.
           if (pair.login_access === "approved") {
             router.replace("/candidate/welcome");
           } else if (pair.login_access === "rejected") {
@@ -166,8 +164,7 @@ export default function LoginPage() {
       }
 
       if (mode === "register") {
-        // Nothing reaches the API until the form itself is sound.
-        const problems = validateRegistration({ fullName, password, confirmPassword });
+        const problems = validateRegistration({ fullName, password, confirmPassword }, tv);
         setFieldErrors(problems);
         if (Object.values(problems).some(Boolean)) return;
 
@@ -179,8 +176,6 @@ export default function LoginPage() {
         });
 
         if (pair.user.role === "candidate") {
-          // Registration itself is open: the account is active straight away. Approval
-          // is asked for when they sign in, so send them to sign in.
           toast("Account created. Sign in to request access.", "mint");
           switchMode("signin");
           return;
@@ -205,200 +200,300 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 bg-paper">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(79,70,229,0.06),transparent)]" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10"
+      style={{ background: "#070a14" }}>
 
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[20px] border border-line bg-surface shadow-[var(--shadow-lift)] lg:grid-cols-[1fr_1fr]">
-        {/* ────────────────── Brand side ────────────────── */}
-        <aside className="relative hidden flex-col justify-between overflow-hidden lg:flex" style={{ background: "#0f1117" }}>
-          <div className="relative p-9 flex-1 flex flex-col justify-center">
-            {/* Logo */}
-            <Brand size={26} onDark className="mb-10" />
+      {/* ── Aurora background orbs ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="aurora-orb animate-glow-pulse" style={{
+          width: 700, height: 700,
+          background: "radial-gradient(circle, rgba(79,70,229,0.18) 0%, transparent 65%)",
+          top: "-25%", left: "-15%",
+        }} />
+        <div className="aurora-orb" style={{
+          width: 600, height: 600,
+          background: "radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 65%)",
+          bottom: "-20%", right: "-10%",
+          animationDelay: "1.5s",
+        }} />
+        <div className="aurora-orb animate-glow-pulse" style={{
+          width: 400, height: 400,
+          background: "radial-gradient(circle, rgba(6,182,212,0.09) 0%, transparent 70%)",
+          top: "40%", right: "20%",
+          animationDelay: "0.8s",
+        }} />
+        {/* Subtle grid */}
+        <div className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: "linear-gradient(rgba(99,102,241,1) 1px, transparent 1px), linear-gradient(to right, rgba(99,102,241,1) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }} />
+      </div>
 
-            <h1 className="text-[28px] font-bold leading-[1.2] tracking-tight text-white max-w-xs">
-              Assessments that hold up to scrutiny.
-            </h1>
-            <p className="mt-3 max-w-sm text-[13.5px] leading-relaxed" style={{ color: "#a1a1b5" }}>
-              AI-powered proctoring, randomized papers, automated grading — and a human examiner reviews every decision.
-            </p>
+      {/* ── Main card ── */}
+      <div className="relative w-full max-w-5xl overflow-hidden rounded-[24px] animate-rise"
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 0 0 1px rgba(99,102,241,0.1), 0 32px 80px -16px rgba(0,0,0,0.7), 0 8px 24px -8px rgba(79,70,229,0.2)",
+        }}>
+        <div className="lg:grid lg:grid-cols-[1fr_1fr]">
 
-            <div className="mt-8 space-y-3">
-              {[
-                { icon: "🎯", text: "Academic & Corporate exam modes" },
-                { icon: "🤖", text: "AI question generation & grading" },
-                { icon: "🔒", text: "Live proctoring with webcam monitoring" },
-                { icon: "📊", text: "Deep performance analytics" },
-              ].map((f) => (
-                <div key={f.text} className="flex items-center gap-3">
-                  <span className="text-[15px]">{f.icon}</span>
-                  <span className="text-[13px]" style={{ color: "#a1a1b5" }}>{f.text}</span>
-                </div>
-              ))}
+          {/* ─────────── Brand side ─────────── */}
+          <aside className="relative hidden flex-col justify-between overflow-hidden lg:flex"
+            style={{ background: "linear-gradient(160deg, #0a0d1e 0%, #0f1535 50%, #0d0a1e 100%)" }}>
+
+            {/* Geometric accent mesh */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div style={{
+                position: "absolute", top: 0, right: 0, width: "60%", height: "100%",
+                background: "radial-gradient(ellipse at 100% 0%, rgba(99,102,241,0.12) 0%, transparent 60%)",
+              }} />
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, width: "50%", height: "60%",
+                background: "radial-gradient(ellipse at 0% 100%, rgba(139,92,246,0.08) 0%, transparent 60%)",
+              }} />
+              {/* Decorative grid lines */}
+              <div className="absolute inset-0 opacity-[0.04]"
+                style={{
+                  backgroundImage: "linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(to right, rgba(139,92,246,1) 1px, transparent 1px)",
+                  backgroundSize: "40px 40px",
+                }} />
             </div>
-          </div>
-          {/* Bottom gradient line */}
-          <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-accent to-transparent opacity-40" />
-        </aside>
 
-        {/* ────────────────── Form side ────────────────── */}
-        <section className="p-7 sm:p-9">
-          <Brand className="mb-6 lg:hidden" />
-
-          {mode !== "forgot" ? (
-            <div className="mb-6 inline-flex rounded-[10px] border border-line bg-sunken p-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => switchMode(tab.key)}
-                  className={cx(
-                    "rounded-[7px] px-3.5 py-1.5 text-[13px] font-medium transition",
-                    mode === tab.key
-                      ? "bg-surface text-ink shadow-[var(--shadow-soft)]"
-                      : "text-ink-muted hover:text-ink",
-                  )}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => switchMode("signin")}
-              className="mb-6 text-[13px] font-medium text-accent hover:text-accent-ink"
-            >
-              ← Back to sign in
-            </button>
-          )}
-
-          <h2 className="text-[20px] font-semibold tracking-tight text-ink">
-            {mode === "signin"
-              ? "Sign in to your account"
-              : mode === "register"
-                ? "Create your account"
-                : "Reset your password"}
-          </h2>
-          <p className="mt-1 text-[13px] text-ink-muted">
-            {mode === "signin"
-              ? "Candidates, examiners and administrators use the same door."
-              : mode === "register"
-                ? "Candidate registration is open. Access to the platform is approved when you first sign in."
-                : "We will issue a reset link for the address you registered with."}
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {mode === "register" && (
-              <Field label="Full name" error={fieldErrors.fullName}>
-                <Input
-                  value={fullName}
-                  onChange={(e) => {
-                    setFullName(e.target.value);
-                    clearFieldError("fullName");
-                  }}
-                  placeholder="Enter your full name"
-                  autoComplete="name"
-                  required
-                />
-              </Field>
-            )}
-
-            <Field label="Email address">
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                autoComplete="email"
-                required
-              />
-            </Field>
-
-            {mode !== "forgot" && (
-              <Field
-                label="Password"
-                hint={mode === "register" ? PASSWORD_HINT : undefined}
-                error={fieldErrors.password}
-              >
-                <PasswordInput
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    clearFieldError("password");
-                  }}
-                  placeholder="Enter your password"
-                  autoComplete={mode === "register" ? "new-password" : "current-password"}
-                  visible={showPassword}
-                  onToggle={() => setShowPassword((on) => !on)}
-                  required
-                  minLength={mode === "register" ? 8 : undefined}
-                />
-              </Field>
-            )}
-
-            {mode === "register" && (
-              <Field label="Confirm password" error={confirmError}>
-                <PasswordInput
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    clearFieldError("confirmPassword");
-                  }}
-                  placeholder="Re-enter your password"
-                  autoComplete="new-password"
-                  visible={showConfirm}
-                  onToggle={() => setShowConfirm((on) => !on)}
-                  required
-                  minLength={8}
-                />
-              </Field>
-            )}
-
-            {mode === "register" && (
-              <Field label="I am registering as">
-                <Select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as RegisterRole)}
-                >
-                  <option value="candidate">Candidate</option>
-                  <option value="examiner">Examiner</option>
-                </Select>
-              </Field>
-            )}
-
-            {mode === "signin" && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => switchMode("forgot")}
-                  className="text-[12.5px] font-medium text-accent hover:text-accent-ink"
-                >
-                  Forgot password?
-                </button>
+            <div className="relative p-10 flex-1 flex flex-col justify-center">
+              {/* Logo */}
+              <div className="mb-10 animate-rise" style={{ animationDelay: "0.05s" }}>
+                <Brand size={26} onDark />
               </div>
+
+              {/* Headline */}
+              <div className="animate-rise" style={{ animationDelay: "0.1s" }}>
+                <h1 className="text-[30px] font-bold leading-[1.2] tracking-tight text-white max-w-xs">
+                  Assessments that hold up to{" "}
+                  <span style={{
+                    background: "linear-gradient(135deg, #818cf8, #a5b4fc)",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}>
+                    scrutiny.
+                  </span>
+                </h1>
+                <p className="mt-4 max-w-sm text-[13.5px] leading-relaxed" style={{ color: "#8b8ba7" }}>
+                  AI-powered proctoring, randomized papers, automated grading — and a human examiner reviews every decision.
+                </p>
+              </div>
+
+              {/* Feature list */}
+              <div className="mt-9 space-y-3.5 animate-rise" style={{ animationDelay: "0.15s" }}>
+                {[
+                  { icon: "🎯", text: "Academic & Corporate exam modes", color: "#818cf8" },
+                  { icon: "🤖", text: "AI question generation & grading", color: "#a5b4fc" },
+                  { icon: "🔒", text: "Live proctoring with webcam monitoring", color: "#818cf8" },
+                  { icon: "📊", text: "Deep performance analytics", color: "#a5b4fc" },
+                ].map((f, i) => (
+                  <div key={f.text} className="flex items-center gap-3.5 animate-rise"
+                    style={{ animationDelay: `${0.2 + i * 0.05}s` }}>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]"
+                      style={{ background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                      <span className="text-[14px]">{f.icon}</span>
+                    </div>
+                    <span className="text-[13px] font-medium" style={{ color: "#a1a1b5" }}>{f.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bottom stat strip */}
+              <div className="mt-10 grid grid-cols-3 gap-4 animate-rise" style={{ animationDelay: "0.35s" }}>
+                {[
+                  { value: "10K+", label: "Exams taken" },
+                  { value: "99.8%", label: "Uptime" },
+                  { value: "4.9★", label: "Avg. rating" },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-[12px] px-3 py-3 text-center"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}>
+                    <p className="text-[16px] font-bold text-white">{stat.value}</p>
+                    <p className="mt-0.5 text-[10px] font-medium" style={{ color: "#6b6b8a" }}>{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom gradient line */}
+            <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-40" />
+          </aside>
+
+          {/* ─────────── Form side ─────────── */}
+          <section className="relative p-7 sm:p-9" style={{ background: "rgba(255,255,255,0.97)" }}>
+            <div className="mb-4 flex items-center justify-between">
+              {/* Mobile brand */}
+              <Brand className="lg:hidden" />
+              <LanguageSelector className="ml-auto" />
+            </div>
+
+            {/* Mode tabs */}
+            {mode !== "forgot" ? (
+              <div className="mb-7 inline-flex rounded-[12px] border border-line bg-sunken p-1">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => switchMode(tab.key)}
+                    className={cx(
+                      "rounded-[9px] px-4 py-1.5 text-[13px] font-semibold transition-all duration-200",
+                      mode === tab.key
+                        ? "bg-surface text-ink shadow-[var(--shadow-soft)]"
+                        : "text-ink-muted hover:text-ink",
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => switchMode("signin")}
+                className="mb-7 flex items-center gap-1.5 text-[13px] font-semibold text-accent hover:text-accent-ink transition-colors"
+              >
+                <span>←</span> {t("sign_in_here")}
+              </button>
             )}
 
-            {error && <Alert tone="rose">{error}</Alert>}
-            {notice && (
-              <Alert tone="mint" title="Check your inbox">
-                {notice}
-              </Alert>
-            )}
+            {/* Heading */}
+            <div className="mb-6">
+              <h2 className="text-[22px] font-bold tracking-tight text-ink">
+                {mode === "signin"
+                  ? t("login_title")
+                  : mode === "register"
+                    ? t("register_title")
+                    : t("reset_password_title")}
+              </h2>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">
+                {mode === "signin"
+                  ? t("login_subtitle")
+                  : mode === "register"
+                    ? t("register_subtitle")
+                    : t("reset_password_title")}
+              </p>
+            </div>
 
-            <Button type="submit" loading={busy} className="w-full">
-              {mode === "signin"
-                ? "Sign in"
-                : mode === "register"
-                  ? "Create account"
-                  : "Send reset link"}
-            </Button>
-          </form>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "register" && (
+                <Field label={tc("name")} error={fieldErrors.fullName}>
+                  <Input
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      clearFieldError("fullName");
+                    }}
+                    placeholder={tc("name")}
+                    autoComplete="name"
+                    required
+                  />
+                </Field>
+              )}
 
-          {mode === "forgot" && <ResetTokenForm onDone={() => switchMode("signin")} />}
+              <Field label={t("email")}>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t("email")}
+                  autoComplete="email"
+                  required
+                />
+              </Field>
 
-          {mode === "signin" && <DemoAccounts onPick={(e, p) => { setEmail(e); setPassword(p); }} />}
-        </section>
+              {mode !== "forgot" && (
+                <Field
+                  label={t("password")}
+                  hint={mode === "register" ? t("password_requirements") : undefined}
+                  error={fieldErrors.password}
+                >
+                  <PasswordInput
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      clearFieldError("password");
+                    }}
+                    placeholder={t("password")}
+                    autoComplete={mode === "register" ? "new-password" : "current-password"}
+                    visible={showPassword}
+                    onToggle={() => setShowPassword((on) => !on)}
+                    required
+                    minLength={mode === "register" ? 8 : undefined}
+                  />
+                </Field>
+              )}
+
+              {mode === "register" && (
+                <Field label={t("confirm_password")} error={confirmError}>
+                  <PasswordInput
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearFieldError("confirmPassword");
+                    }}
+                    placeholder={t("confirm_password")}
+                    autoComplete="new-password"
+                    visible={showConfirm}
+                    onToggle={() => setShowConfirm((on) => !on)}
+                    required
+                    minLength={8}
+                  />
+                </Field>
+              )}
+
+              {mode === "register" && (
+                <Field label={t("role")}>
+                  <Select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as RegisterRole)}
+                  >
+                    <option value="candidate">{t("role_candidate")}</option>
+                    <option value="examiner">{t("role_examiner")}</option>
+                  </Select>
+                </Field>
+              )}
+
+              {mode === "signin" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("forgot")}
+                    className="text-[12.5px] font-semibold text-accent hover:text-accent-ink transition-colors"
+                  >
+                    {t("forgot_password")}
+                  </button>
+                </div>
+              )}
+
+              {error && <Alert tone="rose">{error}</Alert>}
+              {notice && (
+                <Alert tone="mint" title="Check your inbox">
+                  {notice}
+                </Alert>
+              )}
+
+              <Button type="submit" loading={busy} className="w-full" size="lg">
+                {mode === "signin"
+                  ? t("login_button")
+                  : mode === "register"
+                    ? t("register_button")
+                    : t("reset_password_button")}
+              </Button>
+            </form>
+
+            {mode === "forgot" && <ResetTokenForm onDone={() => switchMode("signin")} />}
+
+            {mode === "signin" && <DemoAccounts onPick={(e, p) => { setEmail(e); setPassword(p); }} />}
+          </section>
+        </div>
       </div>
     </main>
   );
@@ -489,7 +584,7 @@ const DEMO = [
 function DemoAccounts({ onPick }: { onPick: (email: string, password: string) => void }) {
   return (
     <div className="mt-6 border-t border-line pt-5">
-      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+      <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.1em] text-ink-muted">
         Demo Accounts — Click to fill
       </p>
       <div className="grid gap-1.5">
@@ -498,9 +593,9 @@ function DemoAccounts({ onPick }: { onPick: (email: string, password: string) =>
             key={account.email}
             type="button"
             onClick={() => onPick(account.email, account.password)}
-            className="flex items-center justify-between rounded-[9px] border border-line px-3 py-2 text-left transition hover:border-accent/40 hover:bg-accent-soft"
+            className="group flex items-center justify-between rounded-[10px] border border-line px-3.5 py-2.5 text-left transition-all duration-200 hover:border-accent/30 hover:bg-accent-soft hover:shadow-sm"
           >
-            <span className="text-[12px] text-ink-soft font-mono">{account.email}</span>
+            <span className="text-[12px] text-ink-muted font-mono group-hover:text-ink-soft transition-colors">{account.email}</span>
             <Badge tone={account.tone}>{account.role}</Badge>
           </button>
         ))}

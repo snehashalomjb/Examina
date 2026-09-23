@@ -1,0 +1,12 @@
+{
+  "user_management": "User Management",
+  "candidate_management": "Candidate Management",
+  "examiner_management": "Examiner Management",
+  "exam_management": "Exam Management",
+  "monitoring": "Monitoring",
+  "system_settings": "System Settings",
+  "audit_log": "Audit Log",
+  "approve": "Approve",
+  "revoke": "Revoke",
+  "reject": "Reject"
+}

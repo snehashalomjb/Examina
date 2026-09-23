@@ -92,6 +92,8 @@ def ingest_batch(
                 server_received_at=received,
                 duration_ms=item.duration_ms,
                 weight=event_weight(item.event_type, config),
+                confidence=item.confidence,
+                question_id=item.question_id,
                 event_metadata=item.metadata,
             )
         )
@@ -195,5 +197,11 @@ def _warnings(
         warnings.append("Your face was not visible. Stay in frame.")
     if ProctorEventType.CAMERA_BLOCKED in types:
         warnings.append("Your camera appears blocked or disabled.")
+    if ProctorEventType.ADDITIONAL_PERSON in types:
+        warnings.append("Another person appears to be in view of the camera.")
+    if ProctorEventType.MIC_DISCONNECTED in types:
+        warnings.append("Your microphone appears disconnected.")
+    if ProctorEventType.NETWORK_LOST in types:
+        warnings.append("Your internet connection dropped. Reconnect to continue.")
 
     return warnings

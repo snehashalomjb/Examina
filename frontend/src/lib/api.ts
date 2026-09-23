@@ -12,6 +12,14 @@ const BASE =
 
 const ACCESS_KEY = "exam.access";
 const REFRESH_KEY = "exam.refresh";
+const LOCALE_KEY = "exam.locale";
+
+export const localePrefs = {
+  get: () => (typeof window === "undefined" ? null : localStorage.getItem(LOCALE_KEY)),
+  set(locale: string) {
+    if (typeof window !== "undefined") localStorage.setItem(LOCALE_KEY, locale);
+  },
+};
 
 export class ApiError extends Error {
   status: number;
@@ -92,6 +100,8 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
     const token = tokens.access();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  const locale = localePrefs.get();
+  if (locale) headers["Accept-Language"] = locale;
   if (examToken) headers["X-Exam-Token"] = examToken;
   if (body !== undefined && !formData) headers["Content-Type"] = "application/json";
 

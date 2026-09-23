@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.db.models.enums import (
     Difficulty,
@@ -25,6 +25,11 @@ class SubjectCreate(BaseModel):
     description: str | None = None
 
 
+class SubjectUpdate(BaseModel):
+    name: str | None = Field(None, min_length=2, max_length=150)
+    description: str | None = None
+
+
 class SubjectOut(ORMModel):
     id: uuid.UUID
     code: str
@@ -40,6 +45,9 @@ class OptionIn(BaseModel):
     image_key: str | None = Field(default=None, max_length=512)
     is_correct: bool = False
     order_index: int = 0
+    #: Per-locale text, e.g. {"te": {"text": "..."}}. ``en`` is always upserted from the
+    #: ``text`` field above regardless of whether it's repeated here.
+    translations: dict[str, dict[str, str]] | None = None
 
 
 class OptionOut(ORMModel):
@@ -53,6 +61,21 @@ class OptionOut(ORMModel):
 
 class OptionOutWithAnswer(OptionOut):
     is_correct: bool
+    #: Per-locale text already on file, keyed by locale (``en`` included), for the
+    #: examiner's translation editor to load into its fields. Empty until a translation
+    #: has been written or generated.
+    translations: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("translations", mode="before")
+    @classmethod
+    def _from_rows(cls, value: Any) -> dict[str, str]:
+        # `model_validate(option, from_attributes=True)` finds `OptionTranslation` rows
+        # on the ORM object's own `.translations` relationship (same field name) before
+        # `_to_full` gets a chance to set the resolved dict - convert them here instead
+        # of forbidding the natural name.
+        if isinstance(value, dict):
+            return value
+        return {row.locale: (row.text or "") for row in value}
 
 
 class QuestionBase(BaseModel):
@@ -86,6 +109,9 @@ class QuestionBase(BaseModel):
 
 class QuestionCreate(QuestionBase):
     options: list[OptionIn] = Field(default_factory=list)
+    #: Per-locale question text, e.g. {"te": {"body": "...", "explanation": "..."}}.
+    #: ``en`` is always upserted from ``body``/``model_answer``/``explanation`` above.
+    translations: dict[str, dict[str, str]] | None = None
 
     #: Where this question came from. The client may declare it, but the AI and import
     #: paths set it server-side - a caller cannot dress an AI draft up as hand-authored.
@@ -146,6 +172,7 @@ class QuestionUpdate(BaseModel):
     max_words: int | None = Field(default=None, ge=1, le=100_000)
     is_active: bool | None = None
     options: list[OptionIn] | None = None
+    translations: dict[str, dict[str, str]] | None = None
 
 
 class QuestionOut(ORMModel):
@@ -191,6 +218,24 @@ class QuestionOutFull(QuestionOut):
     rubric: dict[str, Any] | None = None
     spec: dict[str, Any] | None = None
     options: list[OptionOutWithAnswer] = Field(default_factory=list)
+    #: Per-locale {body, model_answer, explanation} already on file, keyed by locale
+    #: (``en`` included), for the examiner's translation editor to load. Empty until a
+    #: translation has been written or generated.
+    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+    @field_validator("translations", mode="before")
+    @classmethod
+    def _from_rows(cls, value: Any) -> dict[str, dict[str, str]]:
+        if isinstance(value, dict):
+            return value
+        return {
+            row.locale: {
+                "body": row.body or "",
+                "model_answer": row.model_answer or "",
+                "explanation": row.explanation or "",
+            }
+            for row in value
+        }
 
 
 class QuestionImageOut(BaseModel):
@@ -209,3 +254,43 @@ class BulkQuestionResult(BaseModel):
     created: int
     failed: int
     errors: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DuplicateCheckRequest(BaseModel):
+    subject_id: uuid.UUID
+    body: str = Field(..., min_length=1)
+    #: The question being edited, so it never flags itself as its own duplicate.
+    exclude_question_id: uuid.UUID | None = None
+
+
+class DuplicateMatch(BaseModel):
+    id: uuid.UUID
+    body: str
+
+
+class DuplicateCheckOut(BaseModel):
+    matches: list[DuplicateMatch] = Field(default_factory=list)
+
+
+class GenerateTranslationsRequest(BaseModel):
+    #: Locales to (re)generate. Defaults to every supported locale except English, which
+    #: is the source and is never generated.
+    locales: list[str] | None = None
+    #: Regenerate a locale even if it already has a saved translation. Off by default -
+    #: a generate click should never silently blow away an examiner's hand edits.
+    overwrite_existing: bool = False
+
+
+class GenerateTranslationsOut(BaseModel):
+    #: {locale: {body, explanation}} - a *preview* only, nothing is saved here. The
+    #: examiner reviews/edits these in the form, then PATCHes the question with
+    #: ``translations`` to actually persist them.
+    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
+    #: {option_id: {locale: text}}.
+    options: dict[uuid.UUID, dict[str, str]] = Field(default_factory=dict)
+    #: "stub" | "openai" - which provider actually produced this, so the UI can warn
+    #: when no real translation model is configured.
+    provider: str
+    #: Locales that already had a saved translation and were skipped because
+    #: ``overwrite_existing`` was false.
+    skipped_existing: list[str] = Field(default_factory=list)

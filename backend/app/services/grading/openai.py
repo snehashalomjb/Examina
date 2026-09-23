@@ -54,6 +54,9 @@ class OpenAIGrader:
         self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def _rubric_prefix(self, question: Question, max_marks: float) -> str:
+        # Deliberately reads the base columns, never a locale-translated string: grading
+        # must be consistent regardless of which language the candidate saw on screen, so
+        # the model always grades against the canonical (English) body/model_answer/rubric.
         parts = [
             f"QUESTION ({question.question_type.value}, worth {max_marks} marks):",
             question.body.strip(),

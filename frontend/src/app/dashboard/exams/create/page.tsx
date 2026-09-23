@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { AIGenerator } from "@/components/AIGenerator";
+import { BlueprintBuilder } from "@/components/BlueprintBuilder";
 import { CandidateSelector } from "@/components/CandidateSelector";
 import { ExamCategoryCard, ExamCategoryType } from "@/components/ExamCategoryCard";
-import { Hero } from "@/components/Hero";
+import { ExaminerPaperPreview } from "@/components/ExaminerPaperPreview";
+import { GuidedSectionPicker } from "@/components/GuidedSectionPicker";
 import { PaperPreview } from "@/components/PaperPreview";
 import { QuestionBankSelector } from "@/components/QuestionBankSelector";
 import { QuestionEditor } from "@/components/QuestionEditor";
 import { QuestionImporter } from "@/components/QuestionImporter";
 import { QuestionPool } from "@/components/QuestionPool";
+import { SubjectCombobox } from "@/components/SubjectCombobox";
 import {
   Alert,
   Badge,
@@ -28,16 +31,21 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { exampleFor } from "@/lib/exampleQuestions";
+import { LOCALE_NAMES, SUPPORTED_LOCALES, type Locale } from "@/lib/locale";
 import type {
+  BlueprintRow,
+  BlueprintRowResult,
   Difficulty,
   Exam,
   ExamPool,
   Question,
+  QuestionCategory,
   QuestionType,
   SelectionRule,
   Subject,
 } from "@/lib/types";
-import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
+import { CATEGORY_LABEL, QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
 
 interface ExamPattern {
   id: string;
@@ -439,7 +447,6 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
 
 export default function CreateExamWizard() {
   const { user } = useRequireAuth(["examiner", "admin"]);
-  const router = useRouter();
   // ?exam=<id> reopens a draft. Saving a draft you cannot come back to is a trap, and
   // the pool step deliberately leaves drafts behind.
   const resumeId = useSearchParams().get("exam");
@@ -462,6 +469,7 @@ export default function CreateExamWizard() {
   const [negativeMarking, setNegativeMarking] = useState(false);
   const [maxAttempts, setMaxAttempts] = useState(1);
   const [difficulty, setDifficulty] = useState<Difficulty | "">("");
+  const [enabledLanguages, setEnabledLanguages] = useState<Locale[]>(["en"]);
 
   // Academic fields
   const [course, setCourse] = useState("");
@@ -475,11 +483,20 @@ export default function CreateExamWizard() {
   // Randomisation. The pool and the paper are different things: the pool is every
   // question the exam may draw from, the paper is what one candidate sits.
   const [randomize, setRandomize] = useState(true);
-  const [shuffleOptions, setShuffleOptions] = useState(true);
+  // Off by default, and independent of `randomize` - see the toggle copy below.
+  const [shuffleOptions, setShuffleOptions] = useState(false);
 
   // Step 4: Sections & Rules
   const [sections, setSections] = useState<
     Array<{
+      /**
+       * The saved section's server id, once the draft has been saved.
+       *
+       * Undefined until then, and that is the whole reason the per-section bank picker
+       * needs a saved draft: a question is pinned to a section id, and a section that
+       * exists only in this component's state has none.
+       */
+      id?: string;
       name: string;
       description: string;
       duration_minutes: number | null;
@@ -497,12 +514,49 @@ export default function CreateExamWizard() {
   // way into this step and edits the pool in place from there.
   const [examId, setExamId] = useState<string | null>(null);
   const [pool, setPool] = useState<ExamPool | null>(null);
-  const [poolTab, setPoolTab] = useState<"create" | "bank" | "ai" | "import">("bank");
+  const [poolTab, setPoolTab] = useState<"create" | "bank" | "ai" | "import" | "blueprint">("bank");
+  /** The guided, section-by-section picker is the default way to fill the pool - the
+   * "Advanced" tabs stay available for AI generation, import, or free browsing. */
+  const [guidedMode, setGuidedMode] = useState(true);
+  const [guidedComplete, setGuidedComplete] = useState(false);
+  const [guidedReloadToken, setGuidedReloadToken] = useState(0);
+  const [shufflingPool, setShufflingPool] = useState(false);
+  /**
+   * Questions written on the pattern step, before there is a draft to attach them to.
+   *
+   * An examiner who already knows the questions should not have to walk three steps of
+   * configuration before they can type one. There is no exam yet, so these are saved to
+   * the question bank with their answer keys; they are remembered here and added to
+   * this exam's pool the moment the draft exists, on the way into step 5.
+   */
+  const [earlyQuestions, setEarlyQuestions] = useState<Question[]>([]);
+  const [authoringEarly, setAuthoringEarly] = useState(false);
+  /**
+   * Which section rule the examiner is writing a question for, on the sections step.
+   *
+   * A question is never owned by a section - sections draw from the pool by rule. So
+   * "write one for this section" means "write one this rule will match": the editor
+   * opens with the rule's type and difficulty already set, which is the only thing that
+   * decides whether the rule can draw it.
+   */
+  const [ruleAuthor, setRuleAuthor] = useState<{ s: number; r: number } | null>(null);
+  /** True when the open editor started from the worked example rather than blank. */
+  const [ruleSeeded, setRuleSeeded] = useState(false);
+  /** Which rule's worked example is expanded, as "sectionIndex:ruleIndex". */
+  const [exampleOpen, setExampleOpen] = useState<string | null>(null);
+  /** Which section has the Question Bank browser open beneath it. */
+  const [bankForSection, setBankForSection] = useState<number | null>(null);
+  const [pinning, setPinning] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [assignedCount, setAssignedCount] = useState(0);
-  /** Review tab: the summary and checklist, or the candidate's-eye paper. */
-  const [reviewTab, setReviewTab] = useState<"summary" | "paper">("summary");
+  /** Review tab: the summary and checklist, the candidate's-eye paper, or the
+   * examiner's full structured question-paper preview. */
+  const [reviewTab, setReviewTab] = useState<"summary" | "paper" | "full">("summary");
+  /** Set once the examiner has opened the full paper preview at least once - publishing
+   * without having looked at the assembled paper is not allowed. */
+  const [paperPreviewed, setPaperPreviewed] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   /** Set once the exam is live, so the wizard can show what was published. */
   const [published, setPublished] = useState<{ id: string; questions: number } | null>(
     null,
@@ -584,11 +638,13 @@ export default function CreateExamWizard() {
         setSemester(exam.semester ?? "");
         setCompanyName(exam.company_name ?? "");
         setJobRole(exam.job_role ?? "");
+        setEnabledLanguages((exam.languages?.length ? exam.languages : ["en"]) as Locale[]);
 
         setSections(
           [...exam.sections]
             .sort((a, b) => a.order_index - b.order_index)
             .map((section) => ({
+              id: section.id,
               name: section.name,
               description: section.description ?? "",
               duration_minutes: section.duration_minutes,
@@ -708,6 +764,7 @@ export default function CreateExamWizard() {
         max_focus_violations: maxFocusViolations,
       },
       grading_config: { auto_publish_results: false },
+      enabled_languages: enabledLanguages,
       sections: sections.map((sec, idx) => ({
         name: sec.name,
         description: sec.description || null,
@@ -755,6 +812,28 @@ export default function CreateExamWizard() {
     return found;
   }
 
+  /** Every publish gate at once - the pool itself, no duplicates, every question in the
+   * right section, and the examiner having actually looked at the assembled paper. */
+  function canPublish(): boolean {
+    if (!pool?.can_publish) return false;
+    if (!paperPreviewed) return false;
+    const seen = new Set<string>();
+    for (const e of pool.entries) {
+      if (seen.has(e.question_id)) return false;
+      seen.add(e.question_id);
+    }
+    for (const e of pool.entries) {
+      if (!e.section_id) continue;
+      const sec = sections.find((s) => s.id === e.section_id);
+      if (!sec) continue;
+      const matches = sec.rules.some(
+        (r) => r.question_type === e.question_type && (!r.difficulty || r.difficulty === e.difficulty),
+      );
+      if (!matches) return false;
+    }
+    return true;
+  }
+
   /**
    * Create the draft on first call, update it thereafter.
    *
@@ -776,14 +855,16 @@ export default function CreateExamWizard() {
       try {
         const payload = buildPayload();
         if (examId) {
-          await api.patch(`/exams/${examId}`, payload);
+          const updated = await api.patch<Exam>(`/exams/${examId}`, payload);
+          absorbSectionIds(updated);
           if (!options?.quiet) toast("Draft saved", "mint");
           return examId;
         }
-        const created = await api.post<{ id: string }>("/exams", {
+        const created = await api.post<Exam>("/exams", {
           ...payload,
           question_ids: [],
         });
+        absorbSectionIds(created);
         setExamId(created.id);
         if (!options?.quiet) toast("Draft saved — now build the question pool", "mint");
         return created.id;
@@ -815,10 +896,169 @@ export default function CreateExamWizard() {
     }
   }, []);
 
+  /**
+   * Shuffle the pool's saved order with one click, using the same reorder endpoint the
+   * drag handles call. Only meaningful when "Unique paper per candidate" is off - once
+   * randomize is on, every candidate gets their own draw and this order is never shown.
+   */
+  async function shufflePool() {
+    if (!examId || !pool) return;
+    const ids = pool.entries.map((e) => e.question_id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    setShufflingPool(true);
+    try {
+      setPool(await api.put<ExamPool>(`/exams/${examId}/questions/order`, { question_ids: ids }));
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not shuffle the pool.", "rose");
+    } finally {
+      setShufflingPool(false);
+    }
+  }
+
+  /**
+   * Learn the server's section ids after a save.
+   *
+   * The wizard edits sections as a positional list; the server returns them with ids.
+   * Matching by ``order_index`` is safe because that is exactly how the two sides agree
+   * on which section is which - see ``_set_sections``, which updates by position rather
+   * than recreating, so an id survives every autosave.
+   */
+  function absorbSectionIds(exam: Exam) {
+    const byOrder = new Map((exam.sections ?? []).map((s) => [s.order_index, s.id]));
+    setSections((prev) => prev.map((sec, index) => ({ ...sec, id: byOrder.get(index) ?? sec.id })));
+  }
+
+  /**
+   * The exam id and section id needed to pin a question, saving the draft if necessary.
+   *
+   * A section only has an id once it has been written to the server, so the first time
+   * an examiner picks questions for Section A the draft is saved for them rather than
+   * being refused. The saved exam is re-read instead of trusting component state,
+   * because ``setSections`` has not landed yet at this point in the same tick.
+   */
+  async function sectionTarget(sIdx: number): Promise<{ exam: string; section: string } | null> {
+    const id = examId ?? (await saveDraft({ quiet: true }));
+    if (!id) return null;
+
+    const known = sections[sIdx]?.id;
+    if (examId && known) return { exam: id, section: known };
+
+    try {
+      const exam = await api.get<Exam>(`/exams/${id}`);
+      absorbSectionIds(exam);
+      const ordered = [...(exam.sections ?? [])].sort((a, b) => a.order_index - b.order_index);
+      const section = ordered[sIdx]?.id;
+      if (!section) {
+        toast("Save the draft before picking questions for this section.", "amber");
+        return null;
+      }
+      return { exam: id, section };
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not read the exam.", "rose");
+      return null;
+    }
+  }
+
+  /** Add bank questions straight into one section, not just into the shared pool. */
+  async function addToSection(sIdx: number, questionIds: string[]) {
+    const target = await sectionTarget(sIdx);
+    if (!target) return;
+    setPinning(true);
+    try {
+      setPool(
+        await api.post<ExamPool>(`/exams/${target.exam}/questions`, {
+          question_ids: questionIds,
+          section_id: target.section,
+        }),
+      );
+      toast(
+        `${questionIds.length} question(s) added to ${sections[sIdx]?.name ?? "the section"}`,
+        "mint",
+      );
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not add those questions.", "rose");
+    } finally {
+      setPinning(false);
+    }
+  }
+
+  /** Move a question already in the pool into one section. */
+  async function pinToSection(sIdx: number, questionId: string) {
+    const target = await sectionTarget(sIdx);
+    if (!target) return;
+    try {
+      setPool(
+        await api.patch<ExamPool>(`/exams/${target.exam}/questions/${questionId}/section`, {
+          section_id: target.section,
+        }),
+      );
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not move that question.", "rose");
+    }
+  }
+
+  /** Return a question to the shared pool. The question itself is untouched. */
+  async function unpinFromSection(questionId: string) {
+    if (!examId) return;
+    try {
+      setPool(
+        await api.patch<ExamPool>(`/exams/${examId}/questions/${questionId}/section`, {
+          section_id: null,
+        }),
+      );
+      toast("Returned to the shared pool", "mint");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not move that question.", "rose");
+    }
+  }
+
+  /** Drop a question from the pool entirely - used when deselecting a previously-picked
+   * question in the guided flow, rather than just unpinning it back to "any section". */
+  async function unpinAndRemove(questionId: string) {
+    if (!examId) return;
+    try {
+      setPool(await api.delete<ExamPool>(`/exams/${examId}/questions/${questionId}`));
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not remove that question.", "rose");
+    }
+  }
+
   /** Save the draft, then move to the pool step with a live pool loaded. */
   async function goToPool() {
     const id = await saveDraft({ quiet: Boolean(examId) });
     if (!id) return;
+
+    // Anything written on the pattern step has been waiting for an exam to belong to.
+    // A pool may not mix subjects, so questions written against a different subject are
+    // left in the bank and the examiner is told, rather than failing the whole batch.
+    if (earlyQuestions.length) {
+      const matching = earlyQuestions.filter((q) => q.subject_id === subjectId);
+      const strays = earlyQuestions.length - matching.length;
+      if (matching.length) {
+        try {
+          await api.post<ExamPool>(`/exams/${id}/questions`, {
+            question_ids: matching.map((q) => q.id),
+          });
+          toast(`${matching.length} question(s) you wrote earlier added to the pool`, "mint");
+        } catch (err) {
+          toast(
+            err instanceof ApiError ? err.message : "Could not add your earlier questions.",
+            "rose",
+          );
+        }
+      }
+      if (strays) {
+        toast(
+          `${strays} question(s) are for another subject — they stayed in the bank.`,
+          "amber",
+        );
+      }
+      setEarlyQuestions([]);
+    }
+
     await refreshPool(id);
     setStep(5);
   }
@@ -843,6 +1083,49 @@ export default function CreateExamWizard() {
       toast("Copied into this exam", "mint");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not duplicate that.", "rose");
+    }
+  }
+
+  /**
+   * Apply the blueprint table: each row becomes a real section with a matching rule, and
+   * the server has already pulled every matching bank question into the pool. The wizard
+   * only owns `sections` in its own state until it is saved - the blueprint writes
+   * sections directly on the server, so the client copy is re-read afterwards rather
+   * than staying stale and then being overwritten on the next "Save draft".
+   */
+  async function applyBlueprint(rows: BlueprintRow[]): Promise<BlueprintRowResult[] | null> {
+    if (!examId) return null;
+    try {
+      const result = await api.post<{ rows: BlueprintRowResult[]; pool: ExamPool }>(
+        `/exams/${examId}/blueprint`,
+        { rows },
+      );
+      setPool(result.pool);
+      const exam = await api.get<Exam>(`/exams/${examId}`);
+      setSections(
+        [...exam.sections]
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((section) => ({
+            id: section.id,
+            name: section.name,
+            description: section.description ?? "",
+            duration_minutes: section.duration_minutes,
+            marks_per_question: section.marks_per_question,
+            negative_marks: section.negative_marks,
+            rules: section.selection_rules?.rules ?? [],
+          })),
+      );
+      const shortfalls = result.rows.filter((r) => r.added < r.requested);
+      toast(
+        shortfalls.length
+          ? `${result.rows.length - shortfalls.length}/${result.rows.length} rows fully filled - some rows need more bank questions`
+          : `${result.rows.length} section(s) filled from the bank`,
+        shortfalls.length ? "amber" : "mint",
+      );
+      return result.rows;
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not apply the blueprint.", "rose");
+      return null;
     }
   }
 
@@ -875,34 +1158,47 @@ export default function CreateExamWizard() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/exams"
-              className="text-xs font-semibold text-ink-muted hover:text-ink transition-colors"
-            >
+      {/* Premium Header */}
+      <div className="relative overflow-hidden rounded-[18px] px-6 py-5"
+        style={{
+          background: category === "academic"
+            ? "linear-gradient(135deg, #f8f9ff 0%, #eef2ff 50%, #f5f3ff 100%)"
+            : "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #ede9fe 100%)",
+          border: `1px solid ${category === "academic" ? "rgba(99,102,241,0.15)" : "rgba(139,92,246,0.2)"}`,
+          boxShadow: "0 2px 16px -4px rgba(79,70,229,0.08), 0 1px 3px rgba(13,17,23,0.05)",
+        }}>
+        <div className="absolute -top-8 -right-8 h-40 w-40 rounded-full opacity-40"
+          style={{ background: `radial-gradient(circle, ${category === "academic" ? "rgba(99,102,241,0.15)" : "rgba(139,92,246,0.2)"} 0%, transparent 70%)` }} />
+        <div className="relative flex items-start justify-between gap-4">
+          <div>
+            <Link href="/dashboard/exams"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-accent transition-colors mb-2">
               ← Back to Exams
             </Link>
+            <h1 className="text-[22px] font-bold tracking-tight"
+              style={{ background: category === "academic" ? "linear-gradient(135deg, #1e1b4b, #4f46e5)" : "linear-gradient(135deg, #3b0764, #7c3aed)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Create Examination
+            </h1>
+            <p className="mt-1 text-[13px] text-ink-muted">
+              Configure examination mode, choose blueprint patterns, bind question pools, and set AI proctoring.
+            </p>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink mt-1">
-            Create Examination
-          </h1>
-          <p className="text-sm text-ink-muted">
-            Configure examination mode, choose blueprint patterns, bind question bank pools, and set AI proctoring.
-          </p>
+          <Badge tone={category === "academic" ? "accent" : "purple"} className="mt-1 shrink-0">
+            {category === "academic" ? "🎓 Academic Mode" : "💼 Corporate Mode"}
+          </Badge>
         </div>
-        <Badge tone={category === "academic" ? "accent" : "purple"}>
-          {category === "academic" ? "🎓 Academic Mode" : "💼 Corporate Mode"}
-        </Badge>
       </div>
 
       {/* Published. The wizard stops being a form and becomes a receipt. */}
       {published && (
-        <Card className="space-y-4 border-mint/50 bg-mint-soft/20">
+        <div className="overflow-hidden rounded-[18px] border border-green/20 shadow-[var(--shadow-lift)]"
+          style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #f0fdf4 100%)" }}>
+          {/* Green top bar */}
+          <div className="h-[3px] bg-gradient-to-r from-green via-emerald-400 to-teal-400" />
+          <div className="space-y-4 p-6">
           <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-mint text-[16px] text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[18px] text-white shadow-[0_4px_12px_-2px_rgba(22,163,74,0.4)]"
+              style={{ background: "linear-gradient(135deg, #16a34a, #22c55e)" }}>
               ✓
             </span>
             <div>
@@ -957,48 +1253,68 @@ export default function CreateExamWizard() {
               </Button>
             </Link>
           </div>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Stepper Wizard Bar */}
-      <div className="flex items-center justify-between rounded-xl border border-line bg-surface p-2 shadow-sm">
-        {[
-          { num: 1, label: "Category" },
-          { num: 2, label: "Pattern" },
-          { num: 3, label: "Details" },
-          { num: 4, label: "Sections" },
-          { num: 5, label: "Question Pool" },
-          { num: 6, label: "Candidates" },
-          { num: 7, label: "Review & Publish" },
-        ].map((s) => (
-          <button
-            key={s.num}
-            type="button"
-            onClick={() => setStep(s.num)}
-            className={cx(
-              "flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium transition-all",
-              step === s.num
-                ? "bg-accent text-white shadow-sm font-semibold"
-                : step > s.num
-                ? "text-accent hover:bg-accent-soft/30"
-                : "text-ink-muted hover:text-ink hover:bg-surface-elevated"
-            )}
-          >
-            <span
-              className={cx(
-                "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold",
-                step === s.num
-                  ? "bg-white text-accent"
-                  : step > s.num
-                  ? "bg-accent-soft text-accent"
-                  : "bg-line text-ink-muted"
-              )}
-            >
-              {step > s.num ? "✓" : s.num}
-            </span>
-            <span className="hidden sm:inline">{s.label}</span>
-          </button>
-        ))}
+      {/* Premium Stepper Bar */}
+      <div className="overflow-hidden rounded-[16px] border border-line bg-surface shadow-[var(--shadow-card)]">
+        {/* Progress line */}
+        <div className="h-1 bg-sunken">
+          <div
+            className="h-full bg-gradient-to-r from-accent to-indigo-400 transition-all duration-500"
+            style={{ width: `${((step - 1) / 6) * 100}%` }}
+          />
+        </div>
+        <div className="flex items-stretch divide-x divide-line">
+          {[
+            { num: 1, label: "Category", short: "Cat" },
+            { num: 2, label: "Pattern", short: "Pat" },
+            { num: 3, label: "Details", short: "Det" },
+            { num: 4, label: "Sections", short: "Sec" },
+            { num: 5, label: "Pool", short: "Pool" },
+            { num: 6, label: "Candidates", short: "Cand" },
+            { num: 7, label: "Review & Publish", short: "Pub" },
+          ].map((s) => {
+            const isDone = step > s.num;
+            const isActive = step === s.num;
+            return (
+              <button
+                key={s.num}
+                type="button"
+                onClick={() => setStep(s.num)}
+                className={cx(
+                  "flex flex-1 flex-col items-center gap-1 px-1 py-3 text-center transition-all duration-200",
+                  isActive ? "bg-accent/5" : isDone ? "hover:bg-sunken" : "hover:bg-sunken"
+                )}
+              >
+                <span
+                  className={cx(
+                    "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-200",
+                    isActive
+                      ? "bg-gradient-to-br from-accent to-indigo-500 text-white shadow-[0_2px_8px_-2px_rgba(79,70,229,0.5)]"
+                      : isDone
+                        ? "bg-green text-white"
+                        : "bg-line text-ink-muted"
+                  )}
+                >
+                  {isDone ? "✓" : s.num}
+                </span>
+                <span
+                  className={cx(
+                    "hidden text-[11px] font-semibold sm:block",
+                    isActive ? "text-accent" : isDone ? "text-green" : "text-ink-muted"
+                  )}
+                >
+                  {s.label}
+                </span>
+                <span className={cx("text-[10px] font-semibold sm:hidden", isActive ? "text-accent" : isDone ? "text-green" : "text-ink-muted")}>
+                  {s.short}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* STEP 1: EXAM CATEGORY */}
@@ -1132,6 +1448,75 @@ export default function CreateExamWizard() {
             })}
           </div>
 
+          {/* ------------------------------------ write questions without waiting */}
+          <Card className="space-y-4 border-line">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-ink">
+                  Already know the questions? Write them now
+                </h3>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  Type the question, its options, and tick the correct answer. Saved to
+                  your Question Bank and added to this exam&apos;s pool at step 5.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={authoringEarly ? "secondary" : "primary"}
+                onClick={() => setAuthoringEarly((open) => !open)}
+              >
+                {authoringEarly ? "Close editor" : "+ Add a question"}
+              </Button>
+            </div>
+
+            {earlyQuestions.length > 0 && (
+              <ul className="space-y-2 rounded-lg border border-line bg-sunken/40 p-3">
+                {earlyQuestions.map((q, idx) => {
+                  const answer = answerKeySummary(q);
+                  return (
+                    <li key={q.id} className="flex items-start gap-2 text-xs">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent-soft text-[10px] font-bold text-accent">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-ink">{q.body}</p>
+                        <p className="mt-0.5 text-ink-muted">
+                          {TYPE_LABEL[q.question_type]} · {q.marks} mark
+                          {q.marks === 1 ? "" : "s"} · Answer:{" "}
+                          <span className="font-semibold text-ink">{answer}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEarlyQuestions((prev) => prev.filter((p) => p.id !== q.id))
+                        }
+                        className="shrink-0 text-[11px] font-semibold text-rose-500 hover:text-rose-700"
+                        title="Leave it in the bank, but do not put it in this exam"
+                      >
+                        Not in this exam
+                      </button>
+                    </li>
+                  );
+                })}
+                <li className="pt-1 text-[11px] text-ink-muted">
+                  Correct answers stay on the server. Nothing here is ever sent to a
+                  candidate&apos;s browser.
+                </li>
+              </ul>
+            )}
+
+            {authoringEarly && (
+              <QuestionEditor
+                subjects={subjects}
+                lockedSubjectId={subjectId || undefined}
+                stayOpen
+                onSaved={(q) => setEarlyQuestions((prev) => [...prev, q])}
+                onCancel={() => setAuthoringEarly(false)}
+              />
+            )}
+          </Card>
+
           <div className="flex justify-between pt-4">
             <Button variant="secondary" onClick={() => setStep(1)}>
               ← Back to Category
@@ -1173,16 +1558,12 @@ export default function CreateExamWizard() {
             </Field>
 
             <Field label="Primary Subject" required>
-              <Select
+              <SubjectCombobox
+                subjects={subjects}
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-              >
-                {subjects.map((sub) => (
-                  <option key={sub.id} value={sub.id}>
-                    {sub.code} — {sub.name}
-                  </option>
-                ))}
-              </Select>
+                onChange={setSubjectId}
+                onCreated={(subject) => setSubjects((prev) => [...prev, subject])}
+              />
             </Field>
           </div>
 
@@ -1578,6 +1959,90 @@ export default function CreateExamWizard() {
                           <option value="hard">Hard</option>
                         </select>
 
+                        <span className="text-ink-muted">category</span>
+                        <select
+                          value={rule.category ?? ""}
+                          onChange={(e) => {
+                            const val = (e.target.value || null) as QuestionCategory | null;
+                            setSections((prev) =>
+                              prev.map((s, sI) =>
+                                sI === sIdx
+                                  ? {
+                                      ...s,
+                                      rules: s.rules.map((r, rI) =>
+                                        rI === rIdx ? { ...r, category: val } : r
+                                      ),
+                                    }
+                                  : s
+                              )
+                            );
+                          }}
+                          className="rounded border border-line bg-surface px-2 py-1 text-xs"
+                        >
+                          <option value="">Any category</option>
+                          {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((c) => (
+                            <option key={c} value={c}>
+                              {CATEGORY_LABEL[c]}
+                            </option>
+                          ))}
+                        </select>
+
+                        <span className="text-ink-muted">subject</span>
+                        <select
+                          value={rule.topic ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value || null;
+                            setSections((prev) =>
+                              prev.map((s, sI) =>
+                                sI === sIdx
+                                  ? {
+                                      ...s,
+                                      rules: s.rules.map((r, rI) =>
+                                        rI === rIdx ? { ...r, topic: val } : r
+                                      ),
+                                    }
+                                  : s
+                              )
+                            );
+                          }}
+                          className="max-w-[160px] rounded border border-line bg-surface px-2 py-1 text-xs"
+                        >
+                          <option value="">Any subject</option>
+                          {subjects.map((sub) => (
+                            <option key={sub.id} value={sub.name}>
+                              {sub.name}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Write a question this rule can actually draw. */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRuleSeeded(false);
+                            setExampleOpen(null);
+                            setRuleAuthor((cur) =>
+                              cur && cur.s === sIdx && cur.r === rIdx ? null : { s: sIdx, r: rIdx },
+                            );
+                          }}
+                          className="rounded border border-accent/40 bg-accent-soft/30 px-2 py-1 text-[11px] font-semibold text-accent hover:bg-accent-soft/60"
+                        >
+                          {ruleAuthor?.s === sIdx && ruleAuthor?.r === rIdx
+                            ? "Close editor"
+                            : "+ Write one"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const key = `${sIdx}:${rIdx}`;
+                            setExampleOpen((cur) => (cur === key ? null : key));
+                          }}
+                          className="rounded border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-ink-muted hover:text-ink"
+                        >
+                          {exampleOpen === `${sIdx}:${rIdx}` ? "Hide example" : "See example"}
+                        </button>
+
                         {sec.rules.length > 1 && (
                           <button
                             type="button"
@@ -1597,7 +2062,160 @@ export default function CreateExamWizard() {
                         )}
                       </div>
                     ))}
+
+                    {/* ------ the worked example for the rule being looked at ------ */}
+                    {exampleOpen?.startsWith(`${sIdx}:`) &&
+                      (() => {
+                        const rIdx = Number(exampleOpen.split(":")[1]);
+                        const rule = sec.rules[rIdx];
+                        if (!rule) return null;
+                        return (
+                          <ExampleCard
+                            type={rule.question_type}
+                            onUse={() => {
+                              setRuleSeeded(true);
+                              setRuleAuthor({ s: sIdx, r: rIdx });
+                              setExampleOpen(null);
+                            }}
+                          />
+                        );
+                      })()}
+
+                    {/* ------ authoring, pre-set to the rule that will draw it ------ */}
+                    {ruleAuthor?.s === sIdx &&
+                      (() => {
+                        const rule = sec.rules[ruleAuthor.r];
+                        if (!rule) return null;
+                        return (
+                          <div className="rounded-lg border border-accent/30 bg-accent-soft/10 p-3">
+                            <p className="mb-3 text-[11.5px] text-ink-muted">
+                              Writing for{" "}
+                              <span className="font-semibold text-ink">{sec.name}</span> ·{" "}
+                              rule {ruleAuthor.r + 1}. Type and difficulty are pre-set to{" "}
+                              <span className="font-semibold text-ink">
+                                {TYPE_LABEL[rule.question_type]}
+                              </span>
+                              {rule.difficulty ? ` / ${rule.difficulty}` : ""} so this rule
+                              can draw it. Change either and the rule will skip it.
+                              {ruleSeeded && " Started from the worked example — rewrite it."}
+                            </p>
+                            <QuestionEditor
+                              key={`${sIdx}:${ruleAuthor.r}:${ruleSeeded}`}
+                              subjects={subjects}
+                              examId={examId ?? undefined}
+                              lockedSubjectId={subjectId || undefined}
+                              initialType={rule.question_type}
+                              initialDifficulty={rule.difficulty ?? undefined}
+                              seed={ruleSeeded ? exampleFor(rule.question_type) : null}
+                              stayOpen
+                              onSaved={(q) => {
+                                // Written for this section, so it belongs to this
+                                // section - not dropped into the shared pool for any
+                                // rule to pick up.
+                                if (examId && sections[sIdx]?.id) void pinToSection(sIdx, q.id);
+                                else if (examId) void refreshPool(examId);
+                                else setEarlyQuestions((prev) => [...prev, q]);
+                              }}
+                              onCancel={() => setRuleAuthor(null)}
+                            />
+                          </div>
+                        );
+                      })()}
                   </div>
+
+                  {/* --------- questions chosen for THIS section, not the exam --------- */}
+                  {(() => {
+                    const mine = sections[sIdx]?.id
+                      ? (pool?.entries ?? []).filter((e) => e.section_id === sections[sIdx].id)
+                      : [];
+                    const needed = sec.rules.reduce((sum, r) => sum + r.count, 0);
+
+                    return (
+                      <div className="space-y-3 border-t border-line/60 pt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="text-xs font-bold text-ink">
+                              Questions chosen for this section
+                            </span>
+                            <p className="mt-0.5 text-[11px] text-ink-muted">
+                              {mine.length} chosen of {needed} this section draws. The rest
+                              are drawn at random from the shared pool.
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={bankForSection === sIdx ? "secondary" : "primary"}
+                            loading={pinning && bankForSection === sIdx}
+                            onClick={() => {
+                              setRuleAuthor(null);
+                              setExampleOpen(null);
+                              setBankForSection((cur) => (cur === sIdx ? null : sIdx));
+                            }}
+                          >
+                            {bankForSection === sIdx ? "Close bank" : "Pick from Question Bank"}
+                          </Button>
+                        </div>
+
+                        {mine.length > 0 && (
+                          <ul className="space-y-1.5">
+                            {mine.map((entry, i) => (
+                              <li
+                                key={entry.question_id}
+                                className="flex items-start gap-2 rounded-lg border border-line bg-sunken/40 p-2 text-xs"
+                              >
+                                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent-soft text-[10px] font-bold text-accent">
+                                  {i + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-medium text-ink">{entry.body}</p>
+                                  <p className="mt-0.5 text-ink-muted">
+                                    {TYPE_LABEL[entry.question_type]} · {entry.difficulty} ·{" "}
+                                    {entry.effective_marks} mark
+                                    {entry.effective_marks === 1 ? "" : "s"}
+                                    {!entry.has_answer_key && (
+                                      <span className="ml-1 font-semibold text-amber">
+                                        · no answer key
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void unpinFromSection(entry.question_id)}
+                                  className="shrink-0 text-[11px] font-semibold text-ink-muted hover:text-ink"
+                                  title="Keep it in the exam, but let any section draw it"
+                                >
+                                  Unpin
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {bankForSection === sIdx && (
+                          <div className="rounded-lg border border-line bg-surface p-3">
+                            <Alert tone="accent">
+                              Anything you add here is chosen <strong>for {sec.name}</strong>:
+                              this section draws it first, and no other section can. It still
+                              has to match one of this section&apos;s rules — the Question Bank
+                              is your reusable library, the pool is what this exam may draw
+                              from.
+                            </Alert>
+                            <div className="mt-3">
+                              <QuestionBankSelector
+                                subjects={subjects}
+                                subjectId={subjectId || undefined}
+                                alreadyIn={(pool?.entries ?? []).map((e) => e.question_id)}
+                                onAdd={(ids) => addToSection(sIdx, ids)}
+                                currentUserId={user?.id}
+                                isAdmin={user?.role === "admin"}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </Card>
               ))}
             </div>
@@ -1649,6 +2267,67 @@ export default function CreateExamWizard() {
             </Alert>
           ) : (
             <>
+              {/* guided vs advanced */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-line bg-sunken/40 px-3 py-2">
+                <p className="text-[12.5px] text-ink-muted">
+                  {guidedMode
+                    ? "Guided: one section at a time, filtered to exactly its subject, type and difficulty."
+                    : "Advanced: write, browse, AI-generate or import freely into the shared pool."}
+                </p>
+                <Button size="sm" variant="secondary" onClick={() => setGuidedMode((v) => !v)}>
+                  {guidedMode ? "Switch to Advanced editor" : "Switch to Guided Selection"}
+                </Button>
+              </div>
+
+              {guidedMode && (
+                <GuidedSectionPicker
+                  sections={sections}
+                  subjects={subjects}
+                  examSubjectId={subjectId}
+                  pool={pool}
+                  onAdd={addToSection}
+                  onRemove={unpinAndRemove}
+                  onWriteOne={(sIdx, rIdx) => setRuleAuthor({ s: sIdx, r: rIdx })}
+                  onAllComplete={setGuidedComplete}
+                  reloadToken={guidedReloadToken}
+                />
+              )}
+
+              {ruleAuthor && guidedMode && (
+                <Modal open onClose={() => setRuleAuthor(null)} title="Write a matching question" size="lg">
+                  {(() => {
+                    const rule = sections[ruleAuthor.s]?.rules[ruleAuthor.r];
+                    if (!rule) return null;
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-[12px] text-ink-muted">
+                          Type and difficulty are pre-set to{" "}
+                          <span className="font-semibold text-ink">{TYPE_LABEL[rule.question_type]}</span>
+                          {rule.difficulty ? ` / ${rule.difficulty}` : ""} so this section can use it.
+                        </p>
+                        <QuestionEditor
+                          subjects={subjects}
+                          examId={examId ?? undefined}
+                          lockedSubjectId={subjectId || undefined}
+                          initialType={rule.question_type}
+                          initialDifficulty={rule.difficulty ?? undefined}
+                          stayOpen
+                          onSaved={async (q) => {
+                            if (examId && sections[ruleAuthor.s]?.id) await pinToSection(ruleAuthor.s, q.id);
+                            else if (examId) await refreshPool(examId);
+                            setGuidedReloadToken((t) => t + 1);
+                            setRuleAuthor(null);
+                          }}
+                          onCancel={() => setRuleAuthor(null)}
+                        />
+                      </div>
+                    );
+                  })()}
+                </Modal>
+              )}
+
+              {!guidedMode && (
+              <>
               {/* the four sources */}
               <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
                 {(
@@ -1657,6 +2336,7 @@ export default function CreateExamWizard() {
                     { key: "bank", label: "Question Bank" },
                     { key: "ai", label: "AI Generate" },
                     { key: "import", label: "Import Questions" },
+                    { key: "blueprint", label: "Blueprint" },
                   ] as { key: typeof poolTab; label: string }[]
                 ).map((tab) => (
                   <button
@@ -1716,7 +2396,13 @@ export default function CreateExamWizard() {
                     onImported={() => void refreshPool(examId)}
                   />
                 )}
+
+                {poolTab === "blueprint" && (
+                  <BlueprintBuilder subjects={subjects} onApply={applyBlueprint} />
+                )}
               </Card>
+              </>
+              )}
 
               {/* the pool itself */}
               <div>
@@ -1725,6 +2411,16 @@ export default function CreateExamWizard() {
                   <Badge tone="neutral">
                     {pool?.stats.total_questions ?? 0} / {pool?.required_count ?? 0} needed
                   </Badge>
+                  {!randomize && (pool?.entries.length ?? 0) > 1 && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      loading={shufflingPool}
+                      onClick={() => void shufflePool()}
+                    >
+                      🔀 Shuffle order
+                    </Button>
+                  )}
                 </div>
                 <QuestionPool
                   pool={pool}
@@ -1767,11 +2463,23 @@ export default function CreateExamWizard() {
             </>
           )}
 
+          {guidedMode && !guidedComplete && (
+            <Alert tone="amber">
+              Every section still needs its exact question count selected before you can
+              continue.
+            </Alert>
+          )}
+
           <div className="flex justify-between pt-4 border-t border-line">
             <Button variant="secondary" onClick={() => setStep(4)}>
               ← Back to Sections
             </Button>
-            <Button onClick={() => setStep(6)}>Next: Assign Candidates →</Button>
+            <Button
+              onClick={() => setStep(6)}
+              disabled={guidedMode ? !guidedComplete : !pool?.can_publish}
+            >
+              Next: Assign Candidates →
+            </Button>
           </div>
         </div>
       )}
@@ -1816,14 +2524,14 @@ export default function CreateExamWizard() {
               <Toggle
                 checked={randomize}
                 onChange={setRandomize}
-                title="Unique paper per candidate"
-                body="Each paper is drawn deterministically from the pool, so two candidates rarely see the same set."
+                title="Randomize question order"
+                body="Every candidate gets the same questions in a different order — the count never changes, and a question never leaves its section."
               />
               <Toggle
                 checked={shuffleOptions}
                 onChange={setShuffleOptions}
-                title="Shuffle options"
-                body="Option order differs per candidate, so &quot;the answer is C&quot; is not shareable."
+                title="Randomize answer options"
+                body="A separate setting. Shuffles A/B/C/D within each choice question, so &quot;the answer is C&quot; is not shareable. Off by default."
               />
             </div>
 
@@ -1978,13 +2686,17 @@ export default function CreateExamWizard() {
             {(
               [
                 { key: "summary", label: "Summary & validation" },
+                { key: "full", label: "📋 Question Paper Preview" },
                 { key: "paper", label: "Preview the candidate's paper" },
               ] as { key: typeof reviewTab; label: string }[]
             ).map((tab) => (
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setReviewTab(tab.key)}
+                onClick={() => {
+                  setReviewTab(tab.key);
+                  if (tab.key === "full") setPaperPreviewed(true);
+                }}
                 className={cx(
                   "flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold transition-all",
                   reviewTab === tab.key
@@ -1996,6 +2708,23 @@ export default function CreateExamWizard() {
               </button>
             ))}
           </div>
+
+          {reviewTab === "full" && (
+            <ExaminerPaperPreview
+              examId={examId}
+              examTitle={title}
+              category={category}
+              subjectName={subjects.find((s) => s.id === subjectId)?.name ?? null}
+              department={department || null}
+              semester={semester || null}
+              companyName={companyName || null}
+              jobRole={jobRole || null}
+              durationMinutes={durationMinutes}
+              instructions={instructions}
+              sections={sections}
+              pool={pool}
+            />
+          )}
 
           {reviewTab === "paper" && (
             <PaperPreview
@@ -2009,7 +2738,7 @@ export default function CreateExamWizard() {
           <Card
             className={cx(
               "space-y-4 border-accent/40 bg-accent-soft/5",
-              reviewTab === "paper" && "hidden"
+              reviewTab !== "summary" && "hidden"
             )}
           >
             <h2 className="text-base font-bold text-ink">Review before publishing</h2>
@@ -2052,41 +2781,77 @@ export default function CreateExamWizard() {
               <Summary label="Status" value={examId ? "Draft saved" : "Not saved yet"} />
             </dl>
 
-            <ValidationChecklist
-              items={[
-                { label: "Required details completed", ok: Boolean(title.trim() && subjectId) },
-                {
-                  label: "Exam window is valid and fits the duration",
-                  ok: configurationProblems().every((problem) => !problem.includes("window")),
-                },
-                { label: "At least one section with rules", ok: sections.length > 0 },
-                {
-                  label: "Enough questions in the pool for every rule",
-                  ok: Boolean(pool?.can_publish),
-                  detail: pool?.problems.join(" "),
-                },
-                {
-                  label: "Every pooled question has an answer key or model answer",
-                  ok: (pool?.entries ?? []).every((entry) => entry.has_answer_key),
-                  detail: (pool?.entries ?? []).some((entry) => !entry.has_answer_key)
-                    ? "Some pooled questions have nothing to grade against."
-                    : undefined,
-                },
-                {
-                  label: "Proctoring thresholds are consistent",
-                  ok: terminateOnScore > flagOnScore,
-                  detail: "The score that ends a sitting must be above the one that flags it.",
-                },
-                {
-                  // A warning, not a blocker: an exam can legitimately be published
-                  // before its cohort is known, and candidates can be added later.
-                  label: "Candidates assigned",
-                  ok: assignedCount > 0,
-                  detail:
-                    "Nobody is assigned yet, so nobody will see this exam. You can assign them after publishing.",
-                },
-              ]}
-            />
+            {(() => {
+              const seen = new Set<string>();
+              const duplicateIds = new Set<string>();
+              for (const e of pool?.entries ?? []) {
+                if (seen.has(e.question_id)) duplicateIds.add(e.question_id);
+                seen.add(e.question_id);
+              }
+              const sectionMismatch = (pool?.entries ?? []).some((e) => {
+                if (!e.section_id) return false;
+                const sec = sections.find((s) => s.id === e.section_id);
+                if (!sec) return false;
+                return !sec.rules.some(
+                  (r) => r.question_type === e.question_type && (!r.difficulty || r.difficulty === e.difficulty),
+                );
+              });
+              const readyToPublish = canPublish();
+
+              return (
+                <ValidationChecklist
+                  items={[
+                    { label: "Required details completed", ok: Boolean(title.trim() && subjectId) },
+                    {
+                      label: "Exam window is valid and fits the duration",
+                      ok: configurationProblems().every((problem) => !problem.includes("window")),
+                    },
+                    { label: "At least one section with rules", ok: sections.length > 0 },
+                    {
+                      label: "Enough questions in the pool for every rule",
+                      ok: Boolean(pool?.can_publish),
+                      detail: pool?.problems.join(" "),
+                    },
+                    {
+                      label: "Every pooled question has an answer key or model answer",
+                      ok: (pool?.entries ?? []).every((entry) => entry.has_answer_key),
+                      detail: (pool?.entries ?? []).some((entry) => !entry.has_answer_key)
+                        ? "Some pooled questions have nothing to grade against."
+                        : undefined,
+                    },
+                    {
+                      label: "No duplicate questions in the pool",
+                      ok: duplicateIds.size === 0,
+                      detail: duplicateIds.size ? `${duplicateIds.size} question(s) appear more than once.` : undefined,
+                    },
+                    {
+                      label: "Every selected question matches its section's subject, type and difficulty",
+                      ok: !sectionMismatch,
+                    },
+                    {
+                      label: "Question Paper Preview reviewed",
+                      ok: paperPreviewed,
+                      detail: paperPreviewed
+                        ? undefined
+                        : 'Open the "Question Paper Preview" tab above before publishing.',
+                    },
+                    {
+                      label: "Proctoring thresholds are consistent",
+                      ok: terminateOnScore > flagOnScore,
+                      detail: "The score that ends a sitting must be above the one that flags it.",
+                    },
+                    {
+                      // A warning, not a blocker: an exam can legitimately be published
+                      // before its cohort is known, and candidates can be added later.
+                      label: "Candidates assigned",
+                      ok: assignedCount > 0,
+                      detail:
+                        "Nobody is assigned yet, so nobody will see this exam. You can assign them after publishing.",
+                    },
+                  ]}
+                />
+              );
+            })()}
           </Card>
 
           <div className="flex flex-wrap justify-between gap-3 pt-4">
@@ -2098,8 +2863,8 @@ export default function CreateExamWizard() {
                 Save draft
               </Button>
               <Button
-                onClick={() => void publishExam()}
-                disabled={submitting || !pool?.can_publish}
+                onClick={() => setShowPublishConfirm(true)}
+                disabled={submitting || !canPublish()}
                 loading={submitting}
               >
                 Publish exam
@@ -2113,6 +2878,45 @@ export default function CreateExamWizard() {
                 ? pool.problems.join(" ")
                 : "Build the question pool first — an exam with no questions cannot be sat."}
             </Alert>
+          )}
+          {pool?.can_publish && !paperPreviewed && (
+            <Alert tone="amber" title="Review the paper first">
+              Open the &quot;Question Paper Preview&quot; tab above and check the exam
+              exactly as it will appear to candidates before publishing.
+            </Alert>
+          )}
+
+          {showPublishConfirm && (
+            <Modal open onClose={() => setShowPublishConfirm(false)} title="Publish this exam?">
+              <div className="space-y-4">
+                <dl className="grid grid-cols-2 gap-3 text-[13px]">
+                  <Summary label="Exam name" value={title || "Untitled"} />
+                  <Summary label="Total questions" value={String(pool?.stats.total_questions ?? 0)} />
+                  <Summary label="Total marks" value={String(pool?.stats.total_marks ?? 0)} />
+                  <Summary label="Duration" value={`${durationMinutes} minutes`} />
+                  <Summary label="Sections" value={String(sections.length)} />
+                  <Summary label="Candidates assigned" value={String(assignedCount)} />
+                </dl>
+                <Alert tone="accent">
+                  Once published and a candidate has started, the question assignment can
+                  no longer change.
+                </Alert>
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" onClick={() => setShowPublishConfirm(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    loading={submitting}
+                    onClick={async () => {
+                      setShowPublishConfirm(false);
+                      await publishExam();
+                    }}
+                  >
+                    Publish Exam
+                  </Button>
+                </div>
+              </div>
+            </Modal>
           )}
         </div>
       )}
@@ -2167,6 +2971,78 @@ function Toggle({
       </span>
     </label>
   );
+}
+
+/**
+ * A worked example of one question type, shown beside the rule that would draw it.
+ *
+ * Read-only on purpose. "Use this as a starting point" seeds a new question the examiner
+ * then rewrites — it never saves the example itself, because an exam full of the sample
+ * questions is worse than an empty one.
+ */
+function ExampleCard({ type, onUse }: { type: QuestionType; onUse: () => void }) {
+  const ex = exampleFor(type);
+  const key = answerKeySummary({ ...ex, options: ex.options ?? [] } as Question);
+
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <Badge tone="neutral">Example · {TYPE_LABEL[type]}</Badge>
+        <Button size="sm" variant="secondary" onClick={onUse}>
+          Use this as a starting point
+        </Button>
+      </div>
+
+      <p className="text-[11.5px] italic text-ink-muted">{ex.note}</p>
+
+      <p className="mt-2 whitespace-pre-wrap text-[13px] font-medium text-ink">{ex.body}</p>
+
+      {ex.options && ex.options.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {ex.options.map((o, i) => (
+            <li
+              key={i}
+              className={cx(
+                "flex items-center gap-2 rounded px-2 py-1 text-xs",
+                o.is_correct ? "bg-mint/10 font-semibold text-ink" : "text-ink-soft",
+              )}
+            >
+              <span className="text-ink-muted">{String.fromCharCode(65 + i)}.</span>
+              <span>{o.text}</span>
+              {o.is_correct && <span className="ml-auto text-[10px] text-mint">correct</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="mt-2 text-[11.5px] text-ink-muted">
+        Answer key: <span className="font-semibold text-ink">{key}</span> · {ex.marks ?? 0} mark
+        {ex.marks === 1 ? "" : "s"}
+        <span className="ml-1">— examiner only, never sent to a candidate.</span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * One line describing where a question's marks come from.
+ *
+ * Examiner-side only, and deliberately so: this reads the answer key the examiner just
+ * typed back to them for confirmation. The candidate's paper API strips all of it.
+ */
+function answerKeySummary(q: Question): string {
+  const ticked = q.options.filter((o) => o.is_correct).map((o) => o.text);
+  if (ticked.length) return ticked.join(", ");
+
+  const spec = q.spec;
+  if (q.question_type === "numerical" && spec && "answer" in spec) {
+    return spec.unit ? `${spec.answer} ${spec.unit}` : String(spec.answer);
+  }
+  if (q.question_type === "fill_blank" && spec && "accepted_answers" in spec) {
+    return spec.accepted_answers.join(" / ");
+  }
+  if (q.model_answer) return "Model answer set";
+  return "Marked by an examiner";
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

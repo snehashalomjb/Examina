@@ -425,6 +425,71 @@ class TestAccessGate:
         assert response.status_code == 400
 
 
+class TestAdminPasswordReset:
+    def test_admin_resets_an_examiners_password(self, client, db):
+        admin = make_user(db, role=UserRole.ADMIN)
+        examiner = make_user(db, role=UserRole.EXAMINER, access=AccessStatus.APPROVED)
+
+        response = client.post(
+            f"/api/v1/admin/users/{examiner.id}/reset-password",
+            headers=auth_headers(client, admin),
+            json={"new_password": "NewPass1word"},
+        )
+        assert response.status_code == 200, response.text
+
+        # The old password no longer works...
+        old_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": examiner.email, "password": TEST_PASSWORD},
+        )
+        assert old_login.status_code == 401
+
+        # ...and the new one does.
+        new_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": examiner.email, "password": "NewPass1word"},
+        )
+        assert new_login.status_code == 200, new_login.text
+
+    def test_a_weak_password_is_rejected(self, client, db):
+        admin = make_user(db, role=UserRole.ADMIN)
+        examiner = make_user(db, role=UserRole.EXAMINER, access=AccessStatus.APPROVED)
+        response = client.post(
+            f"/api/v1/admin/users/{examiner.id}/reset-password",
+            headers=auth_headers(client, admin),
+            json={"new_password": "alllettersnodigits"},
+        )
+        assert response.status_code == 422
+
+    def test_an_admin_cannot_reset_their_own_password_this_way(self, client, db):
+        admin = make_user(db, role=UserRole.ADMIN)
+        response = client.post(
+            f"/api/v1/admin/users/{admin.id}/reset-password",
+            headers=auth_headers(client, admin),
+            json={"new_password": "NewPass1word"},
+        )
+        assert response.status_code == 400
+
+    def test_an_examiner_cannot_reset_anyones_password(self, client, db):
+        examiner = make_user(db, role=UserRole.EXAMINER, access=AccessStatus.APPROVED)
+        candidate = make_user(db, role=UserRole.CANDIDATE)
+        response = client.post(
+            f"/api/v1/admin/users/{candidate.id}/reset-password",
+            headers=auth_headers(client, examiner),
+            json={"new_password": "NewPass1word"},
+        )
+        assert response.status_code == 403
+
+    def test_an_unknown_user_is_404(self, client, db):
+        admin = make_user(db, role=UserRole.ADMIN)
+        response = client.post(
+            "/api/v1/admin/users/00000000-0000-0000-0000-000000000000/reset-password",
+            headers=auth_headers(client, admin),
+            json={"new_password": "NewPass1word"},
+        )
+        assert response.status_code == 404
+
+
 class TestExamSessionToken:
     def test_token_round_trips(self):
         from datetime import UTC, datetime, timedelta

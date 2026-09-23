@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import { Avatar } from "@/components/Avatar";
@@ -23,12 +24,8 @@ import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type { LoginAccessStatus, LoginRequestRow } from "@/lib/types";
 
-const TABS: { key: LoginAccessStatus | "all"; label: string }[] = [
-  { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
-  { key: "rejected", label: "Rejected" },
-  { key: "all", label: "All" },
-];
+// Tab labels are loaded dynamically from translations
+const TAB_KEYS = ["pending", "approved", "rejected", "all"] as const;
 
 const TONE: Record<LoginAccessStatus, "amber" | "mint" | "rose"> = {
   pending: "amber",
@@ -45,6 +42,7 @@ const TONE: Record<LoginAccessStatus, "amber" | "mint" | "rose"> = {
  * on each row so the basis for deciding is never a mystery.
  */
 export default function LoginRequestsPage() {
+  const t = useTranslations("dashboard-detail");
   const { user } = useRequireAuth(["admin", "examiner"]);
   const [rows, setRows] = useState<LoginRequestRow[]>([]);
   const [tab, setTab] = useState<LoginAccessStatus | "all">("pending");
@@ -97,11 +95,11 @@ export default function LoginRequestsPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Candidate login requests"
+        title={t("hero_login_requests")}
         body={
           user.role === "admin"
-            ? "Every candidate who has tried to sign in. Their account is already active — what you are deciding is whether they may use the platform."
-            : "Candidates enrolled in your examinations. You can decide access for them; candidates outside your papers are an administrator's call."
+            ? t("body_login_requests_admin")
+            : t("body_login_requests_examiner")
         }
       />
 
@@ -110,22 +108,22 @@ export default function LoginRequestsPage() {
       <Card padded={false} className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
           <div className="inline-flex rounded-[10px] border border-line bg-sunken p-1">
-            {TABS.map((item) => (
+            {TAB_KEYS.map((key) => (
               <button
-                key={item.key}
+                key={key}
                 type="button"
                 onClick={() => {
                   setLoading(true);
-                  setTab(item.key);
+                  setTab(key);
                 }}
                 className={cx(
                   "rounded-[7px] px-3 py-1.5 text-[12.5px] font-medium transition",
-                  tab === item.key
+                  tab === key
                     ? "bg-surface text-ink shadow-[var(--shadow-soft)]"
                     : "text-ink-muted hover:text-ink",
                 )}
               >
-                {item.label}
+                {t(`tab_${key}`)}
               </button>
             ))}
           </div>
@@ -133,7 +131,7 @@ export default function LoginRequestsPage() {
           {tab === "pending" && pendingCount > 0 && (
             <Badge tone="amber">
               <IconHourglass size={12} />
-              {pendingCount} awaiting a decision
+              {t("badge_awaiting_decision", { count: pendingCount })}
             </Badge>
           )}
         </div>
@@ -147,11 +145,11 @@ export default function LoginRequestsPage() {
             </div>
           ) : rows.length === 0 ? (
             <EmptyState
-              title={tab === "pending" ? "Nothing waiting" : "Nothing here"}
+              title={tab === "pending" ? t("empty_nothing_waiting") : t("empty_nothing_here")}
               body={
                 user.role === "examiner"
-                  ? "Candidates appear once they are enrolled in one of your examinations and have tried to sign in."
-                  : "Candidate login requests will appear here as people register and sign in."
+                  ? t("empty_body_examiner")
+                  : t("empty_body_admin")
               }
             />
           ) : (
@@ -193,13 +191,13 @@ export default function LoginRequestsPage() {
                     </div>
 
                     <div className="w-full sm:w-auto sm:min-w-[260px]">
-                      <Field label="Note (optional)">
+                      <Field label={t("field_note_optional")}>
                         <Input
                           value={notes[row.id] ?? ""}
                           onChange={(e) =>
                             setNotes((current) => ({ ...current, [row.id]: e.target.value }))
                           }
-                          placeholder="Shown to the candidate"
+                          placeholder={t("placeholder_shown_to_candidate")}
                         />
                       </Field>
                       <div className="mt-2 flex justify-end gap-2">
@@ -210,7 +208,7 @@ export default function LoginRequestsPage() {
                             onClick={() => decide(row, true)}
                           >
                             <IconCheck size={14} />
-                            Approve
+                            {t("button_approve")}
                           </Button>
                         )}
                         {row.status !== "rejected" && (
@@ -221,7 +219,7 @@ export default function LoginRequestsPage() {
                             onClick={() => decide(row, false)}
                           >
                             <IconAlert size={14} />
-                            {row.status === "approved" ? "Revoke" : "Reject"}
+                            {row.status === "approved" ? t("button_revoke") : t("button_reject")}
                           </Button>
                         )}
                       </div>
@@ -235,20 +233,18 @@ export default function LoginRequestsPage() {
       </Card>
 
       <Card>
-        <SectionTitle title="How this works" hint="Two separate ideas, deliberately." />
+        <SectionTitle title={t("section_how_this_works")} hint={t("section_hint_two_separate_ideas")} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-[11px] border border-line p-4">
-            <p className="text-[13px] font-semibold text-ink">Account</p>
+            <p className="text-[13px] font-semibold text-ink">{t("label_account")}</p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">
-              Created active the moment a candidate registers. Registration is open and
-              needs nobody&apos;s approval.
+              {t("text_account_description")}
             </p>
           </div>
           <div className="rounded-[11px] border border-line p-4">
-            <p className="text-[13px] font-semibold text-ink">Login access</p>
+            <p className="text-[13px] font-semibold text-ink">{t("label_login_access")}</p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">
-              Requested automatically at their first sign-in and decided here. Approved
-              once, it stays approved for every later login unless it is revoked.
+              {t("text_login_access_description")}
             </p>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -21,6 +22,18 @@ import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type { Exam, RankingRow, ShortlistStatus } from "@/lib/types";
 
+/** Mirrors the server's publish gate (grading.py): finished, ungraded work cleared,
+ * proctoring ruled on if flagged, not already published. */
+function canPublish(row: RankingRow): boolean {
+  return (
+    Boolean(row.session_id) &&
+    !row.published &&
+    row.pending_review_count === 0 &&
+    !row.needs_integrity_review &&
+    row.integrity_verdict !== "malpractice"
+  );
+}
+
 const SHORTLIST_LABEL: Record<ShortlistStatus, string> = {
   shortlisted: "Shortlisted",
   rejected: "Rejected",
@@ -34,6 +47,7 @@ const SHORTLIST_TONE: Record<ShortlistStatus, "mint" | "rose" | "amber"> = {
 };
 
 export default function RankingPage() {
+  const t = useTranslations("results");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const params = useParams<{ id: string }>();
   const examId = params.id;
@@ -44,6 +58,8 @@ export default function RankingPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !examId) return;
@@ -86,7 +102,48 @@ export default function RankingPage() {
     }
   }
 
+  async function publishOne(row: RankingRow) {
+    if (!row.session_id) return;
+    setPublishing(row.session_id);
+    try {
+      const response = await api.post<{ detail: string }>(
+        `/sessions/${row.session_id}/result/publish`,
+      );
+      toast(response.detail, "mint");
+      setRows((prev) =>
+        prev.map((r) => (r.session_id === row.session_id ? { ...r, published: true } : r)),
+      );
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not publish the result", "rose");
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  async function downloadReport(row: RankingRow) {
+    if (!row.result_id) return;
+    setDownloading(row.result_id);
+    try {
+      const safeName = row.full_name.replace(/\s+/g, "_");
+      await api.download(
+        `/results/${row.result_id}/pdf?simple=true`,
+        `report_${safeName}.pdf`,
+      );
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not download the report", "rose");
+    } finally {
+      setDownloading(null);
+    }
+  }
+
   if (!user) return null;
+
+  const topPerformer = rows.length > 0 ? rows[0] : null;
+
+  // Shortlisting is a hiring decision - meaningful for a corporate assessment, not for
+  // an academic paper. The scores, attempt counts and proctoring flags below are the
+  // same table for both; only the decide-and-shortlist column is corporate-only.
+  const isCorporate = exam?.exam_type === "corporate";
 
   const shortlisted = rows.filter((r) => r.shortlist_status === "shortlisted").length;
   const rejected = rows.filter((r) => r.shortlist_status === "rejected").length;
@@ -95,11 +152,11 @@ export default function RankingPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title={exam ? `Ranking — ${exam.title}` : "Candidate Ranking"}
+        title={exam ? `Results — ${exam.title}` : "Candidate Results"}
         body={
           exam?.company_name
             ? `${exam.company_name}${exam.job_role ? ` · ${exam.job_role}` : ""} — Corporate Assessment`
-            : "Corporate exam ranking with section-wise breakdown"
+            : "Every candidate who sat this exam: score, questions attempted, and proctoring flags."
         }
         action={
           <Link href="/dashboard/exams">
@@ -113,12 +170,34 @@ export default function RankingPage() {
       {/* Summary stats */}
       {!loading && rows.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: "Total Appeared", value: rows.length, tone: "neutral" as const },
-            { label: "Shortlisted", value: shortlisted, tone: "mint" as const },
-            { label: "Rejected", value: rejected, tone: "rose" as const },
-            { label: "Pending Decision", value: pending, tone: "amber" as const },
-          ].map(({ label, value, tone }) => (
+          {(isCorporate
+            ? [
+                { label: "Total Appeared", value: rows.length, tone: "neutral" as const },
+                { label: "Shortlisted", value: shortlisted, tone: "mint" as const },
+                { label: "Rejected", value: rejected, tone: "rose" as const },
+                { label: "Pending Decision", value: pending, tone: "amber" as const },
+              ]
+            : [
+                { label: "Total Appeared", value: rows.length, tone: "neutral" as const },
+                {
+                  label: "Passed",
+                  value: rows.filter((r) => r.overall_percentage >= 50).length,
+                  tone: "mint" as const,
+                },
+                {
+                  label: "Flagged",
+                  value: rows.filter((r) => r.is_flagged).length,
+                  tone: "rose" as const,
+                },
+                {
+                  label: "Average Score",
+                  value: rows.length
+                    ? `${(rows.reduce((s, r) => s + r.overall_percentage, 0) / rows.length).toFixed(1)}%`
+                    : "0%",
+                  tone: "neutral" as const,
+                },
+              ]
+          ).map(({ label, value }) => (
             <Card key={label} className="text-center">
               <p className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</p>
               <p className="mt-1 text-[22px] font-semibold text-ink">{value}</p>
@@ -127,11 +206,30 @@ export default function RankingPage() {
         </div>
       )}
 
+      {/* Top performer */}
+      {!loading && topPerformer && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-amber/30 bg-amber-soft/30">
+          <div className="flex items-center gap-3">
+            <span className="text-[22px]">🏆</span>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-ink-muted">{t("topPerformer")}</p>
+              <p className="text-[14px] font-semibold text-ink">{topPerformer.full_name}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-[15px] font-semibold text-ink">
+              {topPerformer.obtained_marks.toFixed(1)}/{topPerformer.total_marks.toFixed(1)}
+            </p>
+            <p className="text-[12px] text-ink-muted">{topPerformer.overall_percentage.toFixed(1)}%</p>
+          </div>
+        </Card>
+      )}
+
       <Card padded={false}>
         <div className="p-5 border-b border-line">
           <SectionTitle
-            title="Candidate Rankings"
-            hint="Sorted by overall percentage. Click a row to expand section scores."
+            title={t("candidateRankings")}
+            hint={t("candidateRankingsHint")}
           />
         </div>
 
@@ -144,8 +242,8 @@ export default function RankingPage() {
         ) : rows.length === 0 ? (
           <div className="p-8">
             <EmptyState
-              title="No completed sessions yet"
-              body="Candidates need to submit the exam before ranking data appears here."
+              title={t("noCompletedSessions")}
+              body={t("noCompletedSessionsBody")}
             />
           </div>
         ) : (
@@ -153,14 +251,16 @@ export default function RankingPage() {
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-line bg-sunken/40 text-[11px] uppercase tracking-wide text-ink-muted">
-                  <th className="px-5 py-3 text-left">Rank</th>
-                  <th className="px-5 py-3 text-left">Candidate</th>
-                  <th className="px-5 py-3 text-right">Score</th>
-                  <th className="px-5 py-3 text-right">Accuracy</th>
-                  <th className="px-5 py-3 text-right">Time</th>
-                  <th className="px-5 py-3 text-center">Proctor</th>
-                  <th className="px-5 py-3 text-center">Status</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
+                  <th className="px-5 py-3 text-left">{t("rank")}</th>
+                  <th className="px-5 py-3 text-left">{t("candidate")}</th>
+                  <th className="px-5 py-3 text-right">{t("score")}</th>
+                  <th className="px-5 py-3 text-right">{t("attempted")}</th>
+                  <th className="px-5 py-3 text-right">{t("accuracy")}</th>
+                  <th className="px-5 py-3 text-right">{t("time")}</th>
+                  <th className="px-5 py-3 text-center">{t("proctor")}</th>
+                  {isCorporate && <th className="px-5 py-3 text-center">{t("status")}</th>}
+                  {isCorporate && <th className="px-5 py-3 text-right">{t("shortlist")}</th>}
+                  <th className="px-5 py-3 text-right">{t("result")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -206,6 +306,25 @@ export default function RankingPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-right text-ink-soft">
+                        <p className="font-medium text-ink">
+                          {row.correct_count + row.incorrect_count}
+                          <span className="text-ink-muted">
+                            /{row.correct_count + row.incorrect_count + row.unanswered_count}
+                          </span>
+                        </p>
+                        <p className="text-[11px]">
+                          <span className="text-mint">{row.correct_count} ✓</span>
+                          {" · "}
+                          <span className="text-rose">{row.incorrect_count} ✗</span>
+                          {row.unanswered_count > 0 && (
+                            <>
+                              {" · "}
+                              <span>{row.unanswered_count} blank</span>
+                            </>
+                          )}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3 text-right text-ink-soft">
                         {row.accuracy.toFixed(1)}%
                       </td>
                       <td className="px-5 py-3 text-right text-ink-soft">
@@ -217,47 +336,87 @@ export default function RankingPage() {
                         {row.is_flagged ? (
                           <Badge tone="rose">Flagged {row.suspicion_score.toFixed(0)}</Badge>
                         ) : (
-                          <Badge tone="mint">Clear</Badge>
+                          <Badge tone="mint">{t("clear")}</Badge>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-center">
-                        {row.shortlist_status ? (
-                          <Badge tone={SHORTLIST_TONE[row.shortlist_status]}>
-                            {SHORTLIST_LABEL[row.shortlist_status]}
-                          </Badge>
-                        ) : (
-                          <span className="text-ink-muted">Pending</span>
-                        )}
-                      </td>
+                      {isCorporate && (
+                        <td className="px-5 py-3 text-center">
+                          {row.shortlist_status ? (
+                            <Badge tone={SHORTLIST_TONE[row.shortlist_status]}>
+                              {SHORTLIST_LABEL[row.shortlist_status]}
+                            </Badge>
+                          ) : (
+                            <span className="text-ink-muted">{t("pending")}</span>
+                          )}
+                        </td>
+                      )}
+                      {isCorporate && (
+                        <td className="px-5 py-3">
+                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              loading={saving === row.candidate_id}
+                              onClick={() => setShortlist(row.candidate_id, "shortlisted")}
+                              className="!text-mint hover:!bg-mint/10"
+                            >
+                              ✓
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              loading={saving === row.candidate_id}
+                              onClick={() => setShortlist(row.candidate_id, "on_hold")}
+                              className="!text-amber hover:!bg-amber/10"
+                            >
+                              ⏸
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              loading={saving === row.candidate_id}
+                              onClick={() => setShortlist(row.candidate_id, "rejected")}
+                              className="!text-rose hover:!bg-rose/10"
+                            >
+                              ✗
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            loading={saving === row.candidate_id}
-                            onClick={() => setShortlist(row.candidate_id, "shortlisted")}
-                            className="!text-mint hover:!bg-mint/10"
-                          >
-                            ✓
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            loading={saving === row.candidate_id}
-                            onClick={() => setShortlist(row.candidate_id, "on_hold")}
-                            className="!text-amber hover:!bg-amber/10"
-                          >
-                            ⏸
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            loading={saving === row.candidate_id}
-                            onClick={() => setShortlist(row.candidate_id, "rejected")}
-                            className="!text-rose hover:!bg-rose/10"
-                          >
-                            ✗
-                          </Button>
+                          {row.published ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              loading={downloading === row.result_id}
+                              disabled={!row.result_id}
+                              onClick={() => downloadReport(row)}
+                            >
+                              Download Report
+                            </Button>
+                          ) : canPublish(row) ? (
+                            <Button
+                              size="sm"
+                              loading={publishing === row.session_id}
+                              disabled={publishing !== null}
+                              onClick={() => publishOne(row)}
+                            >
+                              Publish Result
+                            </Button>
+                          ) : row.needs_integrity_review ? (
+                            <Link href={`/dashboard/proctoring/${row.session_id}`}>
+                              <Button size="sm" variant="ghost">{t("reviewFlags")}</Button>
+                            </Link>
+                          ) : (
+                            <span className="text-[12px] text-ink-muted">
+                              {row.integrity_verdict === "malpractice"
+                                ? "Withheld"
+                                : row.pending_review_count > 0
+                                  ? "Grading pending"
+                                  : "—"}
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -265,9 +424,9 @@ export default function RankingPage() {
                     {/* Expanded section breakdown */}
                     {expandedRow === row.candidate_id && row.section_scores.length > 0 && (
                       <tr key={`${row.candidate_id}-expanded`} className="bg-sunken/30">
-                        <td colSpan={8} className="px-8 py-4">
+                        <td colSpan={isCorporate ? 9 : 7} className="px-8 py-4">
                           <p className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
-                            Section-wise Breakdown
+                            {t("sectionWiseBreakdown")}
                           </p>
                           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {row.section_scores.map((sec) => (
@@ -310,9 +469,17 @@ export default function RankingPage() {
       {!loading && rows.length > 0 && (
         <Card>
           <p className="text-[12px] text-ink-muted">
-            <strong>Actions:</strong> ✓ = Shortlist · ⏸ = On Hold · ✗ = Reject.
-            Decisions are recorded with your identity and timestamp and can be updated at any time.
-            The platform assists your decision — it does not shortlist automatically.
+            {isCorporate ? (
+              <>
+                <strong>Actions:</strong> ✓ = Shortlist · ⏸ = On Hold · ✗ = Reject.
+                Decisions are recorded with your identity and timestamp and can be updated at any time.
+                The platform assists your decision — it does not shortlist automatically.
+              </>
+            ) : (
+              <>
+                <strong>Proctor</strong> {t("proctorExplanation")}
+              </>
+            )}
           </p>
         </Card>
       )}

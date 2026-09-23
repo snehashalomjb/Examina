@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 
 from app.core.config import settings
@@ -22,8 +22,10 @@ from app.core.security import (
     needs_rehash,
     verify_password,
 )
+from app.core.storage import presigned_url, put_object
 from app.db.models import AccessStatus, LoginAccessStatus, User, UserRole
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     RefreshRequest,
@@ -41,6 +43,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger("auth")
 
 
+MAX_AVATAR_BYTES = 3 * 1024 * 1024
+ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _user_out(user: User) -> UserOut:
+    """``UserOut.model_validate`` plus the one field that isn't a plain column."""
+    out = UserOut.model_validate(user)
+    out.avatar_url = presigned_url(user.avatar_object_key)
+    return out
+
+
 def _issue_tokens(user: User, login_status: LoginAccessStatus | None = None) -> TokenPair:
     """Issue the token pair.
 
@@ -54,7 +67,7 @@ def _issue_tokens(user: User, login_status: LoginAccessStatus | None = None) -> 
         ),
         refresh_token=create_refresh_token(user_id=user.id),
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=UserOut.model_validate(user),
+        user=_user_out(user),
         login_access=login_status,
     )
 
@@ -167,7 +180,7 @@ def refresh(payload: RefreshRequest, db: DbSession) -> TokenPair:
 
 @router.get("/me", response_model=UserOut)
 def me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+    return _user_out(user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -177,9 +190,52 @@ def update_me(payload: UpdateProfileRequest, user: CurrentUser, db: DbSession) -
     It reads the id from the JWT, so it can only ever touch the caller's own record.
     """
     user.set_name(payload.first_name, payload.last_name)
+    if payload.preferred_locale is not None:
+        user.preferred_locale = payload.preferred_locale
     db.flush()
     logger.info("Profile updated for %s", user.email)
-    return UserOut.model_validate(user)
+    return _user_out(user)
+
+
+@router.post("/avatar", response_model=UserOut)
+def upload_avatar(user: CurrentUser, db: DbSession, file: UploadFile = File(...)) -> UserOut:
+    """Upload or replace the caller's own profile picture."""
+    if file.content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Profile pictures must be JPEG, PNG or WebP",
+        )
+    data = file.file.read()
+    if len(data) > MAX_AVATAR_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Profile pictures must be under {MAX_AVATAR_BYTES // (1024 * 1024)} MB",
+        )
+    extension = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[file.content_type]
+    key = f"avatars/{user.id}/{uuid.uuid4().hex[:12]}.{extension}"
+    put_object(key=key, data=data, content_type=file.content_type)
+
+    user.avatar_object_key = key
+    db.flush()
+    logger.info("Avatar updated for %s", user.email)
+    return _user_out(user)
+
+
+@router.post("/change-password", response_model=Message)
+def change_password(payload: ChangePasswordRequest, user: CurrentUser, db: DbSession) -> Message:
+    """Change a known password while signed in.
+
+    Proof of identity is the current password, not a mailed token - this is the "I know
+    my password but want a new one" path; forgot-password is the "I don't" path.
+    """
+    if not verify_password(payload.current_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect"
+        )
+    user.password_hash = hash_password(payload.new_password)
+    db.flush()
+    logger.info("Password changed for %s", user.email)
+    return Message(detail="Your password has been updated.")
 
 
 @router.get("/login-access", response_model=LoginAccessOut)

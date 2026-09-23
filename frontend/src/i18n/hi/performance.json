@@ -1,0 +1,16 @@
+{
+  "performance_analysis": "प्रदर्शन विश्लेषण",
+  "subject_wise": "विषयवार प्रदर्शन",
+  "question_wise": "प्रश्नवार प्रदर्शन",
+  "strengths": "मजबूत बिंदु",
+  "areas_for_improvement": "सुधार के क्षेत्र",
+  "attempts": "प्रयास",
+  "average_score": "औसत स्कोर",
+  "best_score": "सर्वश्रेष्ठ स्कोर",
+  "trend": "रुझान",
+  "chart_legend_correct": "सही",
+  "chart_legend_incorrect": "गलत",
+  "chart_legend_unanswered": "अनुत्तरित",
+  "performance_title": "प्रदर्शन",
+  "performance_body": "आपके जारी किए गए परिणाम एक साथ कैसे दिखते हैं — सटीकता, पूर्णता, और क्या आपके स्कोर आगे बढ़ रहे हैं।"
+}

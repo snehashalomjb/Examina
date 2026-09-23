@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from app.db.models.enrollment import ExamEnrollment
     from app.db.models.exam_session import ExamSession
     from app.db.models.question import Question, Subject
+    from app.db.models.translations import ExamSectionTranslation, ExamTranslation
     from app.db.models.user import User
 
 
@@ -62,6 +63,15 @@ DEFAULT_PROCTOR_CONFIG: dict[str, Any] = {
         "paste_attempt": 12.0,
         "copy_attempt": 6.0,
         "devtools_open": 25.0,
+        "right_click": 2.0,
+        "cut_attempt": 8.0,
+        "text_selection": 1.5,
+        "additional_person": 15.0,
+        "mic_disconnected": 5.0,
+        "network_lost": 3.0,
+        # Never auto-detected - an examiner raises it by hand, so it must never move
+        # the score or the auto-submit ladder on its own.
+        "headphones_manual": 0.0,
     },
 }
 
@@ -124,7 +134,11 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # {"rules": [{"question_type": "mcq", "difficulty": "easy", "count": 10}, ...]}
     selection_rules: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     randomize: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    shuffle_options: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: Independent of ``randomize``: shuffling the question order and shuffling A/B/C/D
+    #: are two different decisions, and an examiner who wants one rarely wants both.
+    #: Off by default - a paper whose options moved is harder to discuss, to print and
+    #: to review, so it is opted into rather than inherited.
+    shuffle_options: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     negative_marking: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     #: How many sittings one candidate may take. Defaults to 1, which is exactly the
     #: behaviour the old two-column unique constraint enforced.
@@ -149,6 +163,15 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     results_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    #: Locale codes a candidate may pick for this exam's language selector, e.g.
+    #: ["en", "hi", "ta"]. "en" is always included regardless of what is stored here -
+    #: see the ``languages`` property - so a candidate never loses the fallback language.
+    #: Defaults to English-only, which is exactly how every exam behaved before this
+    #: column existed.
+    enabled_languages: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=lambda: ["en"], server_default='["en"]'
+    )
+
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
@@ -171,6 +194,9 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     enrollments: Mapped[list[ExamEnrollment]] = relationship(
         back_populates="exam", cascade="all, delete-orphan"
     )
+    translations: Mapped[list["ExamTranslation"]] = relationship(
+        back_populates="exam", cascade="all, delete-orphan"
+    )
 
     @property
     def total_marks(self) -> float:
@@ -184,6 +210,14 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         if self.declared_total_marks is not None:
             return self.declared_total_marks
         return sum(eq.effective_marks for eq in self.exam_questions)
+
+    @property
+    def languages(self) -> list[str]:
+        """The candidate-facing language list. "en" always leads and is never absent -
+        it is the universal fallback, so removing it from the selector would strand
+        anything not yet translated."""
+        stored = [loc for loc in (self.enabled_languages or []) if loc != "en"]
+        return ["en", *stored]
 
 
 class ExamSection(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -228,6 +262,9 @@ class ExamSection(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
 
     exam: Mapped[Exam] = relationship(back_populates="sections")
+    translations: Mapped[list["ExamSectionTranslation"]] = relationship(
+        back_populates="section", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<ExamSection {self.order_index}:{self.name!r}>"
@@ -247,6 +284,18 @@ class ExamQuestion(UUIDPrimaryKeyMixin, Base):
     )
     marks_override: Mapped[float | None] = mapped_column(Float)
     order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    #: Pins this question to one section rather than leaving it to any rule that fits.
+    #:
+    #: Null - the default, and every row before this column existed - means the question
+    #: is available to whichever section's rules match it, which is the behaviour the
+    #: pool has always had. Set, it means the examiner chose this question *for that
+    #: section*: only that section may draw it, and it is drawn before any random pick.
+    #: ON DELETE SET NULL, so deleting a section returns its questions to the pool
+    #: rather than deleting questions an examiner spent time writing.
+    section_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("exam_sections.id", ondelete="SET NULL"), index=True
+    )
 
     exam: Mapped[Exam] = relationship(back_populates="exam_questions")
     question: Mapped[Question] = relationship()

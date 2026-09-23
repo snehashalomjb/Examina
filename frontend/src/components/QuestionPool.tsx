@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -20,7 +21,7 @@ import {
   Input,
   cx,
 } from "@/components/ui";
-import { QuestionPreviewModal } from "@/components/QuestionBankSelector";
+import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { ApiError, api } from "@/lib/api";
 import {
   QUESTION_TYPE_LABEL,
@@ -57,6 +58,7 @@ export function QuestionPool({
   onOverrideMarks,
   onEdit,
 }: QuestionPoolProps) {
+  const t = useTranslations("question");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Question | null>(null);
@@ -67,8 +69,8 @@ export function QuestionPool({
   if (!pool) {
     return (
       <EmptyState
-        title="No pool yet"
-        body="Save the exam as a draft first, then add questions to it."
+        title={t("empty_pool_title")}
+        body={t("empty_pool_body")}
       />
     );
   }
@@ -118,10 +120,14 @@ export function QuestionPool({
       <PoolSummary pool={pool} />
 
       {pool.problems.length > 0 && (
-        <Alert tone="amber" title="This exam cannot be published yet">
+        <Alert tone="amber" title={t("pool_cannot_publish_title")}>
           <ul className="list-inside list-disc space-y-0.5">
-            {pool.problems.map((problem) => (
-              <li key={problem}>{problem}</li>
+            {pool.problems.map((problem, index) => (
+              // Index, not the string: two sections can report the identical shortfall
+              // ("Need 5 mcq/easy question(s) in Section A" / "...in Section B" can even
+              // collide verbatim when both sections share a name prefix), and the string
+              // itself carries no identity worth preserving across renders.
+              <li key={index}>{problem}</li>
             ))}
           </ul>
         </Alert>
@@ -131,8 +137,8 @@ export function QuestionPool({
 
       {entries.length === 0 ? (
         <EmptyState
-          title="The pool is empty"
-          body="Write a question, pull one from the bank, generate a set with AI, or import a file."
+          title={t("pool_is_empty_title")}
+          body={t("pool_is_empty_body")}
         />
       ) : (
         <>
@@ -304,6 +310,7 @@ export function QuestionPool({
 
 /** Totals and distributions - the numbers the spec asks to be visible before publishing. */
 export function PoolSummary({ pool }: { pool: ExamPool }) {
+  const t = useTranslations("question");
   const { stats } = pool;
   return (
     <Card className="space-y-3">
@@ -324,7 +331,7 @@ export function PoolSummary({ pool }: { pool: ExamPool }) {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Distribution
-          title="By type"
+          title={t("pool_by_type")}
           rows={Object.entries(stats.by_type).map(([key, count]) => [
             QUESTION_TYPE_LABEL[key as keyof typeof QUESTION_TYPE_LABEL] ?? key,
             count,
@@ -332,7 +339,7 @@ export function PoolSummary({ pool }: { pool: ExamPool }) {
           total={stats.total_questions}
         />
         <Distribution
-          title="By difficulty"
+          title={t("pool_by_difficulty")}
           rows={Object.entries(stats.by_difficulty).map(([key, count]) => [key, count])}
           total={stats.total_questions}
         />

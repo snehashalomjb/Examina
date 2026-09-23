@@ -21,6 +21,7 @@ from app.db.models.enums import (
 
 if TYPE_CHECKING:
     from app.db.models.exam import Exam
+    from app.db.models.translations import OptionTranslation, QuestionTranslation, SubjectTranslation
     from app.db.models.user import User
 
 
@@ -32,6 +33,10 @@ class Subject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     questions: Mapped[list[Question]] = relationship(back_populates="subject")
+    #: One row per locale a translator has reached. See ``app.services.i18n``.
+    translations: Mapped[list["SubjectTranslation"]] = relationship(
+        back_populates="subject", cascade="all, delete-orphan"
+    )
 
 
 class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -159,6 +164,9 @@ class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="QuestionOption.order_index",
     )
+    translations: Mapped[list["QuestionTranslation"]] = relationship(
+        back_populates="question", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Question {self.question_type.value} {self.body[:40]!r}>"
@@ -178,3 +186,6 @@ class QuestionOption(UUIDPrimaryKeyMixin, Base):
     order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     question: Mapped[Question] = relationship(back_populates="options")
+    translations: Mapped[list["OptionTranslation"]] = relationship(
+        back_populates="option", cascade="all, delete-orphan"
+    )

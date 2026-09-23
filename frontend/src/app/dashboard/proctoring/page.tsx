@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -22,6 +23,7 @@ import type { ProctorReview } from "@/lib/types";
 const REFRESH_MS = 20_000;
 
 export default function ProctoringPage() {
+  const t = useTranslations("proctoring");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [sessions, setSessions] = useState<ProctorReview[]>([]);
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -57,15 +59,15 @@ export default function ProctoringPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Proctoring"
-        body="Suspicion scores are computed on the server from stored evidence — never from a number the browser reports."
+        title={t("hero_proctoring")}
+        body={t("hero_body_suspicion_scores")}
         action={
           <Button
             size="sm"
             variant={flaggedOnly ? "primary" : "secondary"}
             onClick={() => setFlaggedOnly((v) => !v)}
           >
-            {flaggedOnly ? "Showing flagged only" : "Show flagged only"}
+            {flaggedOnly ? t("button_showing_flagged_only") : t("button_show_flagged_only")}
           </Button>
         }
       />
@@ -74,11 +76,11 @@ export default function ProctoringPage() {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-[12px] uppercase tracking-wide text-ink-muted">Live now</p>
+          <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_live_now")}</p>
           <p className="mt-1.5 text-[26px] font-semibold leading-none text-ink">{live.length}</p>
         </Card>
         <Card>
-          <p className="text-[12px] uppercase tracking-wide text-ink-muted">Flagged</p>
+          <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_flagged")}</p>
           <p
             className={cx(
               "mt-1.5 text-[26px] font-semibold leading-none",
@@ -89,7 +91,7 @@ export default function ProctoringPage() {
           </p>
         </Card>
         <Card>
-          <p className="text-[12px] uppercase tracking-wide text-ink-muted">Sessions listed</p>
+          <p className="text-[12px] uppercase tracking-wide text-ink-muted">{t("stat_sessions_listed")}</p>
           <p className="mt-1.5 text-[26px] font-semibold leading-none text-ink">{sessions.length}</p>
         </Card>
       </div>
@@ -103,11 +105,11 @@ export default function ProctoringPage() {
           </div>
         ) : sessions.length === 0 ? (
           <EmptyState
-            title={flaggedOnly ? "Nothing flagged" : "No sittings recorded"}
+            title={flaggedOnly ? t("empty_nothing_flagged") : t("empty_no_sittings_recorded")}
             body={
               flaggedOnly
-                ? "No session has crossed its flagging threshold."
-                : "Sessions appear here as soon as candidates start an exam."
+                ? t("empty_body_no_flagging_threshold")
+                : t("empty_body_sessions_appear")
             }
           />
         ) : (
@@ -132,7 +134,7 @@ export default function ProctoringPage() {
 
                   <div className="w-[150px]">
                     <div className="mb-1 flex justify-between text-[11.5px]">
-                      <span className="text-ink-muted">Suspicion</span>
+                      <span className="text-ink-muted">{t("label_suspicion")}</span>
                       <span className="font-medium text-ink">{session.suspicion_score}</span>
                     </div>
                     <ProgressBar value={Math.min(100, session.suspicion_score)} tone={severity} />

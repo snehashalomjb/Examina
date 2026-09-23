@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "ಕ್ಯಾಮೆರಾ ಪ್ರವೇಶ ಅಗತ್ಯವಿದೆ",
+  "microphone_access_required": "ಮೈಕ್ರೊಫೋನ್ ಪ್ರವೇಶ ಅಗತ್ಯವಿದೆ",
+  "connection_unstable": "ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಅಸ್ಥಿರವಾಗಿದೆ",
+  "exam_submitted_successfully": "ಪರೀಕ್ಷೆಯನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಸಲ್ಲಿಸಲಾಗಿದೆ",
+  "confirm_submit": "ನೀವು ಖಚಿತವಾಗಿ ಸಲ್ಲಿಸಲು ಬಯಸುವಿರಾ?",
+  "cannot_return_question": "ನೀವು ಈ ಪ್ರಶ್ನೆಗೆ ಹಿಂತಿರುಗಲು ಸಾಧ್ಯವಿಲ್ಲ",
+  "time_almost_over": "ಸಮಯ ಬಹುತೇಕ ಮುಗಿದಿದೆ",
+  "changes_saved": "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ",
+  "action_failed": "ಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+}

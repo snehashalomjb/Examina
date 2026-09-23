@@ -199,6 +199,17 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
                 raise ValidationError(f"Rule #{index + 1} has a non-string topic")
             topic = topic.strip() or None
 
+        subject_id = rule.get("subject_id")
+        if subject_id is not None and not isinstance(subject_id, str):
+            raise ValidationError(f"Rule #{index + 1} has a non-string subject_id")
+
+        tags_raw = rule.get("tags")
+        tags: list[str] | None = None
+        if tags_raw:
+            if not isinstance(tags_raw, list) or not all(isinstance(t, str) for t in tags_raw):
+                raise ValidationError(f"Rule #{index + 1} has invalid tags")
+            tags = [t.strip() for t in tags_raw if t.strip()] or None
+
         normalised.append(
             {
                 "question_type": qtype.value,
@@ -206,6 +217,8 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
                 "count": count,
                 "category": category.value if category else None,
                 "topic": topic,
+                "subject_id": subject_id,
+                "tags": tags,
             }
         )
     return normalised

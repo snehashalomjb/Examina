@@ -1,0 +1,12 @@
+{
+  "user_management": "उपयोगकर्ता प्रबंधन",
+  "candidate_management": "उम्मीदवार प्रबंधन",
+  "examiner_management": "परीक्षक प्रबंधन",
+  "exam_management": "परीक्षा प्रबंधन",
+  "monitoring": "निगरानी",
+  "system_settings": "सिस्टम सेटिंग्स",
+  "audit_log": "ऑडिट लॉग",
+  "approve": "स्वीकृत करें",
+  "revoke": "निरस्त करें",
+  "reject": "अस्वीकार करें"
+}

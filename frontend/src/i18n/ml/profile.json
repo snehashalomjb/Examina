@@ -1,0 +1,23 @@
+{
+  "profile_title": "പ്രൊഫൈൽ",
+  "profile_subtitle": "പ്ലാറ്റ്ഫോം സൂക്ഷിക്കുന്ന നിങ്ങളുടെ അക്കൗണ്ട്.",
+  "details_card": "വിവരങ്ങൾ",
+  "access_card": "പ്രവേശനം",
+  "first_name_placeholder": "നിങ്ങളുടെ പേരിന്റെ ആദ്യഭാഗം നൽകുക",
+  "last_name_placeholder": "നിങ്ങളുടെ പേരിന്റെ അവസാന ഭാഗം നൽകുക",
+  "email_label": "ഇമെയിൽ",
+  "role_label": "പങ്ക്",
+  "change_password_title": "പാസ്‌വേഡ് മാറ്റുക",
+  "change_password_hint": "നിങ്ങളുടെ നിലവിലെ പാസ്‌വേഡ് നൽകുക, തുടർന്ന് പുതിയത് രണ്ടു തവണ.",
+  "current_password": "നിലവിലെ പാസ്‌വേഡ്",
+  "new_password": "പുതിയ പാസ്‌വേഡ്",
+  "confirm_password": "പുതിയ പാസ്‌വേഡ് സ്ഥിരീകരിക്കുക",
+  "settings_title": "ക്രമീകരണങ്ങൾ",
+  "settings_subtitle": "നിങ്ങളുടെ പാസ്‌വേഡും സെഷനും.",
+  "session_title": "സെഷൻ",
+  "session_hint": "സൈൻ ഔട്ട് ചെയ്യുന്നത് ഈ ബ്രൗസറിൽ സൂക്ഷിച്ചിരിക്കുന്ന ടോക്കണുകൾ മായ്ക്കും.",
+  "sign_out": "സൈൻ ഔട്ട്",
+  "password_updated": "പാസ്‌വേഡ് വിജയകരമായി മാറ്റി",
+  "profile_updated": "പ്രൊഫൈൽ വിജയകരമായി അപ്ഡേറ്റ് ചെയ്തു",
+  "settingsChangePasswordHint": "കുറഞ്ഞത് 8 അക്ഷരങ്ങൾ, ഒരു അക്ഷരവും ഒരു അക്കവും ഉൾപ്പെടെ."
+}

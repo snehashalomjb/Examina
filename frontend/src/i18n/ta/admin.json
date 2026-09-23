@@ -1,0 +1,12 @@
+{
+  "user_management": "பயனர் மேலாண்மை",
+  "candidate_management": "வேட்பாளர் மேலாண்மை",
+  "examiner_management": "தேர்வாளர் மேலாண்மை",
+  "exam_management": "தேர்வு மேலாண்மை",
+  "monitoring": "கண்காணிப்பு",
+  "system_settings": "கணினி அமைப்புகள்",
+  "audit_log": "தணிக்கை பதிவு",
+  "approve": "அங்கீகரி",
+  "revoke": "ரத்து செய்",
+  "reject": "நிராகரி"
+}

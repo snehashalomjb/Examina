@@ -1,0 +1,12 @@
+{
+  "user_management": "ഉപയോക്തൃ മാനേജ്മെന്റ്",
+  "candidate_management": "ഉദ്യോഗാർത്ഥി മാനേജ്മെന്റ്",
+  "examiner_management": "പരീക്ഷകൻ മാനേജ്മെന്റ്",
+  "exam_management": "പരീക്ഷ മാനേജ്മെന്റ്",
+  "monitoring": "നിരീക്ഷണം",
+  "system_settings": "സിസ്റ്റം ക്രമീകരണങ്ങൾ",
+  "audit_log": "ഓഡിറ്റ് ലോഗ്",
+  "approve": "അംഗീകരിക്കുക",
+  "revoke": "റദ്ദാക്കുക",
+  "reject": "നിരസിക്കുക"
+}

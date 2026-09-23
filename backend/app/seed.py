@@ -7,7 +7,6 @@ Idempotent: re-running tops up what is missing rather than duplicating. Run with
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -39,6 +38,9 @@ from app.db.models import (
 )
 from app.db.models.exam import DEFAULT_GRADING_CONFIG, DEFAULT_PROCTOR_CONFIG
 from app.db.session import SessionLocal
+from app.seed_question_bank_bulk import FLOOR_PER_TYPE
+from app.seed_question_bank_bulk import top_up as top_up_question_bank
+from app.seed_question_bank_images import top_up_images
 
 logger = get_logger("seed")
 
@@ -217,7 +219,7 @@ def _seed_questions(db: Session, subjects: dict[str, Subject], examiner: User) -
         ("The memory region where dynamically allocated variables (via malloc or new) reside is called the _____.", ["heap", "Heap"], Difficulty.EASY, "Dynamic runtime memory is allocated on the heap.", {"kind": "fill_blank", "accepted_answers": ["heap", "Heap"]}),
         ("A graph with no cycles is called an _____ graph.", ["acyclic", "Acyclic", "DAG"], Difficulty.MEDIUM, "Graphs without cycles are termed acyclic.", {"kind": "fill_blank", "accepted_answers": ["acyclic", "Acyclic", "DAG"]}),
     ]
-    for body, accepted, diff, exp, spec in cs101_fill:
+    for body, _accepted, diff, exp, spec in cs101_fill:
         qs.append(_make_q(subject=sub, creator=examiner, qtype=QuestionType.FILL_BLANK, category=cat, topic="Definitions", body=body, difficulty=diff, marks=2.0, explanation=exp, spec=spec))
 
     # Numerical
@@ -225,7 +227,7 @@ def _seed_questions(db: Session, subjects: dict[str, Subject], examiner: User) -
         ("What is the maximum number of nodes in a binary tree of depth 4 (considering root at depth 0)?", 31.0, Difficulty.MEDIUM, "Max nodes = 2^(h+1) - 1 = 2^5 - 1 = 31.", {"kind": "numerical", "answer": 31.0, "tolerance": 0.0}),
         ("Calculate the total number of distinct simple graphs that can be formed with 4 labeled vertices.", 64.0, Difficulty.HARD, "Number of possible edges is 4C2 = 6. Total graphs = 2^6 = 64.", {"kind": "numerical", "answer": 64.0, "tolerance": 0.0}),
     ]
-    for body, ans, diff, exp, spec in cs101_num:
+    for body, _ans, diff, exp, spec in cs101_num:
         qs.append(_make_q(subject=sub, creator=examiner, qtype=QuestionType.NUMERICAL, category=cat, topic="Discrete Math", body=body, difficulty=diff, marks=3.0, explanation=exp, spec=spec))
 
     # Short & Long & Image Answers
@@ -527,7 +529,7 @@ def _seed_questions(db: Session, subjects: dict[str, Subject], examiner: User) -
         ("A vendor bought bananas at 6 for Rs 10 and sold them at 4 for Rs 8. What is his percentage profit?", 20.0, Difficulty.MEDIUM, "CP of 1 = 10/6 = 5/3. SP of 1 = 8/4 = 2. Profit = (2 - 5/3)/(5/3) = 1/5 = 20%.", {"kind": "numerical", "answer": 20.0, "tolerance": 0.5}),
         ("What is the simple interest on Rs 5000 for 3 years at an annual rate of 8%?", 1200.0, Difficulty.EASY, "SI = (P * R * T)/100 = (5000 * 8 * 3)/100 = Rs 1200.", {"kind": "numerical", "answer": 1200.0, "tolerance": 0.0}),
     ]
-    for body, ans, diff, exp, spec in apt_num:
+    for body, _ans, diff, exp, spec in apt_num:
         qs.append(_make_q(subject=sub_apt, creator=examiner, qtype=QuestionType.NUMERICAL, category=cat_apt, topic="Quantitative Aptitude", body=body, difficulty=diff, marks=2.5, explanation=exp, spec=spec))
 
     # --------------------------------------------------------------------------
@@ -637,7 +639,7 @@ def _seed_questions(db: Session, subjects: dict[str, Subject], examiner: User) -
             "def lengthOfLongestSubstring(s: str) -> int:\n    used = {}\n    max_len = start = 0\n    for i, char in enumerate(s):\n        if char in used and start <= used[char]:\n            start = used[char] + 1\n        else:\n            max_len = max(max_len, i - start + 1)\n        used[char] = i\n    return max_len"
         )
     ]
-    for title, body, diff, marks, spec, model_ans in coding_questions:
+    for _title, body, diff, marks, spec, model_ans in coding_questions:
         qs.append(_make_q(subject=sub_code, creator=examiner, qtype=QuestionType.CODING, category=cat_code, topic="Algorithms", body=body, difficulty=diff, marks=marks, spec=spec, model_answer=model_ans))
 
     db.add_all(qs)
@@ -1366,6 +1368,18 @@ def seed(db: Session) -> None:
     questions = _seed_questions(db, subjects, examiner)
     _seed_exams(db, subjects, examiner, candidates, questions)
 
+    # Curated questions above give the bank quality; this gives it depth - every
+    # (subject, question type) combination topped up to a real floor so the bank
+    # filters (type, difficulty, subject) all have something to show rather than one
+    # hand-picked handful.
+    top_up_question_bank(db, examiner)
+
+    # Real, meaningful diagram-based questions (process diagrams, Gantt charts, OSI
+    # stacks, decision trees, attention weights, search trees, CNN architectures, ...)
+    # for the seven core academic subjects - answered as MCQ/multi-select/short/long,
+    # not a new question type. See app.seed_question_bank_images.
+    top_up_images(db, examiner)
+
 
 def main() -> None:
     setup_logging()
@@ -1374,8 +1388,11 @@ def main() -> None:
         seed(db)
         db.commit()
         print("\nSeed complete! Ready-to-use dataset populated:")
-        print("  - 16 Subjects across Academic & Corporate hiring domains")
-        print("  - 240+ Questions in the Question Bank (MCQ, Multi-select, T/F, Fill-blank, Numerical, Short/Long, Image, Coding)")
+        print("  - Subjects across Academic & Corporate hiring domains")
+        print(
+            f"  - A large centralised Question Bank "
+            f"(every subject topped up to ~{FLOOR_PER_TYPE} questions per appropriate type)"
+        )
         print("  - 16 Real ready-to-use Exams created with pools & sections:")
         print("      * 10 Academic Exams (Semester Final, Mid-Term DSA, Speed Quiz, Practical Viva, Essay, Scholarship, ML, AI, NLP, Deep Learning)")
         print("      * 6 Corporate Hiring Exams (Full-Stack SDE-1, Consulting Aptitude, Data Analyst, Frontend, Backend, Freshers)")

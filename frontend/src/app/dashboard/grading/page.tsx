@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useTranslations } from "next-intl";
 import { Hero } from "@/components/Hero";
 import {
   Alert,
@@ -24,6 +25,7 @@ import { useRequireAuth } from "@/lib/auth";
 import type { GradingQueueItem, GradingSummary } from "@/lib/types";
 
 export default function GradingPage() {
+  const t = useTranslations("grading");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [queue, setQueue] = useState<GradingQueueItem[]>([]);
   const [summaries, setSummaries] = useState<GradingSummary[]>([]);
@@ -50,7 +52,7 @@ export default function GradingPage() {
       });
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load the grading queue.");
+      setError(err instanceof ApiError ? err.message : t("error_load_queue"));
     } finally {
       setLoading(false);
     }
@@ -66,7 +68,7 @@ export default function GradingPage() {
       toast(response.detail, "mint");
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not publish results", "rose");
+      toast(err instanceof ApiError ? err.message : t("error_publish_results"), "rose");
     }
   }
 
@@ -79,8 +81,8 @@ export default function GradingPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Grading queue"
-        body="Written answers arrive with a provisional score and a justification. Your decision is the one that counts — nothing publishes until every answer here is cleared."
+        title={t("grading_queue")}
+        body={t("grading_description")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -95,17 +97,17 @@ export default function GradingPage() {
               <Card key={summary.exam_id}>
                 <p className="truncate text-[13.5px] font-semibold text-ink">{summary.exam_title}</p>
                 <p className="mt-0.5 text-[12px] text-ink-muted">
-                  {summary.submitted_sessions}/{summary.total_sessions} submitted
+                  {summary.submitted_sessions}/{summary.total_sessions} {t("submitted")}
                 </p>
                 <div className="mt-3">
                   <ProgressBar value={done} tone={summary.pending_review ? "amber" : "mint"} />
                 </div>
                 <div className="mt-2.5 flex items-center justify-between gap-2">
                   <span className="text-[12px] text-ink-muted">
-                    {summary.reviewed}/{total} reviewed
+                    {summary.reviewed}/{total} {t("reviewed")}
                   </span>
                   {summary.results_published ? (
-                    <Badge tone="mint">published</Badge>
+                    <Badge tone="mint">{t("badge_published")}</Badge>
                   ) : (
                     <Button
                       size="sm"
@@ -114,8 +116,8 @@ export default function GradingPage() {
                       onClick={() => publishResults(summary.exam_id)}
                     >
                       {summary.pending_review > 0
-                        ? `${summary.pending_review} left`
-                        : "Publish results"}
+                        ? `${summary.pending_review} ${t("pending_review_left")}`
+                        : t("publish_results")}
                     </Button>
                   )}
                 </div>
@@ -129,9 +131,9 @@ export default function GradingPage() {
         {/* ------------------------------------------------------------ queue */}
         <Card padded={false} className="overflow-hidden">
           <div className="border-b border-line p-4 space-y-3">
-            <Field label="Filter by exam">
+            <Field label={t("filter_by_exam")}>
               <Select value={examFilter} onChange={(e) => { setExamFilter(e.target.value); setQuestionFilter(""); }}>
-                <option value="">All exams</option>
+                <option value="">{t("all_exams")}</option>
                 {summaries.map((s) => (
                   <option key={s.exam_id} value={s.exam_id}>
                     {s.exam_title}
@@ -147,12 +149,12 @@ export default function GradingPage() {
                   onClick={() => setQuestionFilter("")}
                   className="text-[12px] text-rose hover:underline"
                 >
-                  Clear
+                  {t("clear_filter")}
                 </button>
               </div>
             )}
             <p className="text-[12px] text-ink-muted">
-              {loading ? "Loading…" : `${filteredQueue.length} awaiting review`}
+              {loading ? t("loading") : `${filteredQueue.length} ${t("awaiting_review")}`}
             </p>
           </div>
 
@@ -166,8 +168,8 @@ export default function GradingPage() {
             ) : filteredQueue.length === 0 ? (
               <div className="p-4">
                 <EmptyState
-                  title="Queue is clear"
-                  body="Every written answer has been reviewed. Results can be published."
+                  title={t("queue_is_clear")}
+                  body={t("queue_clear_body")}
                 />
               </div>
             ) : (
@@ -188,7 +190,7 @@ export default function GradingPage() {
                           {item.candidate_name}
                         </p>
                         <Badge tone={item.grade_status === "ai_scored" ? "accent" : "amber"}>
-                          {item.grade_status === "ai_scored" ? "drafted" : "queued"}
+                          {item.grade_status === "ai_scored" ? t("badge_drafted") : t("badge_queued")}
                         </Badge>
                       </div>
                       <p className="mt-0.5 truncate text-[12px] text-ink-muted">{item.exam_title}</p>
@@ -225,8 +227,8 @@ export default function GradingPage() {
           !loading && (
             <Card>
               <EmptyState
-                title="Nothing selected"
-                body="Pick an answer from the queue to review it."
+                title={t("nothing_selected")}
+                body={t("nothing_selected_body")}
               />
             </Card>
           )
@@ -245,6 +247,7 @@ function GradeCard({
   onGraded: () => void;
   onFilterByQuestion?: (questionId: string) => void;
 }) {
+  const t = useTranslations("grading");
   const [marks, setMarks] = useState(
     item.awarded_marks !== null ? String(item.awarded_marks) : "0",
   );
@@ -261,10 +264,10 @@ function GradeCard({
         awarded_marks: Number(marks),
         comment: comment.trim() || null,
       });
-      toast(`Scored ${marks}/${item.max_marks} for ${item.candidate_name}`, "mint");
+      toast(t("score_saved", { marks, max_marks: item.max_marks, candidate_name: item.candidate_name }), "mint");
       onGraded();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the score.");
+      setError(err instanceof ApiError ? err.message : t("error_save_score"));
     } finally {
       setBusy(false);
     }
@@ -282,15 +285,15 @@ function GradeCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge tone="accent">{item.max_marks} marks</Badge>
+          <Badge tone="accent">{t("marks_badge", { max_marks: item.max_marks })}</Badge>
           {onFilterByQuestion && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => onFilterByQuestion(item.question_id)}
-              title="Grade this question for all candidates"
+              title={t("grade_for_all")}
             >
-              Grade for all
+              {t("grade_for_all")}
             </Button>
           )}
         </div>
@@ -298,7 +301,7 @@ function GradeCard({
 
       <div className="rounded-[11px] border border-line bg-sunken/50 p-4">
         <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-          Question
+          {t("question_label")}
         </p>
         <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">
           {item.question_body}
@@ -308,7 +311,7 @@ function GradeCard({
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div className="rounded-[11px] border border-line p-4">
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-            Candidate answer
+            {t("candidate_answer")}
           </p>
           {item.image_url ? (
             <>
@@ -326,17 +329,17 @@ function GradeCard({
               />
             </>
           ) : (
-            <p className="text-[13.5px] italic text-ink-muted">Left blank</p>
+            <p className="text-[13.5px] italic text-ink-muted">{t("left_blank")}</p>
           )}
         </div>
 
         <div className="space-y-4">
           <div className="rounded-[11px] border border-line bg-surface p-4">
             <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-              Model answer
+              {t("model_answer")}
             </p>
             <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink-soft">
-              {item.model_answer ?? "No model answer recorded."}
+              {item.model_answer ?? t("no_model_answer")}
             </p>
           </div>
 
@@ -354,7 +357,7 @@ function GradeCard({
         <div className="mt-4 rounded-[11px] border border-accent/20 bg-accent-soft/60 p-4">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <p className="text-[11px] font-medium uppercase tracking-wide text-accent-ink">
-              Provisional score
+              {t("provisional_score")}
             </p>
             <Badge tone="accent">
               {ai.score} / {ai.max_score}
@@ -368,7 +371,7 @@ function GradeCard({
               {ai.key_points_matched.length > 0 && (
                 <div>
                   <p className="text-[11px] font-medium uppercase tracking-wide text-green">
-                    Key points matched
+                    {t("key_points_matched")}
                   </p>
                   <ul className="mt-1 list-inside list-disc text-[12.5px] text-ink-soft">
                     {ai.key_points_matched.map((point) => (
@@ -380,7 +383,7 @@ function GradeCard({
               {ai.key_points_missed.length > 0 && (
                 <div>
                   <p className="text-[11px] font-medium uppercase tracking-wide text-rose">
-                    Key points missed
+                    {t("key_points_missed")}
                   </p>
                   <ul className="mt-1 list-inside list-disc text-[12.5px] text-ink-soft">
                     {ai.key_points_missed.map((point) => (
@@ -392,10 +395,10 @@ function GradeCard({
             </div>
           )}
           {ai.error && (
-            <p className="mt-2 text-[12px] text-rose">Grader error: {ai.error}</p>
+            <p className="mt-2 text-[12px] text-rose">{t("grader_error", { error: ai.error })}</p>
           )}
           <p className="mt-2 text-[11.5px] text-ink-muted">
-            This is a draft. The marks you enter below are what the candidate receives.
+            {t("draft_note")}
           </p>
         </div>
       )}
@@ -403,7 +406,7 @@ function GradeCard({
       <form onSubmit={submit} className="mt-5 space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="w-[150px]">
-            <Field label={`Marks (0–${item.max_marks})`}>
+            <Field label={t("marks_field_label", { max_marks: item.max_marks })}>
               <Input
                 type="number"
                 min="0"
@@ -424,23 +427,23 @@ function GradeCard({
                 variant="secondary"
                 onClick={() => setMarks(String(item.max_marks * fraction))}
               >
-                {fraction === 0 ? "0" : fraction === 1 ? "Full" : `${fraction * 100}%`}
+                {fraction === 0 ? t("mark_zero") : fraction === 1 ? t("mark_full") : `${fraction * 100}%`}
               </Button>
             ))}
             {ai && (
               <Button type="button" size="sm" variant="ghost" onClick={() => setMarks(String(ai.score))}>
-                Accept draft
+                {t("accept_draft")}
               </Button>
             )}
           </div>
         </div>
 
-        <Field label="Comment to the candidate" hint="Shown with their result once published.">
+        <Field label={t("comment_label")} hint={t("comment_hint")}>
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={3}
-            placeholder="What was right, what was missing."
+            placeholder={t("feedback_placeholder")}
           />
         </Field>
 
@@ -448,7 +451,7 @@ function GradeCard({
 
         <div className="flex justify-end">
           <Button type="submit" loading={busy}>
-            Save score
+            {t("save_score")}
           </Button>
         </div>
       </form>
@@ -464,6 +467,7 @@ function GradeCard({
  * to stand in for reading the handwriting.
  */
 function OcrPanel({ text, confidence }: { text: string | null; confidence: number | null }) {
+  const t = useTranslations("grading");
   const [open, setOpen] = useState(false);
   if (!text) return null;
 
@@ -476,9 +480,9 @@ function OcrPanel({ text, confidence }: { text: string | null; confidence: numbe
         className="flex w-full items-center justify-between gap-2 text-left"
       >
         <span className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-          Machine transcription {percent != null && `· ${percent}% confidence`}
+          {t("ocr_label")} {percent != null && `· ${percent}% confidence`}
         </span>
-        <span className="text-[11.5px] text-ink-muted">{open ? "Hide" : "Show"}</span>
+        <span className="text-[11.5px] text-ink-muted">{open ? t("ocr_hide") : t("ocr_show")}</span>
       </button>
       {open && (
         <>
@@ -486,7 +490,7 @@ function OcrPanel({ text, confidence }: { text: string | null; confidence: numbe
             {text}
           </p>
           <p className="mt-2 text-[11.5px] italic text-ink-muted">
-            OCR is unreliable on handwriting. Mark the image, not this.
+            {t("ocr_unreliable")}
           </p>
         </>
       )}
@@ -496,14 +500,15 @@ function OcrPanel({ text, confidence }: { text: string | null; confidence: numbe
 
 /** Word count, plus the shortfall against the question's minimum if the examiner set one. */
 function LengthNote({ wordCount, shortfall }: { wordCount: number | null; shortfall: number }) {
+  const t = useTranslations("grading");
   if (wordCount == null) return null;
   return (
     <p className="mt-3 text-[11.5px] text-ink-muted">
-      {wordCount} {wordCount === 1 ? "word" : "words"}
+      {wordCount} {wordCount === 1 ? t("word_singular") : t("word_plural")}
       {shortfall > 0 && (
         <span className="text-rose">
           {" "}
-          · {shortfall} below the minimum this question asked for
+          · {shortfall} {t("words_below_minimum")}
         </span>
       )}
     </p>
@@ -529,6 +534,7 @@ function RubricPanel({
   maxMarks: number;
   onMarksChange: (marks: number) => void;
 }) {
+  const t = useTranslations("grading");
   const entries = Object.entries(rubric);
   const [checked, setChecked] = useState<Record<string, boolean>>(
     Object.fromEntries(entries.map(([k]) => [k, false])),
@@ -582,7 +588,7 @@ function RubricPanel({
         ))}
       </ul>
       <p className="mt-2 text-[11px] italic text-ink-muted">
-        Check criteria met — total updates the marks field. You can still edit it directly.
+        {t("rubric_note")}
       </p>
     </div>
   );
@@ -618,6 +624,7 @@ function AnnotationCanvas({
   imageUrl: string;
   answerId: string;
 }) {
+  const t = useTranslations("grading");
   const [tool, setTool] = useState<AnnotationTool>("rect");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [drawing, setDrawing] = useState<Annotation | null>(null);
@@ -719,19 +726,19 @@ function AnnotationCanvas({
       {/* Tool bar */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted mr-2">
-          Annotate
+          {t("annotate_label")}
         </p>
-        {(["rect", "pin", "text"] as AnnotationTool[]).map((t) => (
+        {(["rect", "pin", "text"] as AnnotationTool[]).map((toolType) => (
           <button
-            key={t}
+            key={toolType}
             type="button"
-            onClick={() => setTool(t)}
+            onClick={() => setTool(toolType)}
             className={cx(
               "rounded-[7px] border px-2.5 py-1 text-[12px] font-medium transition",
-              tool === t ? "border-accent bg-accent text-white" : "border-line text-ink-soft hover:bg-sunken",
+              tool === toolType ? "border-accent bg-accent text-white" : "border-line text-ink-soft hover:bg-sunken",
             )}
           >
-            {t === "rect" ? "□ Highlight" : t === "pin" ? "📍 Pin" : "💬 Comment"}
+            {toolType === "rect" ? t("annotate_highlight") : toolType === "pin" ? t("annotate_pin") : t("annotate_comment")}
           </button>
         ))}
         {annotations.length > 0 && (
@@ -741,14 +748,14 @@ function AnnotationCanvas({
               onClick={() => { setAnnotations((p) => p.slice(0, -1)); setSaved(false); }}
               className="rounded-[7px] border border-line px-2.5 py-1 text-[12px] text-ink-soft hover:bg-sunken"
             >
-              ↩ Undo
+              {t("annotate_undo")}
             </button>
             <button
               type="button"
               onClick={() => { setAnnotations([]); setSaved(false); }}
               className="rounded-[7px] border border-rose/30 px-2.5 py-1 text-[12px] text-rose hover:bg-rose-soft"
             >
-              Clear all
+              {t("annotate_clear_all")}
             </button>
           </>
         )}
@@ -760,7 +767,7 @@ function AnnotationCanvas({
             onClick={saveAnnotations}
             disabled={annotations.length === 0 || saved}
           >
-            {saved ? "Saved ✓" : "Save annotations"}
+            {saved ? t("annotations_saved") : t("save_annotations")}
           </Button>
         </div>
       </div>
@@ -779,7 +786,7 @@ function AnnotationCanvas({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
-          alt="Handwritten answer"
+          alt={t("handwritten_answer_alt")}
           className="pointer-events-none max-h-[420px] w-full object-contain"
           draggable={false}
         />
@@ -803,7 +810,7 @@ function AnnotationCanvas({
               onClick={(e) => { e.stopPropagation(); removeAnnotation(ann.id); }}
               className="pointer-events-auto absolute -ml-2 -mt-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose text-[10px] text-white opacity-0 transition hover:opacity-100 focus:opacity-100"
               style={{ left: `${ann.x * 100}%`, top: `${ann.y * 100}%` }}
-              title="Remove"
+              title={t("remove")}
             >
               ×
             </button>
@@ -820,16 +827,16 @@ function AnnotationCanvas({
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addTextAnnotation(); if (e.key === "Escape") { setTextPrompt(null); setTextInput(""); } }}
-            placeholder="Comment text then Enter…"
+            placeholder={t("comment_placeholder")}
             className="flex-1 rounded-[8px] border border-line bg-surface px-3 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
           />
-          <Button size="sm" onClick={addTextAnnotation}>Add</Button>
+          <Button size="sm" onClick={addTextAnnotation}>{t("annotate_add")}</Button>
         </div>
       )}
 
       {annotations.length > 0 && (
         <p className="mt-1.5 text-[11px] text-ink-muted">
-          {annotations.length} annotation{annotations.length === 1 ? "" : "s"} · Click pins/comments to remove
+          {annotations.length} {annotations.length === 1 ? t("annotation_singular") : t("annotation_plural")} · {t("annotation_help")}
         </p>
       )}
     </div>

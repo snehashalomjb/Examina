@@ -1,0 +1,23 @@
+{
+  "profile_title": "ప్రొఫైల్",
+  "profile_subtitle": "ప్లాట్‌ఫారమ్‌లో ఉన్న మీ ఖాతా వివరాలు.",
+  "details_card": "వివరాలు",
+  "access_card": "యాక్సెస్",
+  "first_name_placeholder": "మీ మొదటి పేరును నమోదు చేయండి",
+  "last_name_placeholder": "మీ చివరి పేరును నమోదు చేయండి",
+  "email_label": "ఇమెయిల్",
+  "role_label": "పాత్ర",
+  "change_password_title": "పాస్‌వర్డ్‌ను మార్చండి",
+  "change_password_hint": "మీ ప్రస్తుత పాస్‌వర్డ్‌ను, తర్వాత కొత్తదాన్ని రెండుసార్లు నమోదు చేయండి.",
+  "current_password": "ప్రస్తుత పాస్‌వర్డ్",
+  "new_password": "కొత్త పాస్‌వర్డ్",
+  "confirm_password": "కొత్త పాస్‌వర్డ్‌ను నిర్ధారించండి",
+  "settings_title": "సెట్టింగ్‌లు",
+  "settings_subtitle": "మీ పాస్‌వర్డ్ మరియు సెషన్.",
+  "session_title": "సెషన్",
+  "session_hint": "సైన్ అవుట్ చేయడం ఈ బ్రౌజర్‌లో ఉన్న టోకెన్‌లను తొలగిస్తుంది.",
+  "sign_out": "సైన్ అవుట్",
+  "password_updated": "పాస్‌వర్డ్ విజయవంతంగా మార్చబడింది",
+  "profile_updated": "ప్రొఫైల్ విజయవంతంగా నవీకరించబడింది",
+  "settingsChangePasswordHint": "కనీసం 8 అక్షరాలు, ఒక అక్షరం మరియు ఒక అంకెతో."
+}

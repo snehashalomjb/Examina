@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "Camera access required",
+  "microphone_access_required": "Microphone access required",
+  "connection_unstable": "Internet connection is unstable",
+  "exam_submitted_successfully": "Exam submitted successfully",
+  "confirm_submit": "Are you sure you want to submit?",
+  "cannot_return_question": "You cannot return to this question",
+  "time_almost_over": "Time is almost over",
+  "changes_saved": "Changes saved",
+  "action_failed": "Action failed. Please try again."
+}

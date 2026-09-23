@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -18,6 +19,7 @@ import { ApiError, api } from "@/lib/api";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 
 export default function SettingsPage() {
+  const t = useTranslations("profile");
   const { user } = useRequireAuth();
   const { signOut } = useAuth();
 
@@ -25,13 +27,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <Hero title="Settings" body="Your password and session." />
+      <Hero title={t("settings_title")} body={t("settings_subtitle")} />
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <ChangePasswordCard email={user.email} />
+        <ChangePasswordCard email={user.email} t={t} />
 
         <Card>
-          <SectionTitle title="Session" hint="Signing out clears the tokens held in this browser." />
+          <SectionTitle title={t("session_title")} hint={t("session_hint")} />
           <p className="text-[13.5px] leading-relaxed text-ink-soft">
             You stay signed in on this device until you sign out or your refresh token
             expires. Sign out on any shared or public machine when you finish.
@@ -39,7 +41,7 @@ export default function SettingsPage() {
           <div className="mt-5">
             <Button variant="secondary" onClick={signOut}>
               <IconSignOut size={16} />
-              Sign out
+              {t("sign_out")}
             </Button>
           </div>
         </Card>
@@ -55,7 +57,7 @@ export default function SettingsPage() {
  * token inline in development. Reusing that flow means there is exactly one code path
  * that can change a password, rather than a second one to keep secure.
  */
-function ChangePasswordCard({ email }: { email: string }) {
+function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => string }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -101,7 +103,7 @@ function ChangePasswordCard({ email }: { email: string }) {
 
   return (
     <Card>
-      <SectionTitle title="Change password" hint="At least 8 characters, with a letter and a digit." />
+      <SectionTitle title={t("change_password_title")} hint={t("settingsChangePasswordHint")} />
       <form onSubmit={submit} className="space-y-4">
         <Field label="New password">
           <Input

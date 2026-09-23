@@ -9,9 +9,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.deps import CurrentAdmin, CurrentStaff, DbSession
 from app.core.logging_config import get_logger
 from app.core.security import hash_password
+from app.core.storage import ensure_bucket
 from app.db.models import (
     AccessStatus,
     AiEvaluation,
@@ -30,10 +32,13 @@ from app.db.models import (
     UserRole,
 )
 from app.schemas.admin import (
+    AdminSetPasswordRequest,
     AdminStats,
     AdminUserCreate,
     CandidateAdminRow,
+    ComponentHealth,
     RecentActivity,
+    SystemHealth,
     UserAdminOut,
 )
 from app.schemas.auth import AccessDecision, UserOut
@@ -210,6 +215,33 @@ def set_active(
     return _to_admin_out(user)
 
 
+@router.post("/users/{user_id}/reset-password", response_model=Message)
+def reset_password(
+    user_id: uuid.UUID, payload: AdminSetPasswordRequest, admin: CurrentAdmin, db: DbSession
+) -> Message:
+    """Set someone else's password directly - the examiner-locked-out-of-their-account
+    escape hatch, since there is no mail transport wired up for self-service reset.
+
+    Sets the password immediately, no token, no mailed link: an administrator's word is
+    already the authority here, the same way it is for ``POST /admin/users``. Excluded
+    only from acting on the admin's own account, which goes through the normal
+    change-password flow instead so an admin always proves their current password.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use Account Settings to change your own password",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    db.flush()
+    logger.warning("Admin %s reset the password for %s", admin.email, user.email)
+    return Message(detail=f"Password reset for {user.email}")
+
+
 @router.delete("/users/{user_id}", response_model=Message)
 def delete_user(user_id: uuid.UUID, admin: CurrentAdmin, db: DbSession) -> Message:
     user = db.get(User, user_id)
@@ -229,6 +261,30 @@ def delete_user(user_id: uuid.UUID, admin: CurrentAdmin, db: DbSession) -> Messa
 @router.get("/stats", response_model=AdminStats)
 def stats(admin: CurrentAdmin, db: DbSession) -> AdminStats:
     role_counts = dict(db.execute(select(User.role, func.count(User.id)).group_by(User.role)).all())
+    now = datetime.now(UTC)
+
+    # "Live"/"completed" are not stored - they are the same window logic ExamOut's
+    # effective_status computes per-exam, applied here as a bulk count instead of one
+    # row at a time.
+    live_exams_count = (
+        db.scalar(
+            select(func.count(Exam.id)).where(
+                Exam.status == ExamStatus.PUBLISHED,
+                Exam.starts_at <= now,
+                Exam.ends_at >= now,
+            )
+        )
+        or 0
+    )
+    completed_exams_count = (
+        db.scalar(
+            select(func.count(Exam.id)).where(
+                Exam.status == ExamStatus.PUBLISHED, Exam.ends_at < now
+            )
+        )
+        or 0
+    )
+
     return AdminStats(
         total_users=db.scalar(select(func.count(User.id))) or 0,
         candidates=role_counts.get(UserRole.CANDIDATE, 0),
@@ -247,6 +303,8 @@ def stats(admin: CurrentAdmin, db: DbSession) -> AdminStats:
             select(func.count(Exam.id)).where(Exam.status == ExamStatus.PUBLISHED)
         )
         or 0,
+        live_exams=live_exams_count,
+        completed_exams=completed_exams_count,
         live_sessions=db.scalar(
             select(func.count(ExamSession.id)).where(
                 ExamSession.status == SessionStatus.IN_PROGRESS
@@ -261,6 +319,55 @@ def stats(admin: CurrentAdmin, db: DbSession) -> AdminStats:
             )
         )
         or 0,
+    )
+
+
+@router.get("/system-health", response_model=SystemHealth)
+def system_health(admin: CurrentAdmin, db: DbSession) -> SystemHealth:
+    """What is actually checkable from inside a request, and nothing invented for the
+    rest.
+
+    Two are genuinely probed this request (database, storage); the others - websocket,
+    AI proctoring, authentication - have no server-side signal to poll from here (the
+    proctoring socket and the live-signal relay are per-session and client-driven, and
+    the AI vision model runs entirely in the candidate's browser), so they are reported
+    as "configured"/"enabled" rather than "operational" - the UI is expected to show
+    that distinction, not blur it into a fake uptime claim.
+    """
+    try:
+        db.execute(select(1))
+        database = ComponentHealth(basis="checked", status="operational")
+    except Exception as exc:  # noqa: BLE001 - reporting the failure, not swallowing it
+        database = ComponentHealth(basis="checked", status="unavailable", detail=str(exc))
+
+    if not settings.STORAGE_ENABLED:
+        storage = ComponentHealth(basis="checked", status="disabled")
+    else:
+        storage = ComponentHealth(
+            basis="checked",
+            status="operational" if ensure_bucket() else "unavailable",
+        )
+
+    return SystemHealth(
+        # Reached this line inside a FastAPI request handler, so the API is answering.
+        api=ComponentHealth(basis="checked", status="operational"),
+        database=database,
+        storage=storage,
+        websocket=ComponentHealth(
+            basis="configured",
+            status="enabled",
+            detail="Proctoring and live-monitoring sockets are registered routes.",
+        ),
+        ai_proctoring=ComponentHealth(
+            basis="configured",
+            status="enabled",
+            detail="Vision inference runs client-side (MediaPipe) during a live sitting.",
+        ),
+        authentication=ComponentHealth(
+            basis="checked",
+            status="operational",
+            detail="This request only reached here because a valid admin token was verified.",
+        ),
     )
 
 

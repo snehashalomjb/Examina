@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +21,7 @@ from app.db.models import (
     Difficulty,
     Exam,
     ExamQuestion,
+    ExamType,
     Question,
     QuestionCategory,
     QuestionOption,
@@ -30,10 +31,17 @@ from app.db.models import (
     Subject,
     UserRole,
 )
+from app.db.models.enums import SUPPORTED_LOCALES
+from app.db.models.translations import OptionTranslation, QuestionTranslation
 from app.schemas.common import Message
 from app.schemas.question import (
     BulkQuestionCreate,
     BulkQuestionResult,
+    DuplicateCheckOut,
+    DuplicateCheckRequest,
+    DuplicateMatch,
+    GenerateTranslationsOut,
+    GenerateTranslationsRequest,
     OptionIn,
     QuestionCreate,
     QuestionDuplicate,
@@ -42,29 +50,49 @@ from app.schemas.question import (
     QuestionUpdate,
     SubjectCreate,
     SubjectOut,
+    SubjectUpdate,
 )
+from app.services.i18n import resolve_locale, translated_field, upsert_translations
+from app.services.question_import import fingerprint
+from app.services.translation import get_translator
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
 router = APIRouter(tags=["question-bank"])
 logger = get_logger("questions")
 
 
-def _to_full(question: Question) -> QuestionOutFull:
-    """Serialise a question with its image URLs resolved.
+def _get_locale(staff: CurrentStaff, lang: str | None, accept_language: str | None) -> str:
+    return resolve_locale(
+        query_lang=lang, user_locale=staff.preferred_locale, accept_language=accept_language
+    )
+
+
+def _to_full(question: Question, locale: str = "en") -> QuestionOutFull:
+    """Serialise a question with its image URLs resolved and text in ``locale``.
 
     Object keys are what the database stores; a browser needs a time-limited URL, and
-    presigning is a per-request concern rather than a model one.
+    presigning is a per-request concern rather than a model one. Text falls back
+    ``locale -> en -> base column`` via ``translated_field``, so a candidate never sees
+    blank content just because a translator hasn't reached this question yet.
     """
     out = QuestionOutFull.model_validate(question)
     out.image_url = presigned_url(question.image_key)
     out.created_by_name = question.created_by.full_name if question.created_by else None
     out.subject_code = question.subject.code if question.subject else None
     out.exam_only = question.origin_exam_id is not None
+    out.body = translated_field(question.body, question.translations, locale, "body")
+    out.model_answer = translated_field(
+        question.model_answer, question.translations, locale, "model_answer"
+    )
+    out.explanation = translated_field(
+        question.explanation, question.translations, locale, "explanation"
+    )
     by_id = {o.id: o for o in question.options}
     for option in out.options:
         source = by_id.get(option.id)
         if source is not None:
             option.image_url = presigned_url(source.image_key)
+            option.text = translated_field(source.text, source.translations, locale, "text")
     return out
 
 
@@ -112,6 +140,53 @@ def create_subject(payload: SubjectCreate, staff: CurrentStaff, db: DbSession) -
     )
 
 
+@router.patch("/subjects/{subject_id}", response_model=SubjectOut)
+def update_subject(
+    subject_id: uuid.UUID, payload: SubjectUpdate, staff: CurrentStaff, db: DbSession
+) -> SubjectOut:
+    """Rename or redescribe a subject. The code is permanent - exams and questions already
+    reference it, and it is what an examiner types to find a subject again."""
+    subject = db.get(Subject, subject_id)
+    if subject is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    if payload.name is not None:
+        subject.name = payload.name.strip()
+    if payload.description is not None:
+        subject.description = payload.description
+    db.flush()
+    count = (
+        db.scalar(
+            select(func.count(Question.id)).where(
+                Question.subject_id == subject.id, Question.is_active
+            )
+        )
+        or 0
+    )
+    logger.info("%s updated subject %s", staff.email, subject.code)
+    return SubjectOut(
+        id=subject.id,
+        code=subject.code,
+        name=subject.name,
+        description=subject.description,
+        question_count=count,
+    )
+
+
+@router.get("/subjects/type-counts", response_model=dict[str, dict[str, int]])
+def subject_type_counts(staff: CurrentStaff, db: DbSession) -> dict[str, dict[str, int]]:
+    """Question count per (subject, question_type) - what the bank's landing view shows
+    under each subject before an examiner drills into one: ``Python -> MCQ: 200, ...``."""
+    rows = db.execute(
+        select(Question.subject_id, Question.question_type, func.count(Question.id))
+        .where(Question.is_active)
+        .group_by(Question.subject_id, Question.question_type)
+    ).all()
+    out: dict[str, dict[str, int]] = {}
+    for subject_id, qtype, count in rows:
+        out.setdefault(str(subject_id), {})[qtype.value] = count
+    return out
+
+
 # ----------------------------------------------------------------- questions
 def _apply_options(question: Question, options: list[OptionIn]) -> None:
     question.options.clear()
@@ -124,6 +199,22 @@ def _apply_options(question: Question, options: list[OptionIn]) -> None:
                 order_index=option.order_index or index,
             )
         )
+
+
+def _apply_option_translations(db: DbSession, question: Question, options: list[OptionIn]) -> None:
+    """Upsert each option's per-locale text. Requires ``question.options`` already
+    flushed, since a fresh option's id doesn't exist until then."""
+    for option_row, option_in in zip(question.options, options, strict=False):
+        if option_in.translations or option_row.text:
+            upsert_translations(
+                db,
+                model_cls=OptionTranslation,
+                parent_fk="option_id",
+                parent_id=option_row.id,
+                kind="option",
+                base_values={"text": option_row.text},
+                translations_payload=option_in.translations,
+            )
 
 
 # --------------------------------------------------------------- bank images
@@ -196,6 +287,8 @@ def list_questions(
     marks: float | None = None,
     search: str | None = None,
     source: QuestionSource | None = None,
+    #: Match-any: a question carrying any one of the given tags is included.
+    tags: list[str] | None = Query(default=None),
     #: Only questions this examiner wrote. Cheaper for the client than knowing its own id.
     mine: bool = False,
     created_by: uuid.UUID | None = None,
@@ -206,14 +299,18 @@ def list_questions(
     include_children: bool = False,
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    lang: str | None = None,
+    accept_language: str | None = Header(default=None),
 ) -> list[QuestionOutFull]:
     """Browse the bank. Every filter in the spec, all optional, all combinable."""
+    locale = _get_locale(staff, lang, accept_language)
     stmt = (
         select(Question)
         .options(
-            selectinload(Question.options),
+            selectinload(Question.options).selectinload(QuestionOption.translations),
             selectinload(Question.created_by),
             selectinload(Question.subject),
+            selectinload(Question.translations),
         )
         .order_by(Question.created_at.desc())
         .limit(limit)
@@ -241,6 +338,8 @@ def list_questions(
         stmt = stmt.where(Question.marks == marks)
     if source:
         stmt = stmt.where(Question.source == source)
+    if tags:
+        stmt = stmt.where(or_(*[Question.tags.contains([t]) for t in tags]))
     if mine:
         stmt = stmt.where(Question.created_by_id == staff.id)
     if created_by:
@@ -248,9 +347,7 @@ def list_questions(
     # A question authored for one exam only is not bank material. It is visible when
     # that exam is named, and nowhere else.
     stmt = stmt.where(
-        Question.origin_exam_id == exam_id
-        if exam_id
-        else Question.origin_exam_id.is_(None)
+        Question.origin_exam_id == exam_id if exam_id else Question.origin_exam_id.is_(None)
     )
     if search:
         needle = f"%{search.lower()}%"
@@ -261,7 +358,7 @@ def list_questions(
             )
         )
 
-    return [_to_full(q) for q in db.scalars(stmt)]
+    return [_to_full(q, locale) for q in db.scalars(stmt)]
 
 
 @router.get("/questions/topics", response_model=list[str])
@@ -282,6 +379,53 @@ def list_topics(
     if category:
         stmt = stmt.where(Question.category == category)
     return sorted(t for t in db.scalars(stmt) if t and t.strip())
+
+
+@router.get("/questions/tags", response_model=list[str])
+def list_tags(staff: CurrentStaff, db: DbSession) -> list[str]:
+    """Distinct tags already in use, for the tag picker's autocomplete.
+
+    Tags are a plain JSONB string array on each question rather than their own table -
+    fine to dedupe in Python since a question's tag list is a handful of short strings.
+    """
+    stmt = select(Question.tags).where(Question.tags.is_not(None))
+    seen: set[str] = set()
+    for tag_list in db.scalars(stmt):
+        for tag in tag_list or []:
+            if tag and tag.strip():
+                seen.add(tag.strip())
+    return sorted(seen)
+
+
+@router.post("/questions/check-duplicate", response_model=DuplicateCheckOut)
+def check_duplicate(
+    payload: DuplicateCheckRequest, staff: CurrentStaff, db: DbSession
+) -> DuplicateCheckOut:
+    """Look for an existing bank question that reads the same as this one.
+
+    Non-blocking by design: this only tells the examiner what it found, same fingerprint
+    (whitespace-normalised, case-folded body) already trusted by the bulk-import duplicate
+    check. Saving is never refused here - an examiner may genuinely want a near-duplicate
+    (e.g. a harder variant), so this is a heads-up, not a gate.
+    """
+    needle = fingerprint(payload.body)
+    if not needle:
+        return DuplicateCheckOut()
+
+    stmt = select(Question.id, Question.body).where(
+        Question.subject_id == payload.subject_id,
+        Question.origin_exam_id.is_(None),
+        Question.is_active,
+    )
+    if payload.exclude_question_id:
+        stmt = stmt.where(Question.id != payload.exclude_question_id)
+
+    matches = [
+        DuplicateMatch(id=qid, body=body)
+        for qid, body in db.execute(stmt)
+        if fingerprint(body) == needle
+    ][:3]
+    return DuplicateCheckOut(matches=matches)
 
 
 def _resolve_owning_exam(db, staff, exam_id: uuid.UUID | None) -> Exam | None:
@@ -307,9 +451,7 @@ def _append_to_pool(db, exam: Exam, question: Question) -> None:
         )
     )
     db.add(
-        ExamQuestion(
-            exam_id=exam.id, question_id=question.id, order_index=(next_index or -1) + 1
-        )
+        ExamQuestion(exam_id=exam.id, question_id=question.id, order_index=(next_index or -1) + 1)
     )
 
 
@@ -338,7 +480,11 @@ def create_question(payload: QuestionCreate, staff: CurrentStaff, db: DbSession)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     exam = _resolve_owning_exam(db, staff, payload.exam_id)
-    if exam is not None and payload.subject_id != exam.subject_id:
+    if (
+        exam is not None
+        and exam.exam_type is not ExamType.CORPORATE
+        and payload.subject_id != exam.subject_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The question's subject must match the exam's subject",
@@ -372,10 +518,26 @@ def create_question(payload: QuestionCreate, staff: CurrentStaff, db: DbSession)
     db.add(question)
     db.flush()
 
+    upsert_translations(
+        db,
+        model_cls=QuestionTranslation,
+        parent_fk="question_id",
+        parent_id=question.id,
+        kind="question",
+        base_values={
+            "body": question.body,
+            "model_answer": question.model_answer,
+            "explanation": question.explanation,
+        },
+        translations_payload=payload.translations,
+    )
+    _apply_option_translations(db, question, payload.options)
+
     if exam is not None:
         _append_to_pool(db, exam, question)
         db.flush()
 
+    db.flush()
     db.refresh(question)
     logger.info(
         "%s added a %s question (%s)",
@@ -428,11 +590,101 @@ def bulk_create(
 
 
 @router.get("/questions/{question_id}", response_model=QuestionOutFull)
-def get_question(question_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> QuestionOutFull:
+def get_question(
+    question_id: uuid.UUID,
+    staff: CurrentStaff,
+    db: DbSession,
+    lang: str | None = None,
+    accept_language: str | None = Header(default=None),
+) -> QuestionOutFull:
     question = db.get(Question, question_id)
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
-    return _to_full(question)
+    return _to_full(question, _get_locale(staff, lang, accept_language))
+
+
+@router.post(
+    "/questions/{question_id}/generate-translations", response_model=GenerateTranslationsOut
+)
+def generate_translations(
+    question_id: uuid.UUID,
+    payload: GenerateTranslationsRequest,
+    staff: CurrentStaff,
+    db: DbSession,
+) -> GenerateTranslationsOut:
+    """Machine-translate this question's English text into the requested locales.
+
+    A preview only - nothing is written here. The examiner reviews and edits the
+    result in the authoring form, then saves it the normal way (PATCH with a
+    ``translations`` payload), same as if they had typed it by hand.
+    """
+    question = db.scalar(
+        select(Question)
+        .where(Question.id == question_id)
+        .options(
+            selectinload(Question.options).selectinload(QuestionOption.translations),
+            selectinload(Question.translations),
+        )
+    )
+    if question is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    _require_edit(staff, question)
+
+    requested = payload.locales or [loc for loc in SUPPORTED_LOCALES if loc != "en"]
+    unknown = [loc for loc in requested if loc not in SUPPORTED_LOCALES or loc == "en"]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Not a translatable target language: {', '.join(unknown)}",
+        )
+
+    existing_locales = {t.locale for t in question.translations}
+    skipped: list[str] = []
+    targets: list[str] = []
+    for loc in requested:
+        if loc in existing_locales and not payload.overwrite_existing:
+            skipped.append(loc)
+        else:
+            targets.append(loc)
+
+    translator = get_translator()
+    question_fields = {
+        "body": question.body or "",
+        "explanation": question.explanation or "",
+    }
+    # Index-keyed rather than option-id-keyed: a provider building a structured schema
+    # from these keys (see OpenAITranslator) needs valid identifiers, and a UUID isn't
+    # one.
+    option_keys = [f"opt_{i}" for i in range(len(question.options))]
+    option_fields = {key: (o.text or "") for key, o in zip(option_keys, question.options)}
+
+    out_translations: dict[str, dict[str, str]] = {}
+    out_options: dict[uuid.UUID, dict[str, str]] = {o.id: {} for o in question.options}
+
+    for loc in targets:
+        translated_q = translator.translate(texts=question_fields, target_locale=loc)
+        out_translations[loc] = {
+            "body": translated_q.get("body", ""),
+            "explanation": translated_q.get("explanation", ""),
+        }
+        translated_opts = translator.translate(texts=option_fields, target_locale=loc)
+        for key, option in zip(option_keys, question.options):
+            out_options[option.id][loc] = translated_opts.get(key, "")
+
+    logger.info(
+        "%s generated %s translations for question %s (%d locale(s), %d skipped)",
+        staff.email,
+        translator.name,
+        question_id,
+        len(targets),
+        len(skipped),
+    )
+    return GenerateTranslationsOut(
+        translations=out_translations,
+        options=out_options,
+        provider=translator.name,
+        skipped_existing=skipped,
+    )
 
 
 @router.post(
@@ -449,15 +701,17 @@ def duplicate_question(
     the sanctioned way to build on someone else's work without altering their copy.
     """
     original = db.scalar(
-        select(Question)
-        .where(Question.id == question_id)
-        .options(selectinload(Question.options))
+        select(Question).where(Question.id == question_id).options(selectinload(Question.options))
     )
     if original is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
     exam = _resolve_owning_exam(db, staff, payload.exam_id)
-    if exam is not None and original.subject_id != exam.subject_id:
+    if (
+        exam is not None
+        and exam.exam_type is not ExamType.CORPORATE
+        and original.subject_id != exam.subject_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The question's subject must match the exam's subject",
@@ -517,7 +771,7 @@ def update_question(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
     _require_edit(staff, question)
 
-    data = payload.model_dump(exclude_unset=True, exclude={"options"})
+    data = payload.model_dump(exclude_unset=True, exclude={"options", "translations"})
     for field, value in data.items():
         setattr(question, field, value)
 
@@ -542,6 +796,24 @@ def update_question(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+
+    db.flush()
+
+    upsert_translations(
+        db,
+        model_cls=QuestionTranslation,
+        parent_fk="question_id",
+        parent_id=question.id,
+        kind="question",
+        base_values={
+            "body": question.body,
+            "model_answer": question.model_answer,
+            "explanation": question.explanation,
+        },
+        translations_payload=payload.translations,
+    )
+    if payload.options is not None:
+        _apply_option_translations(db, question, payload.options)
 
     db.flush()
     db.refresh(question)

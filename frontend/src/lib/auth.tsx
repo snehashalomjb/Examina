@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from "next/navigation";
 
 import { api, tokens } from "@/lib/api";
+import { isSupportedLocale, useLocale, type Locale } from "@/lib/locale";
 import type { LoginAccess, LoginAccessStatus, TokenPair, User, UserRole } from "@/lib/types";
 
 interface AuthState {
@@ -20,6 +21,12 @@ interface AuthState {
   register: (input: RegisterInput) => Promise<TokenPair>;
   signOut: () => void;
   refreshUser: () => Promise<void>;
+  /**
+   * What the language selector calls. Updates the UI instantly (no reload) and, when
+   * signed in, persists the choice server-side so it follows the user across devices -
+   * a no-op network call when signed out, since localStorage already carries it then.
+   */
+  changeLocale: (locale: Locale) => void;
 }
 
 export interface RegisterInput {
@@ -48,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loginAccess, setLoginAccess] = useState<LoginAccessStatus | null>(null);
   const [booting, setBooting] = useState(true);
   const router = useRouter();
+  const { locale, setLocale } = useLocale();
 
   const loadUser = useCallback(async () => {
     if (!tokens.access()) {
@@ -58,6 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await api.get<User>("/auth/me");
       setUser(me);
+      // The server is the source of truth once signed in - a locale picked before
+      // login (or on another device) is reconciled here rather than left to drift.
+      if (isSupportedLocale(me.preferred_locale) && me.preferred_locale !== locale) {
+        setLocale(me.preferred_locale);
+      }
 
       if (me.role === "candidate") {
         // Re-read on every boot so a revocation takes effect on the next page load
@@ -76,12 +89,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setLoginAccess(null);
     }
-  }, []);
+  }, [locale, setLocale]);
+
+  // The splash stays up a fixed 3s minimum regardless of how fast `/auth/me` actually
+  // resolves - a sub-second flash reads as broken, not fast.
+  const SPLASH_MIN_MS = 3000;
 
   useEffect(() => {
     let cancelled = false;
+    const started = Date.now();
     (async () => {
       await loadUser();
+      const elapsed = Date.now() - started;
+      const wait = Math.max(SPLASH_MIN_MS - elapsed, 0);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       if (!cancelled) setBooting(false);
     })();
     return () => {
@@ -89,21 +110,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadUser]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const pair = await api.post<TokenPair>("/auth/login", { email, password }, { auth: false });
-    tokens.set(pair.access_token, pair.refresh_token);
-    setUser(pair.user);
-    setLoginAccess(pair.login_access);
-    return pair;
-  }, []);
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      const pair = await api.post<TokenPair>("/auth/login", { email, password }, { auth: false });
+      tokens.set(pair.access_token, pair.refresh_token);
+      setUser(pair.user);
+      setLoginAccess(pair.login_access);
+      if (isSupportedLocale(pair.user.preferred_locale)) setLocale(pair.user.preferred_locale);
+      return pair;
+    },
+    [setLocale],
+  );
 
-  const register = useCallback(async (input: RegisterInput) => {
-    const pair = await api.post<TokenPair>("/auth/register", input, { auth: false });
-    tokens.set(pair.access_token, pair.refresh_token);
-    setUser(pair.user);
-    setLoginAccess(pair.login_access);
-    return pair;
-  }, []);
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      const pair = await api.post<TokenPair>("/auth/register", input, { auth: false });
+      tokens.set(pair.access_token, pair.refresh_token);
+      setUser(pair.user);
+      setLoginAccess(pair.login_access);
+      if (isSupportedLocale(pair.user.preferred_locale)) setLocale(pair.user.preferred_locale);
+      return pair;
+    },
+    [setLocale],
+  );
 
   const signOut = useCallback(() => {
     tokens.clear();
@@ -112,9 +141,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }, [router]);
 
+  const changeLocale = useCallback(
+    (next: Locale) => {
+      setLocale(next);
+      if (user) {
+        // Fire-and-forget: a failed save just means the choice stays local-only until
+        // the next successful one, which is not worth blocking the UI switch over.
+        void api
+          .patch("/auth/me", {
+            first_name: user.first_name,
+            last_name: user.last_name,
+            preferred_locale: next,
+          })
+          .catch(() => {});
+      }
+    },
+    [setLocale, user],
+  );
+
   const value = useMemo(
-    () => ({ user, loginAccess, booting, signIn, register, signOut, refreshUser: loadUser }),
-    [user, loginAccess, booting, signIn, register, signOut, loadUser],
+    () => ({
+      user,
+      loginAccess,
+      booting,
+      signIn,
+      register,
+      signOut,
+      refreshUser: loadUser,
+      changeLocale,
+    }),
+    [user, loginAccess, booting, signIn, register, signOut, loadUser, changeLocale],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

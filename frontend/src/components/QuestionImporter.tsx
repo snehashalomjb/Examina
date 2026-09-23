@@ -10,6 +10,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -34,8 +35,16 @@ import {
   type Subject,
 } from "@/lib/types";
 
-const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm,.docx";
-const MAX_MB = 10;
+const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm,.doc,.docx,.pdf";
+const MAX_MB = 20;
+
+const FILE_TYPE_INFO = [
+  { ext: "PDF",  label: "PDF",          icon: "📄", color: "#ef4444" },
+  { ext: "DOCX", label: "Word (.docx)",  icon: "📝", color: "#2563eb" },
+  { ext: "XLSX", label: "Excel (.xlsx)", icon: "📊", color: "#16a34a" },
+  { ext: "CSV",  label: "CSV / TSV",    icon: "📋", color: "#0d9488" },
+  { ext: "JSON", label: "JSON",          icon: "🔧", color: "#7c3aed" },
+];
 
 export interface QuestionImporterProps {
   subjects: Subject[];
@@ -51,11 +60,15 @@ export function QuestionImporter({
   subjectId,
   onImported,
 }: QuestionImporterProps) {
+  const t = useTranslations("question");
   const [chosenSubject, setChosenSubject] = useState(subjectId ?? "");
   const subject = subjectId ?? chosenSubject;
 
+  const [mode, setMode] = useState<"file" | "url">("file");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [url, setUrl] = useState("");
+  const [urlFetching, setUrlFetching] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +93,18 @@ export function QuestionImporter({
     [importable, chosen],
   );
 
-  async function parse(candidate: File) {
+  /** How many of each question type were actually extracted, so a mixed-type file
+   * ("5 Single Choice, 5 True/False, 3 Multiple Choice") shows its full breakdown
+   * rather than just a total. */
+  const typeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      counts.set(row.question_type, (counts.get(row.question_type) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+
+  async function parse(candidate: File, sheet?: string) {
     if (candidate.size > MAX_MB * 1024 * 1024) {
       setError(`That file is larger than ${MAX_MB} MB.`);
       return;
@@ -91,6 +115,7 @@ export function QuestionImporter({
     const form = new FormData();
     form.append("file", candidate);
     if (subject) form.append("subject_id", subject);
+    if (sheet) form.append("sheet_name", sheet);
 
     try {
       const data = await api.upload<ImportParseResult>("/questions/import/parse", form);
@@ -115,7 +140,42 @@ export function QuestionImporter({
     setParsed(null);
     setRows([]);
     setChosen([]);
+    setError(null);
     if (candidate) void parse(candidate);
+  }
+
+  async function fetchUrl() {
+    const trimmed = url.trim();
+    if (!trimmed) { setError("Paste a Google Forms or web URL first."); return; }
+    setUrlFetching(true);
+    setError(null);
+    setResult(null);
+    setParsed(null);
+    setRows([]);
+    setChosen([]);
+    try {
+      const form = new FormData();
+      form.append("url", trimmed);
+      if (subject) form.append("subject_id", subject);
+      const data = await api.upload<ImportParseResult>("/questions/import/parse-url", form);
+      setParsed(data);
+      setRows(data.rows);
+      setChosen(
+        data.rows
+          .filter((row) => row.problems.length === 0 && !row.duplicate_of)
+          .map((row) => row.row_number),
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not fetch questions from that URL.");
+    } finally {
+      setUrlFetching(false);
+    }
+  }
+
+  function detectUrlType(u: string): "google_forms" | "website" | "unknown" {
+    if (u.includes("docs.google.com/forms")) return "google_forms";
+    if (u.startsWith("http")) return "website";
+    return "unknown";
   }
 
   function patchRow(rowNumber: number, patch: Partial<ImportedRow>) {
@@ -140,6 +200,9 @@ export function QuestionImporter({
         rows: selectedRows.map((row) => ({
           row_number: row.row_number,
           body: row.body,
+          // A row that named its own subject (the CSV/XLSX "Subject" column) keeps it;
+          // everything else falls back to the subject chosen above.
+          subject_id: row.subject_id,
           question_type: row.question_type,
           difficulty: row.difficulty,
           category: row.category,
@@ -178,26 +241,28 @@ export function QuestionImporter({
   return (
     <div className="space-y-5">
       <Card>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[15px] font-semibold tracking-tight text-ink">Import questions</h3>
+        {/* ── Header ─────────────────────────────────────────── */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-[15px] font-bold tracking-tight text-ink">{t("importer_heading")}</h3>
           <button
             type="button"
-            className="text-[12.5px] font-medium text-accent hover:underline"
+            className="text-[12.5px] font-semibold text-accent hover:underline"
             onClick={() =>
               void api
                 .download("/questions/import/template", "examina-question-template.csv")
                 .catch(() => setError("Could not download the template."))
             }
           >
-            Download the CSV template
+            ↓ Download CSV template
           </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {!subjectId && (
+        {/* ── Subject picker ──────────────────────────────────── */}
+        {!subjectId && (
+          <div className="mb-4">
             <Field label="Subject" required hint="Every imported question needs one.">
               <Select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)}>
-                <option value="">Choose a subject</option>
+                <option value="">{t("importer_subject_option")}</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} — {s.name}
@@ -205,63 +270,210 @@ export function QuestionImporter({
                 ))}
               </Select>
             </Field>
-          )}
+          </div>
+        )}
+
+        {/* ── Mode tabs ───────────────────────────────────────── */}
+        <div className="mb-5 flex rounded-[11px] border border-line bg-sunken p-1">
+          {([
+            { id: "file", label: "📁 Upload File" },
+            { id: "url",  label: "🔗 Import from URL" },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => { setMode(tab.id); setError(null); }}
+              className={cx(
+                "flex-1 rounded-[8px] px-4 py-2 text-[13px] font-semibold transition-all duration-200",
+                mode === tab.id
+                  ? "bg-surface text-ink shadow-[var(--shadow-xs)]"
+                  : "text-ink-muted hover:text-ink",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            const dropped = e.dataTransfer.files?.[0];
-            if (dropped) pick(dropped);
-          }}
-          className={cx(
-            "mt-4 rounded-[12px] border-2 border-dashed p-6 text-center transition",
-            dragging ? "border-accent bg-accent-soft/40" : "border-line-strong bg-sunken/40",
-          )}
-        >
-          <p className="text-[13.5px] font-medium text-ink">
-            {file ? file.name : "Drop a file here, or choose one"}
-          </p>
-          <p className="mt-1 text-[12px] text-ink-muted">
-            CSV, Excel (.xlsx) or Word (.docx) — up to {MAX_MB} MB. PDFs go through AI
-            Generate, which reads a syllabus rather than a question table.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-            <label className="cursor-pointer rounded-[9px] border border-line-strong bg-surface px-3 py-1.5 text-[13px] font-medium text-ink hover:bg-sunken">
-              Choose file
-              <input
-                type="file"
-                accept={ACCEPT}
-                className="hidden"
-                onChange={(e) => pick(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            {file && (
-              <Button variant="ghost" size="sm" onClick={() => pick(null)}>
-                Clear
-              </Button>
+        {/* ══ FILE UPLOAD MODE ════════════════════════════════ */}
+        {mode === "file" && (
+          <>
+            {/* Supported formats strip */}
+            <div className="mb-4 flex flex-wrap gap-2">
+              {FILE_TYPE_INFO.map((ft) => (
+                <span
+                  key={ft.ext}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                  style={{ borderColor: `${ft.color}30`, background: `${ft.color}0d`, color: ft.color }}
+                >
+                  {ft.icon} {ft.label}
+                </span>
+              ))}
+            </div>
+
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const dropped = e.dataTransfer.files?.[0];
+                if (dropped) pick(dropped);
+              }}
+              className={cx(
+                "relative rounded-[14px] border-2 border-dashed p-8 text-center transition-all duration-200",
+                dragging
+                  ? "border-accent bg-accent-soft/40 scale-[1.01]"
+                  : file
+                    ? "border-green/40 bg-green-soft/20"
+                    : "border-line-strong bg-sunken/40 hover:border-accent/40 hover:bg-accent-soft/10",
+              )}
+            >
+              {/* Big upload icon */}
+              {!file && (
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[14px] border border-line bg-surface text-3xl shadow-[var(--shadow-xs)]">
+                  {dragging ? "📂" : "📤"}
+                </div>
+              )}
+
+              {file ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-green-soft text-2xl">
+                    ✅
+                  </div>
+                  <p className="text-[14px] font-bold text-ink">{file.name}</p>
+                  <p className="text-[12px] text-ink-muted">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[14px] font-semibold text-ink">
+                    {dragging ? "Drop it!" : "Drag & drop a file here"}
+                  </p>
+                  <p className="mt-1 text-[12px] text-ink-muted">
+                    PDF, Word (.doc/.docx), Excel (.xlsx), CSV, or JSON — up to {MAX_MB} MB
+                  </p>
+                </>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <label className="cursor-pointer rounded-[10px] border border-line-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink shadow-[var(--shadow-xs)] hover:bg-sunken hover:-translate-y-[1px] transition-all">
+                  {file ? "Choose different file" : "Browse files"}
+                  <input
+                    type="file"
+                    accept={ACCEPT}
+                    className="hidden"
+                    onChange={(e) => pick(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {file && (
+                  <Button variant="ghost" size="sm" onClick={() => pick(null)}>
+                    ✕ Clear
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {parsing && (
+              <div className="mt-4 flex items-center gap-3 rounded-[10px] bg-accent-soft/30 px-4 py-3">
+                <span className="animate-spin text-lg">⚙️</span>
+                <p className="text-[13px] font-medium text-accent">Reading {file?.name}…</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══ URL IMPORT MODE ═════════════════════════════════ */}
+        {mode === "url" && (
+          <div className="space-y-4">
+            {/* Supported sources */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex items-start gap-3 rounded-[12px] border border-line bg-gradient-to-br from-blue-50/50 to-transparent p-3.5">
+                <span className="text-2xl">📋</span>
+                <div>
+                  <p className="text-[13px] font-bold text-ink">Google Forms</p>
+                  <p className="mt-0.5 text-[11.5px] text-ink-muted">
+                    Paste a public Google Forms link — questions are extracted automatically.
+                  </p>
+                  <p className="mt-1 text-[10.5px] font-mono text-ink-muted">
+                    docs.google.com/forms/d/…
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 rounded-[12px] border border-line bg-gradient-to-br from-purple-50/50 to-transparent p-3.5">
+                <span className="text-2xl">🌐</span>
+                <div>
+                  <p className="text-[13px] font-bold text-ink">Any Website / Quiz URL</p>
+                  <p className="mt-0.5 text-[11.5px] text-ink-muted">
+                    Publicly accessible quiz pages, question-bank sites, or LMS exports.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* URL input */}
+            <div className="space-y-2">
+              <div className="relative flex gap-2">
+                <div className="relative flex-1">
+                  {url && (
+                    <span className={cx(
+                      "absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded",
+                      detectUrlType(url) === "google_forms"
+                        ? "bg-blue-100 text-blue-600"
+                        : detectUrlType(url) === "website"
+                          ? "bg-purple-100 text-purple-600"
+                          : "bg-sunken text-ink-muted",
+                    )}>
+                      {detectUrlType(url) === "google_forms" ? "🔵 Google Forms" : detectUrlType(url) === "website" ? "🌐 Web" : ""}
+                    </span>
+                  )}
+                  <Input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void fetchUrl(); }}
+                    placeholder="Paste Google Forms link or website URL…"
+                    className={cx(
+                      "w-full pr-4",
+                      url && detectUrlType(url) === "google_forms" ? "pl-36" : url ? "pl-20" : "",
+                    )}
+                  />
+                </div>
+                <Button
+                  onClick={() => void fetchUrl()}
+                  loading={urlFetching}
+                  disabled={!url.trim()}
+                >
+                  {urlFetching ? "Fetching…" : "Import"}
+                </Button>
+              </div>
+
+              {/* Hint rows */}
+              <div className="space-y-1 text-[11.5px] text-ink-muted">
+                <p>💡 The form or page must be <strong>publicly accessible</strong> (no login required).</p>
+                <p>💡 Google Forms: open your form → click ⋮ → <em>Get pre-filled link</em> → copy the URL.</p>
+              </div>
+            </div>
+
+            {urlFetching && (
+              <div className="flex items-center gap-3 rounded-[10px] bg-accent-soft/30 px-4 py-3">
+                <span className="animate-spin text-lg">⚙️</span>
+                <p className="text-[13px] font-medium text-accent">Fetching questions from URL…</p>
+              </div>
             )}
           </div>
-        </div>
-
-        {parsing && (
-          <p className="mt-3 text-[13px] text-ink-muted">Reading {file?.name}…</p>
         )}
+
         {error && (
-          <div className="mt-3">
+          <div className="mt-4">
             <Alert tone="rose">{error}</Alert>
           </div>
         )}
       </Card>
 
       {result && (
-        <Alert tone={result.failed ? "amber" : "mint"} title="Import finished">
+        <Alert tone={result.failed ? "amber" : "mint"} title={t("importer_alert_finished")}>
           {result.created} question{result.created === 1 ? "" : "s"} imported
           {examId ? " and added to this exam" : " into your bank"}.
           {result.failed > 0 && (
@@ -277,6 +489,28 @@ export function QuestionImporter({
         </Alert>
       )}
 
+      {parsed && parsed.sheet_names.length > 1 && (
+        <Alert tone="accent">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>
+              This workbook has {parsed.sheet_names.length} sheets. Reading{" "}
+              <strong>{parsed.sheet_name}</strong>.
+            </span>
+            <Select
+              value={parsed.sheet_name ?? ""}
+              onChange={(e) => file && void parse(file, e.target.value)}
+              className="w-48"
+            >
+              {parsed.sheet_names.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </Alert>
+      )}
+
       {parsed && rows.length > 0 && (
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -284,6 +518,7 @@ export function QuestionImporter({
               <h3 className="text-[15px] font-semibold tracking-tight text-ink">
                 Review before importing
               </h3>
+              <Badge tone="neutral">{rows.length} detected</Badge>
               <Badge tone="mint">{rows.filter((r) => !r.problems.length).length} ready</Badge>
               {rows.some((r) => r.problems.length > 0) && (
                 <Badge tone="rose">
@@ -293,6 +528,14 @@ export function QuestionImporter({
               {parsed.duplicates > 0 && (
                 <Badge tone="amber">{parsed.duplicates} duplicate</Badge>
               )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {typeCounts.map(([type, count]) => (
+                <Badge key={type} tone="neutral">
+                  {count} {QUESTION_TYPE_LABEL[type as QuestionType] ?? type}
+                </Badge>
+              ))}
             </div>
             <label className="flex items-center gap-2 text-[12.5px] text-ink-soft">
               <input
@@ -376,6 +619,9 @@ export function QuestionImporter({
                       </p>
 
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {row.subject_name && (
+                          <Badge tone="purple">{row.subject_name}</Badge>
+                        )}
                         <Badge tone="neutral">
                           {QUESTION_TYPE_LABEL[row.question_type] ?? row.question_type}
                         </Badge>
@@ -397,8 +643,8 @@ export function QuestionImporter({
 
                       {broken && (
                         <ul className="mt-2 list-inside list-disc text-[12.5px] text-rose-ink">
-                          {row.problems.map((problem) => (
-                            <li key={problem}>{problem}</li>
+                          {row.problems.map((problem, index) => (
+                            <li key={index}>{problem}</li>
                           ))}
                         </ul>
                       )}
@@ -449,6 +695,7 @@ function RowFixer({
   row: ImportedRow;
   onChange: (patch: Partial<ImportedRow>) => void;
 }) {
+  const t = useTranslations("question");
   const optionBearing = ["mcq", "multi_select", "true_false"].includes(row.question_type);
   const single = row.question_type === "mcq" || row.question_type === "true_false";
   const written = row.question_type === "short_answer" || row.question_type === "long_answer";
@@ -483,9 +730,9 @@ function RowFixer({
             value={row.difficulty}
             onChange={(e) => onChange({ difficulty: e.target.value as Difficulty })}
           >
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="easy">{t("difficulty_easy")}</option>
+            <option value="medium">{t("difficulty_medium")}</option>
+            <option value="hard">{t("difficulty_hard")}</option>
           </Select>
         </Field>
         <Field label="Marks">

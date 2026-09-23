@@ -1,0 +1,11 @@
+{
+  "camera_access_required": "ക്യാമറ പ്രവേശനം ആവശ്യമാണ്",
+  "microphone_access_required": "മൈക്രോഫോൺ പ്രവേശനം ആവശ്യമാണ്",
+  "connection_unstable": "ഇന്റർനെറ്റ് കണക്ഷൻ അസ്ഥിരമാണ്",
+  "exam_submitted_successfully": "പരീക്ഷ വിജയകരമായി സമർപ്പിച്ചു",
+  "confirm_submit": "നിങ്ങൾക്ക് ഉറപ്പാണോ സമർപ്പിക്കണമെന്ന്?",
+  "cannot_return_question": "ഈ ചോദ്യത്തിലേക്ക് നിങ്ങൾക്ക് തിരികെ പോകാൻ കഴിയില്ല",
+  "time_almost_over": "സമയം ഏതാണ്ട് കഴിഞ്ഞു",
+  "changes_saved": "മാറ്റങ്ങൾ സേവ് ചെയ്തു",
+  "action_failed": "പ്രവർത്തനം പരാജയപ്പെട്ടു. ദയവായി വീണ്ടും ശ്രമിക്കുക."
+}

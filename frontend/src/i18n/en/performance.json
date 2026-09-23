@@ -1,0 +1,16 @@
+{
+  "performance_analysis": "Performance Analysis",
+  "subject_wise": "Subject-wise Performance",
+  "question_wise": "Question-wise Performance",
+  "strengths": "Strengths",
+  "areas_for_improvement": "Areas for Improvement",
+  "attempts": "Attempts",
+  "average_score": "Average Score",
+  "best_score": "Best Score",
+  "trend": "Trend",
+  "chart_legend_correct": "Correct",
+  "chart_legend_incorrect": "Incorrect",
+  "chart_legend_unanswered": "Unanswered",
+  "performance_title": "Performance",
+  "performance_body": "How your released results look together — accuracy, completion, and whether your scores are moving."
+}

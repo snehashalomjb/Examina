@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -61,6 +60,20 @@ class RankingRow(BaseModel):
     is_flagged: bool = False
     result_id: uuid.UUID | None = None
     session_id: uuid.UUID | None = None
+    published: bool = False
+    needs_integrity_review: bool = False
+    integrity_verdict: str = "pending"
+    pending_review_count: int = 0
+
+
+class TopPerformer(BaseModel):
+    """The single best published score for an exam or a subject."""
+
+    candidate_name: str
+    exam_title: str
+    obtained_marks: float
+    total_marks: float
+    percentage: float
 
 
 class ShortlistBulkCreate(BaseModel):

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.db.models import (
     Answer,
     Exam,
+    ExamEnrollment,
     ExamSession,
     ExamStatus,
     GradeStatus,
@@ -400,6 +401,81 @@ def build(db: Session, staff: User) -> dict:
         "upcoming_exams": upcoming_exams,
         "recent_activity": _activity(db, scope, now=now, since=since),
     }
+
+
+def live_exams(db: Session, staff: User) -> list[dict]:
+    """One row per exam currently inside its published window - the admin/examiner
+    "Live Examinations" table, as opposed to ``live_sessions`` above which is one row
+    per candidate sitting. Same scope rule: an examiner sees their own, an admin sees
+    every exam on the platform.
+    """
+    now = datetime.now(UTC)
+    scope = scope_for(db, staff)
+
+    exams = list(
+        db.scalars(
+            select(Exam)
+            .where(
+                Exam.status == ExamStatus.PUBLISHED,
+                Exam.starts_at <= now,
+                Exam.ends_at >= now,
+                *scope.exam_clause,
+            )
+            .options(selectinload(Exam.created_by))
+            .order_by(Exam.ends_at)
+        )
+    )
+    if not exams:
+        return []
+
+    exam_ids = [e.id for e in exams]
+
+    enrolled_counts = dict(
+        db.execute(
+            select(ExamEnrollment.exam_id, func.count(ExamEnrollment.id))
+            .where(ExamEnrollment.exam_id.in_(exam_ids))
+            .group_by(ExamEnrollment.exam_id)
+        ).all()
+    )
+    active_counts = dict(
+        db.execute(
+            select(ExamSession.exam_id, func.count(ExamSession.id))
+            .where(
+                ExamSession.exam_id.in_(exam_ids),
+                ExamSession.status == SessionStatus.IN_PROGRESS,
+            )
+            .group_by(ExamSession.exam_id)
+        ).all()
+    )
+    flagged_counts = dict(
+        db.execute(
+            select(ExamSession.exam_id, func.count(ExamSession.id))
+            .where(ExamSession.exam_id.in_(exam_ids), ExamSession.is_flagged.is_(True))
+            .group_by(ExamSession.exam_id)
+        ).all()
+    )
+
+    rows = []
+    for exam in exams:
+        remaining = max(int((exam.ends_at - now).total_seconds()), 0)
+        hours, rem = divmod(remaining, 3600)
+        minutes, seconds = divmod(rem, 60)
+        remaining_str = (
+            f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
+        )
+
+        rows.append(
+            {
+                "exam_id": str(exam.id),
+                "exam_title": exam.title,
+                "examiner_name": exam.created_by.full_name if exam.created_by else "—",
+                "candidate_count": enrolled_counts.get(exam.id, 0),
+                "active_count": active_counts.get(exam.id, 0),
+                "flagged_count": flagged_counts.get(exam.id, 0),
+                "time_remaining_str": remaining_str,
+            }
+        )
+    return rows
 
 
 def _signals(sessions: list[ExamSession]) -> dict:

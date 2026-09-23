@@ -10,6 +10,7 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     File,
+    Header,
     HTTPException,
     Response,
     UploadFile,
@@ -31,9 +32,11 @@ from app.db.models import (
     ExamSession,
     ExamStatus,
     Question,
+    QuestionOption,
     QuestionType,
     Result,
     SessionStatus,
+    Subject,
 )
 from app.db.session import SessionLocal
 from app.schemas.exam_session import (
@@ -48,6 +51,7 @@ from app.schemas.exam_session import (
 )
 from app.schemas.question import OptionOut
 from app.services import answer_media, exam_engine, login_access
+from app.services.i18n import resolve_locale, translated_field
 from app.services.question_spec import candidate_spec
 from app.services.text_metrics import WordCountError
 from app.services.validators import ValidationError
@@ -55,20 +59,58 @@ from app.services.validators import ValidationError
 router = APIRouter(tags=["exam-session"])
 logger = get_logger("exam")
 
+
+def _candidate_locale(
+    candidate: CurrentCandidate,
+    accept_language: str | None = Header(default=None),
+    lang: str | None = None,
+) -> str:
+    """Explicit ``?lang=`` wins over the candidate's saved preference over the browser's
+    header - see ``resolve_locale``. The override is per-request only: switching
+    language mid-exam never touches ``candidate.preferred_locale``, so it can't surprise
+    them anywhere else in the app."""
+    return resolve_locale(
+        query_lang=lang, user_locale=candidate.preferred_locale, accept_language=accept_language
+    )
+
+
+def _within_exam_languages(exam: Exam, locale: str) -> str:
+    """Fall back to English when the candidate asks for a language this exam never
+    enabled - never a 4xx, since a stale selector choice must never block the paper."""
+    return locale if locale in exam.languages else "en"
+
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 # ------------------------------------------------------------------ helpers
-def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessionOut:
-    """Render the candidate's frozen paper, merged with whatever they have saved."""
+def _localized_option(option: QuestionOption, locale: str) -> OptionOut:
+    out = OptionOut.model_validate(option)
+    out.text = translated_field(option.text, option.translations, locale, "text")
+    return out
+
+
+def _build_paper(
+    db, session: ExamSession, *, include_token: bool, locale: str = "en"
+) -> ExamSessionOut:
+    """Render the candidate's frozen paper, merged with whatever they have saved.
+
+    Question/option text is resolved to ``locale`` with fallback to English (see
+    ``app.services.i18n``) - the frozen ``question_order``/answer-key data underneath is
+    entirely language-independent, so translating display text here never touches
+    grading.
+    """
+    locale = _within_exam_languages(session.exam, locale)
     question_ids = [uuid.UUID(e["question_id"]) for e in session.question_order]
     questions = {
         q.id: q
         for q in db.scalars(
             select(Question)
             .where(Question.id.in_(question_ids))
-            .options(selectinload(Question.options))
+            .options(
+                selectinload(Question.options).selectinload(QuestionOption.translations),
+                selectinload(Question.translations),
+            )
         )
     }
     answers = {a.question_id: a for a in session.answers}
@@ -110,7 +152,7 @@ def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessio
                 question_id=qid,
                 question_type=question.question_type,
                 difficulty=question.difficulty,
-                body=question.body,
+                body=translated_field(question.body, question.translations, locale, "body"),
                 marks=entry.get("marks", question.marks),
                 negative_marks=question.negative_marks,
                 category=question.category,
@@ -124,7 +166,7 @@ def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessio
                 parent_question_id=question.parent_question_id,
                 section_id=sec_id,
                 # No is_correct field here - the answer key never reaches the browser.
-                options=[OptionOut.model_validate(o) for o in ordered],
+                options=[_localized_option(o, locale) for o in ordered],
                 saved_option_ids=[uuid.UUID(o) for o in (answer.selected_option_ids or [])]
                 if answer
                 else [],
@@ -155,7 +197,7 @@ def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessio
             built_sections.append(
                 SessionSection(
                     id=s.id,
-                    name=s.name,
+                    name=translated_field(s.name, s.translations, locale, "name"),
                     order_index=s.order_index,
                     question_ids=sec_question_lists[s.id],
                 )
@@ -164,7 +206,9 @@ def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessio
     return ExamSessionOut(
         session_id=session.id,
         exam_id=session.exam_id,
-        exam_title=session.exam.title,
+        exam_title=translated_field(
+            session.exam.title, session.exam.translations, locale, "title"
+        ),
         status=session.status,
         started_at=session.started_at,
         expires_at=session.expires_at,
@@ -175,6 +219,8 @@ def _build_paper(db, session: ExamSession, *, include_token: bool) -> ExamSessio
         proctor_config=session.exam.proctor_config,
         exam_token=token,
         sections=built_sections,
+        locale=locale,
+        available_languages=session.exam.languages,
     )
 
 
@@ -207,12 +253,18 @@ def _grade_in_background(session_id: uuid.UUID) -> None:
 
 # ------------------------------------------------------------- candidate view
 @router.get("/my/exams", response_model=list[CandidateExamCard])
-def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCard]:
+def my_exams(
+    candidate: CurrentCandidate,
+    db: DbSession,
+    accept_language: str | None = Header(default=None),
+    lang: str | None = None,
+) -> list[CandidateExamCard]:
     """Everything this candidate can sit, is sitting, or has sat.
 
     Scoped to their enrolments: an approved login is permission to use the platform, not
     permission to sit every paper on it.
     """
+    locale = _candidate_locale(candidate, accept_language, lang)
     enrolled_ids = login_access.enrolled_exam_ids(db, candidate.id)
     if not enrolled_ids:
         return []
@@ -225,9 +277,10 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
                 Exam.status.in_([ExamStatus.PUBLISHED, ExamStatus.CLOSED]),
             )
             .options(
-                selectinload(Exam.subject),
+                selectinload(Exam.subject).selectinload(Subject.translations),
                 selectinload(Exam.exam_questions).selectinload(ExamQuestion.question),
                 selectinload(Exam.sections),
+                selectinload(Exam.translations),
             )
             .order_by(Exam.starts_at.desc())
         )
@@ -287,8 +340,10 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
         cards.append(
             CandidateExamCard(
                 exam_id=exam.id,
-                title=exam.title,
-                subject_name=exam.subject.name,
+                title=translated_field(exam.title, exam.translations, locale, "title"),
+                subject_name=translated_field(
+                    exam.subject.name, exam.subject.translations, locale, "name"
+                ),
                 duration_minutes=exam.duration_minutes,
                 starts_at=exam.starts_at,
                 ends_at=exam.ends_at,
@@ -308,14 +363,19 @@ def my_exams(candidate: CurrentCandidate, db: DbSession) -> list[CandidateExamCa
                 can_start=can_start,
                 reason=reason,
                 exam_type=exam.exam_type,
-                course=exam.course,
-                department=exam.department,
-                semester=exam.semester,
-                company_name=exam.company_name,
-                job_role=exam.job_role,
+                course=translated_field(exam.course, exam.translations, locale, "course"),
+                department=translated_field(
+                    exam.department, exam.translations, locale, "department"
+                ),
+                semester=translated_field(exam.semester, exam.translations, locale, "semester"),
+                company_name=translated_field(
+                    exam.company_name, exam.translations, locale, "company_name"
+                ),
+                job_role=translated_field(exam.job_role, exam.translations, locale, "job_role"),
                 sections_count=len(exam.sections or []),
                 has_coding=has_coding,
                 proctor_config=exam.proctor_config,
+                available_languages=exam.languages,
             )
         )
     return cards
@@ -342,7 +402,14 @@ def speed_test_payload(candidate: CurrentCandidate) -> Response:
 
 # ------------------------------------------------------------- session lifecycle
 @router.post("/exams/{exam_id}/start", response_model=ExamSessionOut)
-def start_exam(exam_id: uuid.UUID, candidate: CurrentCandidate, db: DbSession) -> ExamSessionOut:
+def start_exam(
+    exam_id: uuid.UUID,
+    candidate: CurrentCandidate,
+    db: DbSession,
+    accept_language: str | None = Header(default=None),
+    lang: str | None = None,
+) -> ExamSessionOut:
+    locale = _candidate_locale(candidate, accept_language, lang)
     exam = exam_engine.load_exam_with_pool(db, exam_id)
     if exam is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
@@ -386,7 +453,7 @@ def start_exam(exam_id: uuid.UUID, candidate: CurrentCandidate, db: DbSession) -
         # Resume rather than refuse: a refresh or a crash must not cost the attempt.
         if existing.status is SessionStatus.IN_PROGRESS:
             exam_engine.expire_if_due(db, existing)
-            return _build_paper(db, existing, include_token=True)
+            return _build_paper(db, existing, include_token=True, locale=locale)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="You have already attempted this exam",
@@ -426,19 +493,29 @@ def start_exam(exam_id: uuid.UUID, candidate: CurrentCandidate, db: DbSession) -
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     db.refresh(session)
-    return _build_paper(db, session, include_token=True)
+    return _build_paper(db, session, include_token=True, locale=locale)
 
 
 @router.get("/sessions/{session_id}", response_model=ExamSessionOut)
 def get_session(
-    session_id: uuid.UUID, candidate: CurrentCandidate, db: DbSession
+    session_id: uuid.UUID,
+    candidate: CurrentCandidate,
+    db: DbSession,
+    accept_language: str | None = Header(default=None),
+    lang: str | None = None,
 ) -> ExamSessionOut:
-    """Rehydrate after a refresh or a crash. Deliberately does not need the exam token."""
+    """Rehydrate after a refresh or a crash. Deliberately does not need the exam token.
+
+    Also what the in-exam language selector calls: passing ``?lang=`` re-renders the
+    paper's text in that locale without touching the session, the answers, the timer or
+    the token - see ``_build_paper``, which merges saved answers back in unchanged.
+    """
     session = exam_engine.load_session(db, session_id)
     if session is None or session.candidate_id != candidate.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     exam_engine.expire_if_due(db, session)
-    return _build_paper(db, session, include_token=True)
+    locale = _candidate_locale(candidate, accept_language, lang)
+    return _build_paper(db, session, include_token=True, locale=locale)
 
 
 @router.put("/sessions/{session_id}/answers/{question_id}", response_model=AnswerSaved)

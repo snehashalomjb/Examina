@@ -15,6 +15,10 @@ class ProctorEventIn(BaseModel):
     occurred_at: datetime
     severity: ProctorSeverity | None = None
     duration_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+    #: The detector's own confidence (0-1), when this came from a scored model.
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    #: The question on screen when the event fired, if any.
+    question_id: uuid.UUID | None = None
     metadata: dict | None = None
 
 
@@ -54,6 +58,8 @@ class ProctorEventOut(BaseModel):
     server_received_at: datetime
     duration_ms: int | None = None
     weight: float
+    confidence: float | None = None
+    question_id: uuid.UUID | None = None
     metadata: dict | None = None
     snapshot_url: str | None = None
 

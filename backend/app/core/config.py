@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     GRADER_MODEL: str = "gpt-4o"
     OPENAI_API_KEY: str | None = None
 
+    # Question/exam translation (auto-translate "Generate Translations" button)
+    TRANSLATION_PROVIDER: str = "stub"
+    TRANSLATION_MODEL: str = "gpt-4o-mini"
+    TRANSLATION_API_KEY: str | None = None
+
     # OCR (handwritten answer scans)
     #: Absolute path to the tesseract binary. Only needed when it is not on PATH -
     #: the usual case on Windows: C:/Program Files/Tesseract-OCR/tesseract.exe

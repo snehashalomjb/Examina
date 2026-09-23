@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -30,6 +31,7 @@ import type { CandidateStats, PerformanceAnalysis, Result } from "@/lib/types";
  */
 export default function PerformancePage() {
   const { user } = useRequireAuth(["candidate"]);
+  const t = useTranslations("results");
   const [results, setResults] = useState<Result[]>([]);
   const [stats, setStats] = useState<CandidateStats | null>(null);
   /**
@@ -111,8 +113,8 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Performance"
-        body="How your released results look together — accuracy, completion, and whether your scores are moving."
+        title={t("performance_title")}
+        body={t("performance_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -125,26 +127,26 @@ export default function PerformancePage() {
         ) : (
           <>
             <Stat
-              label="Average"
+              label={t("average")}
               value={stats.average_percentage !== null ? `${stats.average_percentage}%` : "—"}
-              hint="Across published results"
+              hint={t("across_published_results")}
               tone="accent"
             />
             <Stat
-              label="Best"
+              label={t("best")}
               value={stats.best_percentage !== null ? `${stats.best_percentage}%` : "—"}
-              hint="Your strongest paper"
+              hint={t("your_strongest_paper")}
               tone="mint"
             />
             <Stat
-              label="Accuracy"
+              label={t("accuracy")}
               value={analysis ? `${Math.round(analysis.accuracy)}%` : "—"}
-              hint="Correct out of attempted"
+              hint={t("correct_out_of_attempted")}
             />
             <Stat
-              label="Completion"
+              label={t("completion")}
               value={analysis ? `${Math.round(analysis.answeredShare)}%` : "—"}
-              hint="Questions you attempted"
+              hint={t("questions_you_attempted")}
               tone={analysis && analysis.answeredShare < 90 ? "amber" : "neutral"}
             />
           </>
@@ -155,11 +157,11 @@ export default function PerformancePage() {
         <Skeleton className="h-[260px] rounded-[14px]" />
       ) : !analysis ? (
         <EmptyState
-          title="No published results yet"
-          body="Once an examiner releases a paper you have sat, your performance appears here."
+          title={t("no_published_results_performance")}
+          body={t("no_results_performance_body")}
           action={
             <Link href="/dashboard/candidate/exams">
-              <Button size="sm">See my exams</Button>
+              <Button size="sm">{t("see_my_exams")}</Button>
             </Link>
           }
         />
@@ -167,21 +169,21 @@ export default function PerformancePage() {
         <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <Card>
             <SectionTitle
-              title="Score history"
-              hint="Oldest to newest, by the date each result was published."
+              title={t("score_history")}
+              hint={t("score_history_hint")}
             />
-            <ScoreChart results={analysis.ordered} />
+            <ScoreChart results={analysis.ordered} t={t} />
           </Card>
 
           <div className="space-y-5">
             <Card>
-              <SectionTitle title="Answer breakdown" hint="Every published paper combined." />
+              <SectionTitle title={t("answer_breakdown")} hint={t("answer_breakdown_hint")} />
               <div className="space-y-3">
                 {(
                   [
-                    { label: "Correct", value: analysis.totals.correct, tone: "mint" },
-                    { label: "Incorrect", value: analysis.totals.incorrect, tone: "rose" },
-                    { label: "Left blank", value: analysis.totals.blank, tone: "neutral" },
+                    { label: t("correct"), value: analysis.totals.correct, tone: "mint" },
+                    { label: t("incorrect"), value: analysis.totals.incorrect, tone: "rose" },
+                    { label: t("left_blank"), value: analysis.totals.blank, tone: "neutral" },
                   ] as const
                 ).map(({ label, value, tone }) => {
                   const total =
@@ -201,9 +203,9 @@ export default function PerformancePage() {
             </Card>
 
             <Card>
-              <SectionTitle title="Reading" hint="What the numbers suggest." />
+              <SectionTitle title={t("reading")} hint={t("reading_hint")} />
               <ul className="space-y-2.5">
-                {buildInsights(analysis).map((insight) => (
+                {buildInsights(analysis, t).map((insight) => (
                   <li key={insight.text} className="flex gap-2.5">
                     <span
                       className={cx(
@@ -220,8 +222,7 @@ export default function PerformancePage() {
                 ))}
               </ul>
               <p className="mt-4 text-[11.5px] leading-relaxed text-ink-muted">
-                Based on {results.length} published result{results.length === 1 ? "" : "s"}.
-                Papers still awaiting examiner review are not counted.
+                {t("based_on_results", { count: results.length, plural: results.length === 1 ? "" : "s" })}
               </p>
             </Card>
           </div>
@@ -230,8 +231,8 @@ export default function PerformancePage() {
           {topics && topics.topic_scores.length > 0 && (
             <Card>
               <SectionTitle
-                title="By topic"
-                hint="Where your marks came from, across every published paper."
+                title={t("by_topic")}
+                hint={t("by_topic_hint")}
               />
               <ul className="space-y-3">
                 {topics.topic_scores.map((score) => (
@@ -267,7 +268,7 @@ export default function PerformancePage() {
               {topics.recommendations.length > 0 && (
                 <div className="mt-5 rounded-[10px] border border-line bg-sunken/50 p-3.5">
                   <p className="mb-1.5 text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
-                    Where to put your time
+                    {t("where_to_put_your_time")}
                   </p>
                   <ul className="space-y-1">
                     {topics.recommendations.map((line) => (
@@ -280,8 +281,7 @@ export default function PerformancePage() {
               )}
 
               <p className="mt-3 text-[11.5px] leading-relaxed text-ink-muted">
-                A topic appears once it has at least two marked answers — one question
-                is not a pattern.
+                {t("topic_pattern_note")}
               </p>
             </Card>
           )}
@@ -299,34 +299,34 @@ interface Analysis {
   trend: "up" | "down" | "flat" | null;
 }
 
-function buildInsights(analysis: Analysis): { text: string; tone: "mint" | "amber" | "accent" }[] {
+function buildInsights(analysis: Analysis, t: ReturnType<typeof useTranslations>): { text: string; tone: "mint" | "amber" | "accent" }[] {
   const out: { text: string; tone: "mint" | "amber" | "accent" }[] = [];
 
   if (analysis.trend === "up") {
-    out.push({ text: "Your recent papers score higher than your earlier ones.", tone: "mint" });
+    out.push({ text: t("recent_papers_higher"), tone: "mint" });
   } else if (analysis.trend === "down") {
     out.push({
-      text: "Your recent papers score lower than your earlier ones — worth reviewing what changed.",
+      text: t("recent_papers_lower"),
       tone: "amber",
     });
   } else if (analysis.trend === "flat") {
-    out.push({ text: "Your scores are holding steady across papers.", tone: "accent" });
+    out.push({ text: t("scores_holding_steady"), tone: "accent" });
   }
 
   if (analysis.answeredShare < 90) {
     out.push({
-      text: `You left ${analysis.totals.blank} question(s) blank. Blank answers score zero but never cost a negative mark — a considered guess is usually better than nothing.`,
+      text: t("left_blank_warning", { count: analysis.totals.blank }),
       tone: "amber",
     });
   } else {
-    out.push({ text: "You attempt nearly everything put in front of you.", tone: "mint" });
+    out.push({ text: t("attempt_nearly_everything"), tone: "mint" });
   }
 
   if (analysis.accuracy >= 75) {
-    out.push({ text: "When you answer, you are usually right — accuracy is strong.", tone: "mint" });
+    out.push({ text: t("accuracy_strong"), tone: "mint" });
   } else if (analysis.accuracy < 50) {
     out.push({
-      text: "Under half of your attempted answers are correct. Accuracy, not coverage, is the thing to work on.",
+      text: t("accuracy_weak"),
       tone: "amber",
     });
   }
@@ -335,14 +335,14 @@ function buildInsights(analysis: Analysis): { text: string; tone: "mint" | "ambe
 }
 
 /** Compact inline chart. Deliberately hand-drawn SVG rather than a charting dependency. */
-function ScoreChart({ results }: { results: Result[] }) {
+function ScoreChart({ results, t }: { results: Result[]; t: ReturnType<typeof useTranslations> }) {
   if (results.length === 1) {
     const only = results[0];
     return (
       <div className="rounded-[11px] border border-line bg-sunken/40 p-6 text-center">
         <p className="text-[30px] font-semibold tracking-tight text-ink">{only.percentage}%</p>
         <p className="mt-1 text-[12.5px] text-ink-muted">
-          One published result — a trend needs at least two.
+          {t("one_result_note")}
         </p>
       </div>
     );
@@ -397,7 +397,7 @@ function ScoreChart({ results }: { results: Result[] }) {
             </Badge>
             <Link href={`/results/${result.id}`}>
               <Button size="sm" variant="ghost">
-                Detail
+                {t("detail_button")}
               </Button>
             </Link>
           </li>

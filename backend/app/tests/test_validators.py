@@ -223,10 +223,12 @@ class TestSelectionRules:
                 "question_type": QuestionType.MCQ.value,
                 "difficulty": Difficulty.EASY.value,
                 "count": 5,
-                # Both narrowings are always present in the normalised shape, null when
+                # Every narrowing is always present in the normalised shape, null when
                 # the rule declared none, so the generator never has to use .get().
                 "category": None,
                 "topic": None,
+                "subject_id": None,
+                "tags": None,
             }
         ]
 

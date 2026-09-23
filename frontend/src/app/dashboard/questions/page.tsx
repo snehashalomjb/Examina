@@ -22,10 +22,10 @@ import {
 } from "@/components/ui";
 import { QuestionEditor } from "@/components/QuestionEditor";
 import { QuestionImporter } from "@/components/QuestionImporter";
+import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type {
-  CodingLanguage,
   Difficulty,
   PdfImportResult,
   Question,
@@ -47,14 +47,6 @@ const DIFFICULTY_TONE: Record<Difficulty, "mint" | "amber" | "rose"> = {
 };
 
 const OBJECTIVE = OPTION_BEARING_TYPES;
-
-const CODING_LANGUAGES: CodingLanguage[] = ["python", "java", "cpp", "javascript"];
-const LANGUAGE_LABEL: Record<CodingLanguage, string> = {
-  python: "Python",
-  java: "Java",
-  cpp: "C++",
-  javascript: "JavaScript",
-};
 
 /** The shelves the spec asks for, expressed as filter presets over one bank. */
 type Shelf = "all" | "mine" | "shared" | "ai" | "imported" | "archived";
@@ -84,22 +76,34 @@ export default function QuestionBankPage() {
   const [categoryFilter, setCategoryFilter] = useState<QuestionCategory | "">("");
   const [topicFilter, setTopicFilter] = useState("");
   const [marksFilter, setMarksFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
   const [search, setSearch] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
   /** The shelves the bank is organised into. Filter presets, not separate stores. */
   const [shelf, setShelf] = useState<Shelf>("all");
 
   const [composing, setComposing] = useState(searchParams.get("compose") === "1");
   const [editing, setEditing] = useState<Question | null>(null);
-  const [addingSubject, setAddingSubject] = useState(false);
+  const [previewing, setPreviewing] = useState<Question | null>(null);
+  const [managingSubjects, setManagingSubjects] = useState(false);
   const [importingPdf, setImportingPdf] = useState(false);
   const [importingFile, setImportingFile] = useState(false);
+  const [typeCounts, setTypeCounts] = useState<Record<string, Record<string, number>>>({});
 
   const loadSubjects = useCallback(async () => {
     try {
       setSubjects(await api.get<Subject[]>("/subjects"));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load subjects.");
+    }
+  }, []);
+
+  const loadTypeCounts = useCallback(async () => {
+    try {
+      setTypeCounts(await api.get<Record<string, Record<string, number>>>("/subjects/type-counts"));
+    } catch {
+      setTypeCounts({}); // a missing breakdown just hides the count strip
     }
   }, []);
 
@@ -111,6 +115,7 @@ export default function QuestionBankPage() {
     if (categoryFilter) query.set("category", categoryFilter);
     if (topicFilter) query.set("topic", topicFilter);
     if (marksFilter) query.set("marks", marksFilter);
+    if (tagFilter) query.set("tags", tagFilter);
     if (search.trim()) query.set("search", search.trim());
 
     if (shelf === "mine") query.set("mine", "true");
@@ -143,6 +148,7 @@ export default function QuestionBankPage() {
     categoryFilter,
     topicFilter,
     marksFilter,
+    tagFilter,
     search,
     shelf,
     user,
@@ -157,13 +163,29 @@ export default function QuestionBankPage() {
     }
   }, [subjectFilter]);
 
+  const loadTags = useCallback(async () => {
+    try {
+      setAllTags(await api.get<string[]>("/questions/tags"));
+    } catch {
+      setAllTags([]); // a missing tag list is a degraded filter, not a failure
+    }
+  }, []);
+
   useEffect(() => {
     if (user) void loadSubjects();
   }, [user, loadSubjects]);
 
   useEffect(() => {
+    if (user) void loadTypeCounts();
+  }, [user, loadTypeCounts]);
+
+  useEffect(() => {
     if (user) void loadTopics();
   }, [user, loadTopics]);
+
+  useEffect(() => {
+    if (user) void loadTags();
+  }, [user, loadTags]);
 
   useEffect(() => {
     if (!user) return;
@@ -245,8 +267,8 @@ export default function QuestionBankPage() {
           <Button size="sm" variant="secondary" onClick={() => setImportingPdf((v) => !v)}>
             {importingPdf ? "Close PDF Import" : "📄 PDF → AI"}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setAddingSubject((v) => !v)}>
-            New Subject
+          <Button size="sm" variant="secondary" onClick={() => setManagingSubjects((v) => !v)}>
+            {managingSubjects ? "Close Subjects" : "Manage Subjects"}
           </Button>
           <Button size="sm" onClick={() => setComposing((v) => !v)}>
             {composing ? "Close Composer" : "+ New Question"}
@@ -262,11 +284,13 @@ export default function QuestionBankPage() {
 
       {importingPdf && <PdfImportSection subjects={subjects} />}
 
-      {addingSubject && (
-        <SubjectComposer
-          onDone={() => {
-            setAddingSubject(false);
+      {managingSubjects && (
+        <SubjectManager
+          subjects={subjects}
+          typeCounts={typeCounts}
+          onChanged={() => {
             void loadSubjects();
+            void loadTypeCounts();
           }}
         />
       )}
@@ -304,6 +328,8 @@ export default function QuestionBankPage() {
           />
         </Modal>
       )}
+
+      <QuestionPreviewModal question={previewing} onClose={() => setPreviewing(null)} />
 
       <Card>
         {/* ─── Shelves ────────────────────────────────────────── */}
@@ -387,6 +413,12 @@ export default function QuestionBankPage() {
             onChange={(e) => setMarksFilter(e.target.value)}
             placeholder="Marks"
           />
+          <Select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
+            <option value="">Any tag</option>
+            {allTags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </Select>
           {/* Active filter indicator */}
           {(subjectFilter ||
             typeFilter ||
@@ -394,6 +426,7 @@ export default function QuestionBankPage() {
             categoryFilter ||
             topicFilter ||
             marksFilter ||
+            tagFilter ||
             search) && (
             <button
               onClick={() => {
@@ -403,6 +436,7 @@ export default function QuestionBankPage() {
                 setCategoryFilter("");
                 setTopicFilter("");
                 setMarksFilter("");
+                setTagFilter("");
                 setSearch("");
               }}
               className="justify-self-start rounded-[8px] px-3 py-2 text-[12.5px] font-medium text-rose transition hover:bg-rose-soft"
@@ -411,6 +445,18 @@ export default function QuestionBankPage() {
             </button>
           )}
         </div>
+
+        {subjectFilter && typeCounts[subjectFilter] && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {Object.entries(typeCounts[subjectFilter])
+              .sort(([, a], [, b]) => b - a)
+              .map(([qtype, count]) => (
+                <Badge key={qtype} tone="neutral" size="xs">
+                  {TYPE_LABEL[qtype as QuestionType] ?? qtype}: {count}
+                </Badge>
+              ))}
+          </div>
+        )}
 
         <p className="mb-3 flex items-center gap-2 text-[12.5px] text-ink-muted">
           {loading ? (
@@ -442,7 +488,7 @@ export default function QuestionBankPage() {
             {questions.map((question) => (
               <li
                 key={question.id}
-                className="group rounded-[12px] border border-line bg-surface p-4 transition hover:border-line-strong hover:shadow-[var(--shadow-xs)]"
+                className="card-hover group rounded-[12px] border border-line bg-surface p-4 hover:border-line-strong"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -474,6 +520,9 @@ export default function QuestionBankPage() {
                         <Badge tone="amber" size="xs">imported</Badge>
                       )}
                       {question.topic && <Badge tone="neutral" size="xs">{question.topic}</Badge>}
+                      {question.tags?.map((tag) => (
+                        <Badge key={tag} tone="purple" size="xs">{tag}</Badge>
+                      ))}
                       {question.created_by_name && (
                         <span className="text-[11px] text-ink-muted">
                           by {question.created_by_name}
@@ -517,7 +566,10 @@ export default function QuestionBankPage() {
                     )}
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-1 transition sm:opacity-0 sm:group-hover:opacity-100">
+                  <div className="flex shrink-0 flex-wrap items-center gap-1 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+                    <Button size="sm" variant="ghost" onClick={() => setPreviewing(question)}>
+                      Preview
+                    </Button>
                     {mayEdit(question) ? (
                       <Button size="sm" variant="ghost" onClick={() => setEditing(question)}>
                         Edit
@@ -865,11 +917,22 @@ function PdfImportSummary({ result }: { result: PdfImportResult }) {
 }
 
 /* -------------------------------------------------------------- composers */
-function SubjectComposer({ onDone }: { onDone: () => void }) {
+function SubjectManager({
+  subjects,
+  typeCounts,
+  onChanged,
+}: {
+  subjects: Subject[];
+  typeCounts: Record<string, Record<string, number>>;
+  onChanged: () => void;
+}) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -878,7 +941,9 @@ function SubjectComposer({ onDone }: { onDone: () => void }) {
     try {
       await api.post("/subjects", { code: code.trim().toUpperCase(), name: name.trim() });
       toast(`Subject ${code.toUpperCase()} created`, "mint");
-      onDone();
+      setCode("");
+      setName("");
+      onChanged();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not create the subject.");
     } finally {
@@ -886,10 +951,31 @@ function SubjectComposer({ onDone }: { onDone: () => void }) {
     }
   }
 
+  function startEdit(subject: Subject) {
+    setEditingId(subject.id);
+    setEditName(subject.name);
+  }
+
+  async function saveEdit(subject: Subject) {
+    if (!editName.trim()) return;
+    setSavingId(subject.id);
+    try {
+      await api.patch(`/subjects/${subject.id}`, { name: editName.trim() });
+      toast("Subject renamed", "mint");
+      setEditingId(null);
+      onChanged();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not rename the subject", "rose");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   return (
     <Card>
-      <SectionTitle title="New subject" hint="Questions and exams are grouped by subject." />
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
+      <SectionTitle title="Manage Subjects" hint="Add a subject, or rename an existing one. Questions and exams are grouped by subject." />
+
+      <form onSubmit={submit} className="mb-5 flex flex-wrap items-end gap-3">
         <div className="w-[160px]">
           <Field label="Code">
             <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" required minLength={2} />
@@ -907,19 +993,61 @@ function SubjectComposer({ onDone }: { onDone: () => void }) {
           </Field>
         </div>
         <Button type="submit" loading={busy}>
-          Create
+          Add Subject
         </Button>
-        {error && (
-          <div className="w-full">
-            <Alert tone="rose">{error}</Alert>
-          </div>
-        )}
       </form>
+      {error && (
+        <div className="mb-4">
+          <Alert tone="rose">{error}</Alert>
+        </div>
+      )}
+
+      <div className="-mx-5 overflow-x-auto px-5">
+        <table className="w-full min-w-[520px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-muted">
+              <th className="pb-2 pr-3 font-medium">Code</th>
+              <th className="pb-2 pr-3 font-medium">Name</th>
+              <th className="pb-2 pr-3 font-medium">Questions</th>
+              <th className="pb-2 text-right font-medium"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {subjects.map((subject) => {
+              const total = Object.values(typeCounts[subject.id] ?? {}).reduce((s, n) => s + n, 0);
+              return (
+                <tr key={subject.id}>
+                  <td className="py-2.5 pr-3 text-[12.5px] font-mono text-ink-muted">{subject.code}</td>
+                  <td className="py-2.5 pr-3 text-[13px] text-ink">
+                    {editingId === subject.id ? (
+                      <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="max-w-xs" />
+                    ) : (
+                      subject.name
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-3 text-[12.5px] text-ink-soft">{total}</td>
+                  <td className="py-2.5 text-right">
+                    {editingId === subject.id ? (
+                      <div className="flex justify-end gap-1.5">
+                        <Button size="sm" loading={savingId === subject.id} onClick={() => saveEdit(subject)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => startEdit(subject)}>
+                        Edit
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
-}
-
-interface DraftOption {
-  text: string;
-  is_correct: boolean;
 }
