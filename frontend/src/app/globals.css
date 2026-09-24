@@ -256,7 +256,9 @@ body {
 }
 
 /* Animation utility classes */
-.animate-rise        { animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* backwards, not both: a held transform turns this wrapper into the containing block
+   for position:fixed children, so modal backdrops stopped at the page column. */
+.animate-rise        { animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 .animate-rise-sm     { animation: rise-sm 0.22s ease-out both; }
 .animate-fade        { animation: fade 0.25s ease both; }
 .animate-scale-in    { animation: scale-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
