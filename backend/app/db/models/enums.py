@@ -54,6 +54,7 @@ class QuestionType(str, enum.Enum):
     PASSAGE = "passage"
     CODING = "coding"
     SQL = "sql"
+    IMAGE_UPLOAD = "image_upload"
 
 
 #: Scored by comparing selected option ids against the key. No human needed.
@@ -68,6 +69,7 @@ RESPONSE_TYPES = {QuestionType.FILL_BLANK, QuestionType.NUMERICAL}
 SUBJECTIVE_TYPES = {
     QuestionType.SHORT_ANSWER,
     QuestionType.LONG_ANSWER,
+    QuestionType.IMAGE_UPLOAD,
     QuestionType.CODING,
     QuestionType.SQL,
 }
