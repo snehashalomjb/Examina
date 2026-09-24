@@ -42,3 +42,6 @@ backend/storage/
 # Vendored MediaPipe runtime + model (re-fetch: see README)
 frontend/public/mediapipe/
 frontend/public/models/
+
+# Stray logs written from backend/ as cwd
+backend/logs/
