@@ -35,8 +35,16 @@ import {
   type Subject,
 } from "@/lib/types";
 
-const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm,.doc,.docx,.pdf";
-const MAX_MB = 20;
+/** Everything the backend importer reads (`SUPPORTED_EXTENSIONS` in question_import.py).
+ * Images, and scanned pages inside PDFs and Word files, are read with OCR. */
+const ACCEPT = [
+  ".pdf", ".docx", ".doc", ".odt", ".rtf", ".txt", ".md",
+  ".xlsx", ".xlsm", ".xls", ".csv", ".tsv", ".json",
+  ".pptx", ".ppt", ".html", ".htm",
+  ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".gif",
+].join(",");
+/** Matches MAX_IMPORT_BYTES on the server - it said 20 here while the server refused 10+. */
+const MAX_MB = 10;
 
 const FILE_TYPE_INFO = [
   { ext: "PDF",  label: "PDF",          icon: "📄", color: "#ef4444" },
@@ -44,6 +52,10 @@ const FILE_TYPE_INFO = [
   { ext: "XLSX", label: "Excel (.xlsx)", icon: "📊", color: "#16a34a" },
   { ext: "CSV",  label: "CSV / TSV",    icon: "📋", color: "#0d9488" },
   { ext: "JSON", label: "JSON",          icon: "🔧", color: "#7c3aed" },
+  { ext: "PPTX", label: "PowerPoint",    icon: "📽️", color: "#ea580c" },
+  { ext: "TXT",  label: "Text / RTF / ODT", icon: "🗒️", color: "#475569" },
+  { ext: "HTML", label: "Web page",      icon: "🌐", color: "#0284c7" },
+  { ext: "IMG",  label: "Image / scan (OCR)", icon: "🖼️", color: "#db2777" },
 ];
 
 export interface QuestionImporterProps {
@@ -353,7 +365,7 @@ export function QuestionImporter({
                     {dragging ? "Drop it!" : "Drag & drop a file here"}
                   </p>
                   <p className="mt-1 text-[12px] text-ink-muted">
-                    PDF, Word (.doc/.docx), Excel (.xlsx), CSV, or JSON — up to {MAX_MB} MB
+                    PDF, Word, Excel, PowerPoint, text, web page, JSON or a photo/scan (read with OCR) — up to {MAX_MB} MB
                   </p>
                 </>
               )}

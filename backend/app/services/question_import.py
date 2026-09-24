@@ -1,4 +1,5 @@
-"""Parse a spreadsheet, CSV or Word document into reviewable question rows.
+"""Parse a spreadsheet, document, presentation, web page, JSON, PDF or image into
+reviewable question rows.
 
 Three deliberate properties:
 
@@ -574,8 +575,25 @@ _BULLET_PREFIX = re.compile(r"^[\s•●○◦‣▪✓✔☑☒☐➤►\-–�
 
 #: "1. What is X?" / "Q3) What is X?" - the numbering examiners actually type.
 QUESTION_START = re.compile(r"^\s*(?:q(?:uestion)?\s*)?(\d{1,3})\s*[\.\):]\s*(.+)$", re.IGNORECASE)
+#: "Question 1 (Easy)" / "Q.4 [Hard]" / "Question 7" - a labelled heading, often with the
+#: body on the *next* line and the difficulty in brackets. The "Q"/"Question" prefix is
+#: required here, since without the punctuation QUESTION_START demands, a bare number
+#: at the start of a wrapped line would otherwise read as a new question.
+QUESTION_LABEL = re.compile(
+    r"^\s*q(?:uestion)?\.?\s*(?:no\.?\s*)?(\d{1,3})\s*"
+    r"(?:[\(\[]\s*(easy|medium|hard)\s*[\)\]])?\s*[\.\):\-–—]?\s*(.*)$",
+    re.IGNORECASE,
+)
 #: "A. Learning from data" / "(b) Removing data" / "C) ..." - optionally starred correct.
-OPTION_LINE = re.compile(r"^\s*\(?([a-fA-F])\)?\s*[\.\):]?\s*(.+?)\s*(\*)?\s*$")
+#: The separator is required: without it, a wrapped body line such as "BY dept_id;" or
+#: "failure?" reads as option B or F. "e.g." is excluded for the same reason.
+OPTION_LINE = re.compile(
+    r"^\s*(?:\(([a-fA-F])\)|([a-fA-F])[\.\):])(?![A-Za-z]\.)\s*(.+?)\s*(\*)?\s*$"
+)
+#: "B. SELECT" / "(C) PRIMARY KEY" on an answer line - the letter, then the option's own
+#: text repeated. Only the letter is the key; the text must not be mined for more
+#: letters ("B. It references a column" is one answer, not B and A).
+_LETTERED_ANSWER = re.compile(r"^\(?([A-F])\)?[\.\):]\s+\S", re.IGNORECASE)
 #: A True/False option written without a letter at all - just the word on its own line,
 #: which is how a True/False question is commonly laid out ("True" / "False", one per
 #: line) rather than "A. True" / "B. False".
@@ -651,11 +669,17 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
     #: about to begin.
     active_section_type: QuestionType | None = None
     active_section_difficulty: str = ""
+    #: "(Easy)" on a "Question 3 (Easy)" heading - applies to that question only.
+    heading_difficulty: str = ""
 
     def flush() -> None:
         nonlocal body, options, answer, meta, saw_bare_true, saw_bare_false
-        if body is None:
+        if not body:
+            body, options, answer, meta = None, [], "", {}
             return
+        lettered = _LETTERED_ANSWER.match(answer)
+        if lettered:
+            answer = lettered.group(1).upper()
         cells = [""] * 6
         starred: list[str] = []
         for letter, text, is_correct in options:
@@ -704,7 +728,7 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
                 correct_cell,
                 meta.get("Subject", ""),
                 meta.get("Topic", ""),
-                meta.get("Difficulty", "") or active_section_difficulty,
+                meta.get("Difficulty", "") or heading_difficulty or active_section_difficulty,
                 meta.get("Marks", ""),
                 meta.get("Negative Marks", ""),
             ]
@@ -718,10 +742,16 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
             continue
         text = _BULLET_PREFIX.sub("", raw).strip() or raw
 
+        label = QUESTION_LABEL.match(text)
         start = QUESTION_START.match(text)
-        if start:
+        if label or start:
             flush()
-            body = start.group(2).strip()
+            if label:
+                body = label.group(3).strip()
+                heading_difficulty = (label.group(2) or "").lower()
+            else:
+                body = start.group(2).strip()
+                heading_difficulty = ""
             active_section_type, active_section_difficulty = section_type, section_difficulty
             continue
 
@@ -738,6 +768,12 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
             continue
 
         if body is None:
+            continue
+
+        # First line under a bare "Question 3 (Easy)" heading is the body, whatever it
+        # starts with - "Define ..." must not be mistaken for option D.
+        if body == "":
+            body = raw
             continue
 
         # A line may bundle several "Key: value" fields separated by "|" - match each
@@ -769,7 +805,8 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
 
         option = OPTION_LINE.match(text)
         if option and len(text) < 400:
-            options.append((option.group(1), option.group(2).strip(), bool(option.group(3))))
+            letter = option.group(1) or option.group(2)
+            options.append((letter, option.group(3).strip(), bool(option.group(4))))
             continue
 
         # A continuation line - part of the question, wrapped. Kept from the raw,
@@ -780,12 +817,29 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
     return rows
 
 
+#: A page whose text layer holds fewer characters than this is treated as scanned.
+_MIN_TEXT_LAYER_CHARS = 40
+#: OCR costs a second or two a page, and the import request is synchronous.
+MAX_OCR_PAGES = 50
+
+
+def _page_has_images(page: Any) -> bool:
+    try:
+        return len(page.images) > 0
+    except Exception:  # noqa: BLE001 - a malformed image stream just means "unknown"
+        return False
+
+
 def _rows_from_pdf(data: bytes) -> list[list[str]]:
     """Read a PDF the same way as a Word paper: numbered questions, options, answers.
 
-    A PDF containing an actual question table is imported directly, same as a DOCX. A
-    PDF that turns out to hold no questions - a syllabus, a topic list - is refused
-    with a message pointing at AI Generate, which is what reads that kind of document.
+    Pages with a real text layer are read directly. Scanned pages - no text layer, just
+    a picture of the paper - are rendered and read with OCR. If the text layer yields
+    no questions but some pages carry images, those are OCR'd too, for papers where the
+    questions were pasted in as screenshots under a typed title.
+
+    A PDF that still holds no questions - a syllabus, a topic list - is refused with a
+    message pointing at AI Generate, which is what reads that kind of document.
     """
     try:
         from pypdf import PdfReader
@@ -797,12 +851,43 @@ def _rows_from_pdf(data: bytes) -> list[list[str]]:
     except Exception as exc:
         raise ImportError_("That file could not be opened as a PDF.") from exc
 
-    lines: list[str] = []
-    for page in reader.pages:
-        lines.extend((page.extract_text() or "").splitlines())
+    page_text: list[str] = [(page.extract_text() or "") for page in reader.pages]
+    scanned = [i for i, text in enumerate(page_text) if len(text.strip()) < _MIN_TEXT_LAYER_CHARS]
+    ocr_error: str | None = None
 
-    rows = _rows_from_prose(lines)
+    def ocr(indexes: list[int]) -> bool:
+        nonlocal ocr_error
+        indexes = indexes[:MAX_OCR_PAGES]
+        if not indexes:
+            return False
+        from app.services.ocr import read_pdf_pages
+
+        try:
+            for index, text in read_pdf_pages(data, indexes).items():
+                page_text[index] = text
+        except RuntimeError as exc:
+            ocr_error = str(exc)
+            return False
+        return True
+
+    def parse() -> list[list[str]]:
+        return _rows_from_prose([line for text in page_text for line in text.splitlines()])
+
+    ocr(scanned)
+    rows = parse()
     if len(rows) < 2:
+        with_images = [
+            i for i, page in enumerate(reader.pages) if i not in scanned and _page_has_images(page)
+        ]
+        if ocr(with_images):
+            rows = parse()
+
+    if len(rows) < 2:
+        if ocr_error and scanned:
+            raise ImportError_(
+                "This PDF looks scanned, but text recognition (OCR) is not available on "
+                "the server, so no questions could be read from it."
+            )
         raise ImportError_(
             "No questions were found in this PDF. If it's a syllabus rather than a "
             "question paper, use AI Generate instead."
@@ -810,16 +895,389 @@ def _rows_from_pdf(data: bytes) -> list[list[str]]:
     return rows
 
 
+# --------------------------------------------------------------------------------------
+# Every other document type. Each reader turns its file into either table rows (when the
+# document carries a real question table) or plain lines, and lines go through the same
+# numbered-paper parser as Word and PDF - so a question reads the same whichever program
+# the examiner wrote it in.
+# --------------------------------------------------------------------------------------
+
+_NO_QUESTIONS = (
+    "No questions were found in this {kind}. Number each question (\"1. ...\" or "
+    "\"Question 1\") with lettered options (\"A. ...\") and an \"Answer:\" line - or, "
+    "if it's a syllabus rather than a question paper, use AI Generate instead."
+)
+
+
+def _decode_text(data: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-16", "utf-8", "cp1252", "latin-1"):
+        try:
+            text = data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        # utf-16 "succeeds" on most even-length byte strings; only trust it with a BOM.
+        if encoding == "utf-16" and not data.startswith((b"\xff\xfe", b"\xfe\xff")):
+            continue
+        return text
+    raise ImportError_("That file is not text we can read.")  # pragma: no cover
+
+
+def _prose_or_fail(lines: list[str], kind: str) -> list[list[str]]:
+    rows = _rows_from_prose(lines)
+    if len(rows) < 2:
+        raise ImportError_(_NO_QUESTIONS.format(kind=kind))
+    return rows
+
+
+def _looks_like_a_table(text: str) -> bool:
+    """A first line naming a Question column, split by a delimiter, is a CSV in disguise."""
+    first = next((line for line in text.splitlines() if line.strip()), "")
+    if not any(sep in first for sep in (",", "\t", ";", "|")):
+        return False
+    cells = re.split(r"[,\t;|]", first)
+    return any(_normalise_header(c.strip().strip('"')) in COLUMN_ALIASES["body"] for c in cells)
+
+
+def _rows_from_text(data: bytes) -> list[list[str]]:
+    """.txt / .md: a delimited table if it has a Question header, else a numbered paper."""
+    text = _decode_text(data)
+    if _looks_like_a_table(text):
+        return _rows_from_csv(data)
+    # Markdown decoration an examiner types around a question is not part of it.
+    lines = [re.sub(r"^\s{0,3}(#{1,6}\s+|>\s?)|\*\*|__", "", line) for line in text.splitlines()]
+    return _prose_or_fail(lines, "text file")
+
+
+def _rtf_to_text(rtf: str) -> str:
+    """Plain text of an RTF document: enough for question papers, not a full renderer.
+
+    Keeps paragraph and line breaks, decodes ``\\'hh`` and ``\\uN`` characters, and drops
+    destination groups (font tables, colour tables, pictures, metadata) whose content is
+    not document text.
+    """
+    out: list[str] = []
+    skip_depth: list[bool] = []
+    skipping = False
+    i = 0
+    ignorable = {
+        "fonttbl", "colortbl", "stylesheet", "info", "pict", "object", "header", "footer",
+        "listtable", "listoverridetable", "rsidtbl", "generator", "xmlnstbl", "themedata",
+        "colorschememapping", "latentstyles", "datastore", "filetbl", "revtbl",
+    }
+    while i < len(rtf):
+        ch = rtf[i]
+        if ch == "{":
+            skip_depth.append(skipping)
+            i += 1
+            if rtf.startswith("\\*", i):
+                skipping = True
+            continue
+        if ch == "}":
+            skipping = skip_depth.pop() if skip_depth else False
+            i += 1
+            continue
+        if ch == "\\":
+            match = re.match(r"\\([a-zA-Z]+)(-?\d+)? ?|\\'([0-9a-fA-F]{2})|\\(.)", rtf[i:])
+            if not match:
+                i += 1
+                continue
+            i += match.end()
+            word, arg, hexcode, symbol = match.groups()
+            if skipping:
+                continue
+            if word:
+                if word in ignorable:
+                    skipping = True
+                elif word in ("par", "line", "row", "sect", "page"):
+                    out.append("\n")
+                elif word == "tab" or word == "cell":
+                    out.append("\t")
+                elif word == "u" and arg:
+                    out.append(chr(int(arg) % 65536))
+                    if i < len(rtf) and rtf[i] == "?":
+                        i += 1  # the ANSI fallback character after \uN
+            elif hexcode:
+                out.append(bytes([int(hexcode, 16)]).decode("cp1252", errors="replace"))
+            elif symbol in ("\\", "{", "}"):
+                out.append(symbol)
+            continue
+        if not skipping and ch not in "\r\n":
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _rows_from_rtf(data: bytes) -> list[list[str]]:
+    text = _rtf_to_text(data.decode("latin-1"))
+    return _prose_or_fail(text.splitlines(), "RTF document")
+
+
+def _rows_from_html(data: bytes) -> list[list[str]]:
+    """An HTML page: its first question table if it has one, else its text by block."""
+    from html.parser import HTMLParser
+
+    blocks = {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "section",
+              "article", "table", "ul", "ol", "pre", "blockquote"}
+
+    class _Collector(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=True)
+            self.lines: list[str] = [""]
+            self.tables: list[list[list[str]]] = []
+            self._row: list[str] | None = None
+            self._cell: list[str] | None = None
+            self._skip = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "head"):
+                self._skip += 1
+            elif tag == "table":
+                self.tables.append([])
+            elif tag == "tr" and self.tables:
+                self._row = []
+            elif tag in ("td", "th") and self._row is not None:
+                self._cell = []
+            if tag in blocks:
+                self.lines.append("")
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "head"):
+                self._skip = max(0, self._skip - 1)
+            elif tag in ("td", "th") and self._cell is not None and self._row is not None:
+                self._row.append(" ".join("".join(self._cell).split()))
+                self._cell = None
+            elif tag == "tr" and self._row is not None and self.tables:
+                if any(self._row):
+                    self.tables[-1].append(self._row)
+                self._row = None
+            if tag in blocks:
+                self.lines.append("")
+
+        def handle_data(self, text):
+            if self._skip:
+                return
+            if self._cell is not None:
+                self._cell.append(text)
+            self.lines[-1] += text
+
+    collector = _Collector()
+    collector.feed(_decode_text(data))
+    for table in collector.tables:
+        if len(table) >= 2 and "body" in _map_columns(table[0])[0]:
+            return table
+    return _prose_or_fail(collector.lines, "web page")
+
+
+def _zip_xml(data: bytes, kind: str):
+    import zipfile
+
+    try:
+        return zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise ImportError_(f"That file could not be opened as a {kind}.") from exc
+
+
+def _xml_paragraphs(xml: bytes, paragraph_tag: str, text_tag: str) -> list[str]:
+    """Paragraph texts from an Office XML part: each paragraph's text runs, joined.
+
+    Tags are matched on their local name, so the namespace prefix never matters.
+    """
+    from xml.etree import ElementTree
+
+    def local(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1]
+
+    root = ElementTree.fromstring(xml)
+    return [
+        "".join(node.text or "" for node in element.iter() if local(node.tag) == text_tag)
+        for element in root.iter()
+        if local(element.tag) == paragraph_tag
+    ]
+
+
+def _rows_from_odt(data: bytes) -> list[list[str]]:
+    """OpenDocument text (LibreOffice / Google Docs export)."""
+    archive = _zip_xml(data, "OpenDocument text file")
+    try:
+        xml = archive.read("content.xml")
+    except KeyError as exc:
+        raise ImportError_("That file is not an OpenDocument text file.") from exc
+    from xml.etree import ElementTree
+
+    root = ElementTree.fromstring(xml)
+    lines: list[str] = []
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] in ("p", "h"):
+            lines.append("".join(element.itertext()))
+    return _prose_or_fail(lines, "document")
+
+
+def _rows_from_pptx(data: bytes) -> list[list[str]]:
+    """PowerPoint: every slide's text, slide by slide, in slide order."""
+    archive = _zip_xml(data, "PowerPoint file")
+    slides = sorted(
+        (n for n in archive.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
+        key=lambda n: int(re.search(r"(\d+)\.xml$", n).group(1)),  # type: ignore[union-attr]
+    )
+    if not slides:
+        raise ImportError_("That PowerPoint file has no slides.")
+    lines: list[str] = []
+    for name in slides:
+        lines.extend(_xml_paragraphs(archive.read(name), "p", "t"))
+    return _prose_or_fail(lines, "presentation")
+
+
+#: Extensions read by OCR - a photo or scan of a printed question paper.
+IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "gif")
+
+
+def _rows_from_image(data: bytes) -> list[list[str]]:
+    from app.services.ocr import read_image_lines
+
+    try:
+        text = read_image_lines(data)
+    except RuntimeError as exc:
+        raise ImportError_(f"Text recognition (OCR) could not read this image: {exc}") from exc
+    return _prose_or_fail(text.splitlines(), "image")
+
+
+def _docx_images_text(data: bytes) -> str:
+    """OCR of the pictures inside a Word file - a scanned paper pasted in as images."""
+    from app.services.ocr import read_image_lines
+
+    archive = _zip_xml(data, "Word document")
+    media = sorted(
+        n for n in archive.namelist()
+        if n.startswith("word/media/") and n.rsplit(".", 1)[-1].lower() in IMAGE_EXTENSIONS
+    )
+    texts: list[str] = []
+    for name in media[:MAX_OCR_PAGES]:
+        try:
+            texts.append(read_image_lines(archive.read(name)))
+        except RuntimeError:
+            continue
+    return "\n".join(texts)
+
+
+def _rows_from_docx_any(data: bytes) -> list[list[str]]:
+    """A Word file's tables or text - and, when that holds no questions, its pictures."""
+    rows = _rows_from_docx(data)
+    if len(rows) >= 2:
+        return rows
+    rows = _rows_from_prose(_docx_images_text(data).splitlines())
+    if len(rows) < 2:
+        raise ImportError_(_NO_QUESTIONS.format(kind="Word document"))
+    return rows
+
+
+def _rows_from_json(data: bytes) -> list[list[str]]:
+    """A JSON list of questions: ``[{"question": ..., "options": [...], "answer": ...}]``.
+
+    Also accepted wrapped as ``{"questions": [...]}``. Keys use the same names as the
+    CSV template's columns. ``options`` may be plain strings or ``{"text", "is_correct"}``
+    objects; the latter mark the answer themselves.
+    """
+    import json
+
+    try:
+        payload = json.loads(_decode_text(data))
+    except ValueError as exc:
+        raise ImportError_("That file is not valid JSON.") from exc
+    items = payload.get("questions") if isinstance(payload, dict) else payload
+    if not isinstance(items, list) or not all(isinstance(i, dict) for i in items):
+        raise ImportError_('Expected a list of questions, or {"questions": [...]}.')
+
+    keys: list[str] = []
+    for item in items:
+        for key in item:
+            if key not in ("options", "choices") and key not in keys:
+                keys.append(key)
+    header = [*keys, *(f"Option {letter}" for letter in "ABCDEF")]
+    if not any(_normalise_header(k) in COLUMN_ALIASES["correct"] for k in keys):
+        header.append("Correct")
+    rows = [header]
+    for item in items:
+        row = ["" if item.get(k) is None else str(item.get(k)) for k in keys]
+        options = item.get("options") or item.get("choices") or []
+        texts: list[str] = []
+        marked: list[str] = []
+        for index, option in enumerate(options[:6]):
+            if isinstance(option, dict):
+                texts.append(str(option.get("text", "")))
+                if option.get("is_correct") or option.get("correct"):
+                    marked.append(chr(65 + index))
+            else:
+                texts.append(str(option))
+        row += texts + [""] * (6 - len(texts))
+        if len(header) > len(keys) + 6:
+            row.append(",".join(marked))
+        elif marked:  # an explicit answer key exists, but only fill it if it is blank
+            index = next(
+                i for i, k in enumerate(keys) if _normalise_header(k) in COLUMN_ALIASES["correct"]
+            )
+            row[index] = row[index] or ",".join(marked)
+        rows.append(row)
+    return rows
+
+
+def _via_libreoffice(extension: str, target: str):
+    """Old binary Office formats (.doc/.ppt/.xls) need LibreOffice to be read at all."""
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    def read(data: bytes) -> list[list[str]]:
+        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        if soffice is None:
+            raise ImportError_(
+                f"Old .{extension} files can't be read on this server. Save it as "
+                f".{target} and import that instead."
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / f"upload.{extension}"
+            source.write_bytes(data)
+            try:
+                subprocess.run(
+                    [soffice, "--headless", "--convert-to", target, "--outdir", tmp, str(source)],
+                    check=True, capture_output=True, timeout=90,
+                )
+                converted = (Path(tmp) / f"upload.{target}").read_bytes()
+            except (subprocess.SubprocessError, OSError) as exc:
+                raise ImportError_(
+                    f"That .{extension} file could not be converted. Save it as .{target}."
+                ) from exc
+        return READERS[target](converted)
+
+    return read
+
+
 #: Extension -> reader.
 READERS = {
     "csv": _rows_from_csv,
     "tsv": _rows_from_csv,
-    "txt": _rows_from_csv,
+    "txt": _rows_from_text,
+    "text": _rows_from_text,
+    "md": _rows_from_text,
+    "markdown": _rows_from_text,
+    "rtf": _rows_from_rtf,
+    "html": _rows_from_html,
+    "htm": _rows_from_html,
+    "json": _rows_from_json,
     "xlsx": _rows_from_xlsx,
     "xlsm": _rows_from_xlsx,
-    "docx": _rows_from_docx,
+    "docx": _rows_from_docx_any,
+    "odt": _rows_from_odt,
+    "pptx": _rows_from_pptx,
     "pdf": _rows_from_pdf,
+    **{ext: _rows_from_image for ext in IMAGE_EXTENSIONS},
+    "doc": _via_libreoffice("doc", "docx"),
+    "ppt": _via_libreoffice("ppt", "pptx"),
+    "xls": _via_libreoffice("xls", "xlsx"),
 }
+
+#: Shown in error messages and handed to the upload control's ``accept`` list.
+SUPPORTED_EXTENSIONS = tuple(READERS)
 
 
 def parse_questions(
@@ -834,8 +1292,8 @@ def parse_questions(
     reader = READERS.get(extension)
     if reader is None:
         raise ImportError_(
-            f"'{extension or filename}' is not a format we can import. "
-            "Use CSV, Excel (.xlsx), Word (.docx) or PDF."
+            f"'{extension or filename}' is not a format we can import. Supported: "
+            + ", ".join(f".{e}" for e in SUPPORTED_EXTENSIONS)
         )
 
     rows = (
