@@ -41,6 +41,12 @@ from app.main import app
 TEST_PASSWORD = "Passw0rd!"
 
 
+@pytest.fixture(autouse=True)
+def _offline_translation(monkeypatch):
+    """Tests never call a real translation service, whatever ``.env`` selects."""
+    monkeypatch.setattr(settings, "TRANSLATION_PROVIDER", "stub")
+
+
 @pytest.fixture(scope="session")
 def engine():
     eng = create_engine(settings.TEST_DATABASE_URL, pool_pre_ping=True, future=True)

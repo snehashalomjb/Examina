@@ -1,6 +1,6 @@
 """Translator factory.
 
-Resolution order: ``settings.TRANSLATION_PROVIDER`` (``stub`` | ``openai``), falling
+Resolution order: ``settings.TRANSLATION_PROVIDER`` (``stub`` | ``google`` | ``openai``), falling
 back to the stub if a provider is requested but cannot be constructed - missing
 package, missing key - so "Generate Translations" degrades to a clearly-unfinished
 draft rather than a 500. Same shape as ``app.services.grading``.
@@ -23,6 +23,15 @@ def get_translator() -> Translator:
 
     if provider == "stub":
         return StubTranslator()
+
+    if provider == "google":
+        try:
+            from app.services.translation.google import GoogleTranslator
+
+            return GoogleTranslator()
+        except Exception as exc:  # noqa: BLE001 - never fail the request over a config problem
+            logger.error("Could not build the Google translator (%s) - using the stub", exc)
+            return StubTranslator()
 
     if provider == "openai":
         api_key = settings.TRANSLATION_API_KEY or settings.OPENAI_API_KEY

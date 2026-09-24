@@ -661,15 +661,23 @@ def generate_translations(
     out_translations: dict[str, dict[str, str]] = {}
     out_options: dict[uuid.UUID, dict[str, str]] = {o.id: {} for o in question.options}
 
-    for loc in targets:
-        translated_q = translator.translate(texts=question_fields, target_locale=loc)
-        out_translations[loc] = {
-            "body": translated_q.get("body", ""),
-            "explanation": translated_q.get("explanation", ""),
-        }
-        translated_opts = translator.translate(texts=option_fields, target_locale=loc)
-        for key, option in zip(option_keys, question.options):
-            out_options[option.id][loc] = translated_opts.get(key, "")
+    try:
+        for loc in targets:
+            translated_q = translator.translate(texts=question_fields, target_locale=loc)
+            out_translations[loc] = {
+                "body": translated_q.get("body", ""),
+                "explanation": translated_q.get("explanation", ""),
+            }
+            translated_opts = translator.translate(texts=option_fields, target_locale=loc)
+            for key, option in zip(option_keys, question.options):
+                out_options[option.id][loc] = translated_opts.get(key, "")
+    except RuntimeError as exc:
+        # A provider that is down or rate-limiting must not look like a successful
+        # translation that happens to still be English.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Translation service unavailable: {exc}",
+        ) from exc
 
     logger.info(
         "%s generated %s translations for question %s (%d locale(s), %d skipped)",

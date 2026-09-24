@@ -23,6 +23,7 @@ dependencies = [
     "pypdf>=6.17.0",
     "openpyxl>=3.1.5",
     "python-docx>=1.2.0",
+    "deep-translator>=1.11.4",
 ]
 
 [project.optional-dependencies]

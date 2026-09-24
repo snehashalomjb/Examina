@@ -808,10 +808,14 @@ def my_summary(candidate: CurrentCandidate, db: DbSession) -> dict:
         .where(ExamSession.candidate_id == candidate.id, Result.published.is_(True))
     )
     enrolled_ids = login_access.enrolled_exam_ids(db, candidate.id)
+    now = exam_engine.now()
     available = (
         db.scalar(
             select(func.count(Exam.id))
             .where(Exam.id.in_(enrolled_ids), Exam.status == ExamStatus.PUBLISHED)
+            # "Open to sit" means sittable now: a published exam whose window has closed,
+            # or not opened yet, is not open, and the dashboard cards agree.
+            .where(Exam.starts_at <= now, Exam.ends_at > now)
             .where(
                 ~Exam.id.in_(
                     select(ExamSession.exam_id).where(ExamSession.candidate_id == candidate.id)
