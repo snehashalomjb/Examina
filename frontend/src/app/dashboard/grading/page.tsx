@@ -143,7 +143,7 @@ export default function GradingPage() {
             </Field>
             {questionFilter && (
               <div className="flex items-center gap-2">
-                <Badge tone="accent">Question filter active</Badge>
+                <Badge tone="accent">{t("question_filter_active")}</Badge>
                 <button
                   type="button"
                   onClick={() => setQuestionFilter("")}
@@ -248,6 +248,7 @@ function GradeCard({
   onFilterByQuestion?: (questionId: string) => void;
 }) {
   const t = useTranslations("grading");
+  const tx = useTranslations("examsOps");
   const [marks, setMarks] = useState(
     item.awarded_marks !== null ? String(item.awarded_marks) : "0",
   );
@@ -281,7 +282,7 @@ function GradeCard({
         <div>
           <p className="text-[15px] font-semibold tracking-tight text-ink">{item.candidate_name}</p>
           <p className="text-[12.5px] text-ink-muted">
-            {item.candidate_email} · {item.exam_title} · submitted {formatDate(item.submitted_at)}
+            {item.candidate_email} · {item.exam_title} · {tx("grading_submitted_on", { date: formatDate(item.submitted_at) })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -363,7 +364,7 @@ function GradeCard({
               {ai.score} / {ai.max_score}
             </Badge>
             <Badge>{ai.provider}{ai.model ? ` · ${ai.model}` : ""}</Badge>
-            <Badge>confidence {Math.round(ai.confidence * 100)}%</Badge>
+            <Badge>{tx("grading_confidence", { pct: Math.round(ai.confidence * 100) })}</Badge>
           </div>
           <p className="text-[13px] leading-relaxed text-ink-soft">{ai.justification}</p>
           {(ai.key_points_matched.length > 0 || ai.key_points_missed.length > 0) && (
@@ -468,6 +469,7 @@ function GradeCard({
  */
 function OcrPanel({ text, confidence }: { text: string | null; confidence: number | null }) {
   const t = useTranslations("grading");
+  const tx = useTranslations("examsOps");
   const [open, setOpen] = useState(false);
   if (!text) return null;
 
@@ -480,7 +482,7 @@ function OcrPanel({ text, confidence }: { text: string | null; confidence: numbe
         className="flex w-full items-center justify-between gap-2 text-left"
       >
         <span className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-          {t("ocr_label")} {percent != null && `· ${percent}% confidence`}
+          {t("ocr_label")} {percent != null && `· ${tx("grading_pct_confidence", { pct: percent })}`}
         </span>
         <span className="text-[11.5px] text-ink-muted">{open ? t("ocr_hide") : t("ocr_show")}</span>
       </button>
@@ -561,7 +563,7 @@ function RubricPanel({
     <div className="rounded-[11px] border border-accent/20 bg-accent-soft/30 p-4">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-accent-ink">
-          Rubric
+          {t("rubric_label")}
         </p>
         <span className="text-[13px] font-bold tabular-nums text-ink">
           {earned} / {maxMarks}
@@ -625,6 +627,7 @@ function AnnotationCanvas({
   answerId: string;
 }) {
   const t = useTranslations("grading");
+  const tx = useTranslations("examsOps");
   const [tool, setTool] = useState<AnnotationTool>("rect");
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [drawing, setDrawing] = useState<Annotation | null>(null);
@@ -713,9 +716,9 @@ function AnnotationCanvas({
     try {
       await api.put(`/grading/answers/${answerId}/annotations`, { annotations });
       setSaved(true);
-      toast("Annotations saved", "mint");
+      toast(tx("grading_annotations_saved"), "mint");
     } catch {
-      toast("Could not save annotations", "rose");
+      toast(tx("grading_error_save_annotations"), "rose");
     } finally {
       setSaving(false);
     }

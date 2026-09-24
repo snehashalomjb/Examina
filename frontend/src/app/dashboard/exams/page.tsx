@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import {
@@ -37,6 +38,7 @@ import type {
 import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
 
 export default function ExamsPage() {
+  const t = useTranslations("examsOps");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -93,11 +95,11 @@ export default function ExamsPage() {
       );
       setChecks(Object.fromEntries(results.filter(Boolean) as [string, ExamPoolCheck][]));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load exams.");
+      setError(err instanceof ApiError ? err.message : t("exams_error_load"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (user) void load();
@@ -106,7 +108,7 @@ export default function ExamsPage() {
   async function publish(exam: Exam) {
     try {
       await api.post(`/exams/${exam.id}/publish`);
-      toast(`${exam.title} is live`, "mint");
+      toast(t("exams_toast_live", { title: exam.title }), "mint");
       void load();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -121,10 +123,10 @@ export default function ExamsPage() {
   async function close(exam: Exam) {
     try {
       await api.post(`/exams/${exam.id}/close`);
-      toast(`${exam.title} closed`, "neutral");
+      toast(t("exams_toast_closed", { title: exam.title }), "neutral");
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not close the exam", "rose");
+      toast(err instanceof ApiError ? err.message : t("exams_error_close"), "rose");
     }
   }
 
@@ -133,17 +135,17 @@ export default function ExamsPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Exams"
-        body="An exam is a set of rules, not a fixed paper: each candidate's questions are drawn dynamically from your question bank pool."
+        title={t("exams_title")}
+        body={t("exams_body")}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/dashboard/exams/create">
               <Button size="sm">
-                + Create Exam Wizard
+                {t("exams_create_wizard")}
               </Button>
             </Link>
             <Button size="sm" variant="secondary" onClick={() => setBuilding((v) => !v)}>
-              {building ? "Close quick builder" : "Quick Builder"}
+              {building ? t("exams_close_quick_builder") : t("exams_quick_builder")}
             </Button>
           </div>
         }
@@ -156,11 +158,11 @@ export default function ExamsPage() {
         <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
           {(
             [
-              { key: "all", label: `All (${exams.length})` },
-              { key: "academic", label: `🎓 Academic (${exams.filter((e) => e.exam_type === "academic").length})` },
-              { key: "corporate", label: `💼 Corporate (${exams.filter((e) => e.exam_type === "corporate").length})` },
-              { key: "published", label: `Live (${exams.filter((e) => e.status === "published").length})` },
-              { key: "draft", label: `Drafts (${exams.filter((e) => e.status === "draft").length})` },
+              { key: "all", label: t("exams_tab_all", { count: exams.length }) },
+              { key: "academic", label: t("exams_tab_academic", { count: exams.filter((e) => e.exam_type === "academic").length }) },
+              { key: "corporate", label: t("exams_tab_corporate", { count: exams.filter((e) => e.exam_type === "corporate").length }) },
+              { key: "published", label: t("exams_tab_live", { count: exams.filter((e) => e.status === "published").length }) },
+              { key: "draft", label: t("exams_tab_drafts", { count: exams.filter((e) => e.status === "draft").length }) },
             ] as { key: typeof filterTab; label: string }[]
           ).map((tab) => (
             <button
@@ -183,7 +185,7 @@ export default function ExamsPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search exams..."
+            placeholder={t("exams_search_placeholder")}
             className="text-xs h-9"
           />
         </div>
@@ -209,11 +211,11 @@ export default function ExamsPage() {
         </div>
       ) : filteredExams.length === 0 ? (
         <EmptyState
-          title={exams.length === 0 ? "No exams yet" : "No exams match filter"}
-          body={exams.length === 0 ? "Build an exam from your question bank or use the creation wizard." : "Try adjusting your search query or switching tabs."}
+          title={exams.length === 0 ? t("exams_empty_title") : t("exams_empty_filter_title")}
+          body={exams.length === 0 ? t("exams_empty_body") : t("exams_empty_filter_body")}
           action={
             <Link href="/dashboard/exams/create">
-              <Button size="sm">+ Create Exam Wizard</Button>
+              <Button size="sm">{t("exams_create_wizard")}</Button>
             </Link>
           }
         />
@@ -230,7 +232,7 @@ export default function ExamsPage() {
                         {exam.title}
                       </p>
                       <Badge tone={exam.exam_type === "corporate" ? "purple" : "accent"}>
-                        {exam.exam_type === "corporate" ? "💼 Corporate" : "🎓 Academic"}
+                        {exam.exam_type === "corporate" ? t("exams_badge_corporate") : t("exams_badge_academic")}
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-[12.5px] text-ink-muted">
@@ -249,16 +251,16 @@ export default function ExamsPage() {
                           : "neutral"
                     }
                   >
-                    {exam.status}
+                    {t(`status_${exam.status}`)}
                   </Badge>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-4 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
                   {[
-                    ["Duration", `${exam.duration_minutes}m`],
-                    ["Questions", String(exam.total_questions)],
-                    ["Pool", String(exam.pool_size)],
-                    ["Negative", exam.negative_marking ? "on" : "off"],
+                    [t("exams_stat_duration"), t("minutes_short", { count: exam.duration_minutes })],
+                    [t("exams_stat_questions"), String(exam.total_questions)],
+                    [t("exams_stat_pool"), String(exam.pool_size)],
+                    [t("exams_stat_negative"), exam.negative_marking ? t("on") : t("off")],
                   ].map(([label, value]) => (
                     <div key={label}>
                       <dt className="text-[10.5px] uppercase tracking-wide text-ink-muted">
@@ -272,15 +274,15 @@ export default function ExamsPage() {
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {exam.selection_rules.rules.map((rule, index) => (
                     <Badge key={index}>
-                      {rule.count}× {TYPE_LABEL[rule.question_type]}
-                      {rule.difficulty ? ` (${rule.difficulty})` : ""}
+                      {rule.count}× {t(`qtype_${rule.question_type}`)}
+                      {rule.difficulty ? ` (${t(`difficulty_${rule.difficulty}`)})` : ""}
                     </Badge>
                   ))}
                 </div>
 
                 {check && !check.can_publish && (
                   <div className="mt-3">
-                    <Alert tone="amber" title="Cannot publish yet">
+                    <Alert tone="amber" title={t("exams_cannot_publish_yet")}>
                       <ul className="list-disc pl-4">
                         {check.problems.map((problem, index) => (
                           <li key={index}>{problem}</li>
@@ -297,7 +299,7 @@ export default function ExamsPage() {
                           wizard is where it gets finished. */}
                       <Link href={`/dashboard/exams/create?exam=${exam.id}`}>
                         <Button size="sm" variant={check?.can_publish ? "secondary" : "primary"}>
-                          Continue editing
+                          {t("exams_continue_editing")}
                         </Button>
                       </Link>
                       <Button
@@ -305,26 +307,26 @@ export default function ExamsPage() {
                         onClick={() => publish(exam)}
                         disabled={Boolean(check && !check.can_publish)}
                       >
-                        Publish
+                        {t("exams_publish")}
                       </Button>
                     </>
                   )}
                   {exam.status === "published" && (
                     <Button size="sm" variant="secondary" onClick={() => close(exam)}>
-                      Close exam
+                      {t("exams_close_exam")}
                     </Button>
                   )}
                   <PaperPreviewButton examId={exam.id} />
                   <EnrollmentButton exam={exam} />
                   <Link href={`/dashboard/exams/${exam.id}/analytics`}>
-                    <Button size="sm" variant="ghost">Analytics</Button>
+                    <Button size="sm" variant="ghost">{t("exams_analytics")}</Button>
                   </Link>
                   <Link href={`/dashboard/exams/${exam.id}/ranking`}>
                     <Button size="sm" variant="ghost">
-                      {exam.exam_type === "corporate" ? "Ranking" : "Candidate Report"}
+                      {exam.exam_type === "corporate" ? t("exams_ranking") : t("exams_candidate_report")}
                     </Button>
                   </Link>
-                  {exam.results_published && <Badge tone="mint">results published</Badge>}
+                  {exam.results_published && <Badge tone="mint">{t("exams_results_published")}</Badge>}
                 </div>
               </Card>
             );
@@ -337,6 +339,7 @@ export default function ExamsPage() {
 
 /** Proves the determinism claim to the examiner: same call, byte-identical paper. */
 function PaperPreviewButton({ examId }: { examId: string }) {
+  const t = useTranslations("examsOps");
   const [preview, setPreview] = useState<{ seed: string; entries: { question_id: string; body: string; marks: number }[] } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -349,7 +352,7 @@ function PaperPreviewButton({ examId }: { examId: string }) {
       }>(`/exams/${examId}/preview-paper`);
       setPreview(data);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not generate a preview", "rose");
+      toast(err instanceof ApiError ? err.message : t("exams_error_preview"), "rose");
     } finally {
       setBusy(false);
     }
@@ -358,17 +361,17 @@ function PaperPreviewButton({ examId }: { examId: string }) {
   return (
     <>
       <Button size="sm" variant="ghost" loading={busy} onClick={run}>
-        Preview paper
+        {t("exams_preview_paper")}
       </Button>
       {preview && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 px-5 backdrop-blur-sm">
           <Card className="animate-rise max-h-[80vh] w-full max-w-2xl overflow-y-auto">
             <SectionTitle
-              title="Generated paper"
-              hint={`Seed ${preview.seed.slice(0, 16)}… — the same candidate always gets this exact paper.`}
+              title={t("exams_generated_paper")}
+              hint={t("exams_generated_paper_hint", { seed: preview.seed.slice(0, 16) })}
               action={
                 <Button size="sm" variant="secondary" onClick={() => setPreview(null)}>
-                  Close
+                  {t("close")}
                 </Button>
               }
             />
@@ -376,8 +379,8 @@ function PaperPreviewButton({ examId }: { examId: string }) {
               {preview.entries.map((entry, index) => (
                 <li key={entry.question_id} className="rounded-[10px] border border-line p-3">
                   <div className="mb-1 flex items-center gap-2">
-                    <Badge tone="accent">Q{index + 1}</Badge>
-                    <Badge>{entry.marks} marks</Badge>
+                    <Badge tone="accent">{t("q_number", { n: index + 1 })}</Badge>
+                    <Badge>{t("marks_count", { count: entry.marks })}</Badge>
                   </div>
                   <p className="text-[13px] leading-relaxed text-ink-soft">{entry.body}</p>
                 </li>
@@ -392,6 +395,7 @@ function PaperPreviewButton({ examId }: { examId: string }) {
 
 /** Highest scorer on a chosen subject, across every published result for it. */
 function TopPerformerBySubject({ subjects }: { subjects: Subject[] }) {
+  const t = useTranslations("examsOps");
   const [subjectId, setSubjectId] = useState("");
   const [performer, setPerformer] = useState<TopPerformer | null>(null);
   const [loading, setLoading] = useState(false);
@@ -419,10 +423,10 @@ function TopPerformerBySubject({ subjects }: { subjects: Subject[] }) {
 
   return (
     <Card>
-      <SectionTitle title="Top Performer by Subject" hint="Highest published score for a subject, across all its exams." />
+      <SectionTitle title={t("exams_top_performer_title")} hint={t("exams_top_performer_hint")} />
       <div className="flex flex-wrap items-center gap-3">
         <Select className="w-64" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-          <option value="">Choose a subject…</option>
+          <option value="">{t("exams_choose_subject")}</option>
           {subjects.map((subject) => (
             <option key={subject.id} value={subject.id}>
               {subject.code} — {subject.name}
@@ -436,15 +440,19 @@ function TopPerformerBySubject({ subjects }: { subjects: Subject[] }) {
           <div className="flex items-center gap-2 rounded-[10px] border border-amber/30 bg-amber-soft/30 px-3.5 py-2">
             <span className="text-[16px]">🏆</span>
             <span className="text-[13px] text-ink">
-              <strong>{performer.candidate_name}</strong> — {performer.obtained_marks.toFixed(1)}/
-              {performer.total_marks.toFixed(1)} ({performer.percentage.toFixed(1)}%) on{" "}
-              {performer.exam_title}
+              <strong>{performer.candidate_name}</strong> —{" "}
+              {t("exams_top_performer_score", {
+                obtained: performer.obtained_marks.toFixed(1),
+                total: performer.total_marks.toFixed(1),
+                pct: performer.percentage.toFixed(1),
+                exam: performer.exam_title,
+              })}
             </span>
           </div>
         )}
 
         {!loading && checked && !performer && (
-          <span className="text-[13px] text-ink-muted">No published results for this subject yet.</span>
+          <span className="text-[13px] text-ink-muted">{t("exams_top_performer_none")}</span>
         )}
       </div>
     </Card>
@@ -467,9 +475,9 @@ interface SectionDraft {
   rules: SelectionRule[];
 }
 
-function makeSectionDraft(order_index: number): SectionDraft {
+function makeSectionDraft(order_index: number, name: string): SectionDraft {
   return {
-    name: `Section ${order_index + 1}`,
+    name,
     description: "",
     order_index,
     duration_minutes: "",
@@ -480,6 +488,7 @@ function makeSectionDraft(order_index: number): SectionDraft {
 }
 
 function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => void }) {
+  const t = useTranslations("examsOps");
   const now = new Date();
 
   const [examType, setExamType] = useState<"academic" | "corporate">("academic");
@@ -502,7 +511,9 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
   const [rules, setRules] = useState<SelectionRule[]>([
     { question_type: "mcq", difficulty: null, count: 5 },
   ]);
-  const [sections, setSections] = useState<SectionDraft[]>([makeSectionDraft(0)]);
+  const [sections, setSections] = useState<SectionDraft[]>(() => [
+    makeSectionDraft(0, t("exams_section_default_name", { n: 1 })),
+  ]);
   const [pool, setPool] = useState<Question[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -533,7 +544,13 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
       );
       if (matches.length < rule.count) {
         problems.push(
-          `Need ${rule.count} ${TYPE_LABEL[rule.question_type]}${rule.difficulty ? ` (${rule.difficulty})` : ""}, pool has ${matches.length}`,
+          t("exams_feasibility_need", {
+            count: rule.count,
+            type: rule.difficulty
+              ? `${t(`qtype_${rule.question_type}`)} (${t(`difficulty_${rule.difficulty}`)})`
+              : t(`qtype_${rule.question_type}`),
+            have: matches.length,
+          }),
         );
       }
       matches.slice(0, rule.count).forEach((match) => {
@@ -542,7 +559,7 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
       });
     }
     return problems;
-  }, [pool, rules, sections, examType]);
+  }, [pool, rules, sections, examType, t]);
 
   const totalQuestions =
     examType === "academic"
@@ -599,10 +616,10 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
         }));
       }
       await api.post("/exams", body);
-      toast(`${title} created as a draft`, "mint");
+      toast(t("exams_toast_created", { title }), "mint");
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the exam.");
+      setError(err instanceof ApiError ? err.message : t("exams_error_create"));
     } finally {
       setBusy(false);
     }
@@ -611,8 +628,8 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
   if (subjects.length === 0) {
     return (
       <Card>
-        <Alert tone="amber" title="No subjects yet">
-          Create a subject and some questions in the question bank first.
+        <Alert tone="amber" title={t("exams_no_subjects_title")}>
+          {t("exams_no_subjects_body")}
         </Alert>
       </Card>
     );
@@ -621,8 +638,8 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
   return (
     <Card>
       <SectionTitle
-        title="Build an exam"
-        hint="Choose Academic for a single-subject paper or Corporate for a multi-section hiring assessment."
+        title={t("exams_build_title")}
+        hint={t("exams_build_hint")}
       />
       <form onSubmit={submit} className="space-y-5">
         <div className="flex gap-2">
@@ -640,87 +657,87 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
                   : "border-line text-ink-soft hover:bg-sunken",
               )}
             >
-              <p className="text-[13px] font-semibold capitalize">{type}</p>
+              <p className="text-[13px] font-semibold">{t(`exams_type_${type}`)}</p>
               <p className="mt-0.5 text-[12px] opacity-70">
                 {type === "academic"
-                  ? "Single subject paper — graded results"
-                  : "Multi-section hiring drive — ranking & shortlisting"}
+                  ? t("exams_type_academic_desc")
+                  : t("exams_type_corporate_desc")}
               </p>
             </button>
           ))}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Title">
+          <Field label={t("exams_field_title")}>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={examType === "academic" ? "CS101 Mid-Semester Examination" : "Software Engineer Hiring Drive 2025"}
+              placeholder={examType === "academic" ? t("exams_title_placeholder_academic") : t("exams_title_placeholder_corporate")}
               required
               minLength={3}
             />
           </Field>
-          <Field label="Subject" hint={examType === "corporate" ? "Optional for corporate exams" : undefined}>
+          <Field label={t("exams_field_subject")} hint={examType === "corporate" ? t("exams_subject_optional_corporate") : undefined}>
             <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required={examType === "academic"}>
-              {examType === "corporate" && <option value="">— Any / All subjects —</option>}
+              {examType === "corporate" && <option value="">{t("exams_any_subject")}</option>}
               {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
-                  {subject.code} — {subject.name} ({subject.question_count} questions)
+                  {subject.code} — {subject.name} ({t("questions_count", { count: subject.question_count })})
                 </option>
               ))}
             </Select>
           </Field>
         </div>
 
-        <Field label="Description" hint="Shown to candidates before they start.">
+        <Field label={t("exams_field_description")} hint={t("exams_description_hint")}>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            placeholder="What this paper covers and how it is marked."
+            placeholder={t("exams_description_placeholder")}
           />
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Duration (minutes)">
+          <Field label={t("exams_field_duration")}>
             <Input type="number" min="1" max="600" value={duration} onChange={(e) => setDuration(e.target.value)} required />
           </Field>
-          <Field label="Window opens">
+          <Field label={t("exams_field_window_opens")}>
             <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required />
           </Field>
-          <Field label="Window closes">
+          <Field label={t("exams_field_window_closes")}>
             <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required />
           </Field>
         </div>
 
         {examType === "academic" && (
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Course code" hint="Optional"><Input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="CS101" /></Field>
-            <Field label="Department" hint="Optional"><Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Computer Science" /></Field>
-            <Field label="Semester / batch" hint="Optional"><Input value={semester} onChange={(e) => setSemester(e.target.value)} placeholder="Sem 3 — 2025" /></Field>
+            <Field label={t("exams_field_course_code")} hint={t("optional")}><Input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="CS101" /></Field>
+            <Field label={t("exams_field_department")} hint={t("optional")}><Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder={t("exams_department_placeholder")} /></Field>
+            <Field label={t("exams_field_semester")} hint={t("optional")}><Input value={semester} onChange={(e) => setSemester(e.target.value)} placeholder={t("exams_semester_placeholder")} /></Field>
           </div>
         )}
 
         {examType === "corporate" && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Company name"><Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Technologies" /></Field>
-            <Field label="Job role"><Input value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Software Engineer — Backend" /></Field>
+            <Field label={t("exams_field_company")}><Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Technologies" /></Field>
+            <Field label={t("exams_field_job_role")}><Input value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder={t("exams_job_role_placeholder")} /></Field>
           </div>
         )}
 
-        <Field label="Passing percentage" hint="Used in analytics and pass/fail calculation">
+        <Field label={t("exams_field_passing")} hint={t("exams_passing_hint")}>
           <Input type="number" min="1" max="100" value={passingPct} onChange={(e) => setPassingPct(e.target.value)} />
         </Field>
 
         {examType === "academic" ? (
           <div>
             <p className="mb-2 text-[13px] font-medium text-ink-soft">
-              Paper composition <span className="font-normal text-ink-muted">— {totalQuestions} questions per candidate</span>
+              {t("exams_paper_composition")} <span className="font-normal text-ink-muted">— {t("exams_questions_per_candidate", { count: totalQuestions })}</span>
             </p>
             <RuleEditor rules={rules} onChange={setRules} />
             {feasibility.length > 0 && (
               <div className="mt-3">
-                <Alert tone="amber" title="The pool cannot satisfy these rules">
+                <Alert tone="amber" title={t("exams_pool_cannot_satisfy")}>
                   <ul className="list-disc pl-4">{feasibility.map((p, index) => <li key={index}>{p}</li>)}</ul>
                 </Alert>
               </div>
@@ -730,10 +747,10 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-[13px] font-medium text-ink-soft">
-                Sections <span className="font-normal text-ink-muted">— {totalQuestions} questions total</span>
+                {t("exams_sections")} <span className="font-normal text-ink-muted">— {t("exams_questions_total", { count: totalQuestions })}</span>
               </p>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setSections((s) => [...s, makeSectionDraft(s.length)])}>
-                + Add section
+              <Button type="button" variant="secondary" size="sm" onClick={() => setSections((s) => [...s, makeSectionDraft(s.length, t("exams_section_default_name", { n: s.length + 1 }))])}>
+                {t("exams_add_section")}
               </Button>
             </div>
             <div className="space-y-4">
@@ -746,28 +763,28 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
                         className="rounded-[8px] border border-line-strong bg-surface px-2.5 py-1.5 text-[13px] font-medium text-ink focus:border-accent focus:outline-none"
                         value={sec.name}
                         onChange={(e) => setSections((s) => s.map((x, i) => i === si ? { ...x, name: e.target.value } : x))}
-                        placeholder="Section name"
+                        placeholder={t("exams_section_name_placeholder")}
                       />
                     </div>
                     {sections.length > 1 && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => setSections((s) => s.filter((_, i) => i !== si).map((x, i) => ({ ...x, order_index: i })))}>
-                        Remove
+                        {t("remove")}
                       </Button>
                     )}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <Field label="Section duration (min)" hint="Leave blank to share the exam timer">
+                    <Field label={t("exams_field_section_duration")} hint={t("exams_section_duration_hint")}>
                       <Input type="number" min="1" value={sec.duration_minutes} onChange={(e) => setSections((s) => s.map((x, i) => i === si ? { ...x, duration_minutes: e.target.value } : x))} placeholder="—" />
                     </Field>
-                    <Field label="Marks per question">
+                    <Field label={t("exams_field_marks_per_question")}>
                       <Input type="number" min="0.5" step="0.5" value={sec.marks_per_question} onChange={(e) => setSections((s) => s.map((x, i) => i === si ? { ...x, marks_per_question: e.target.value } : x))} />
                     </Field>
-                    <Field label="Negative marks">
+                    <Field label={t("exams_field_negative_marks")}>
                       <Input type="number" min="0" step="0.25" value={sec.negative_marks} onChange={(e) => setSections((s) => s.map((x, i) => i === si ? { ...x, negative_marks: e.target.value } : x))} />
                     </Field>
                   </div>
                   <div>
-                    <p className="mb-1.5 text-[12px] font-medium text-ink-muted">Question rules</p>
+                    <p className="mb-1.5 text-[12px] font-medium text-ink-muted">{t("exams_question_rules")}</p>
                     <RuleEditor
                       rules={sec.rules}
                       onChange={(newRules) => setSections((s) => s.map((x, i) => i === si ? { ...x, rules: newRules } : x))}
@@ -778,7 +795,7 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
             </div>
             {feasibility.length > 0 && (
               <div className="mt-3">
-                <Alert tone="amber" title="Pool gap across sections">
+                <Alert tone="amber" title={t("exams_pool_gap_sections")}>
                   <ul className="list-disc pl-4">{feasibility.map((p, index) => <li key={index}>{p}</li>)}</ul>
                 </Alert>
               </div>
@@ -787,10 +804,10 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
         )}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <ToggleRow label="Randomize per candidate" hint="Each candidate gets a different draw and option order." checked={randomize} onChange={setRandomize} />
-          <ToggleRow label="Negative marking" hint="Wrong objective answers deduct the question's penalty." checked={negative} onChange={setNegative} />
-          <ToggleRow label="Webcam proctoring" hint="Face presence, face count and head orientation." checked={webcam} onChange={setWebcam} />
-          <Field label="Tab-switch warnings before flagging">
+          <ToggleRow label={t("exams_toggle_randomize")} hint={t("exams_toggle_randomize_hint")} checked={randomize} onChange={setRandomize} />
+          <ToggleRow label={t("exams_toggle_negative")} hint={t("exams_toggle_negative_hint")} checked={negative} onChange={setNegative} />
+          <ToggleRow label={t("exams_toggle_webcam")} hint={t("exams_toggle_webcam_hint")} checked={webcam} onChange={setWebcam} />
+          <Field label={t("exams_field_tab_warnings")}>
             <Input type="number" min="0" max="50" value={maxTabs} onChange={(e) => setMaxTabs(e.target.value)} />
           </Field>
         </div>
@@ -798,8 +815,8 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
         {error && <Alert tone="rose">{error}</Alert>}
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[12.5px] text-ink-muted">Created as a draft — review it, then publish when ready.</p>
-          <Button type="submit" loading={busy} disabled={feasibility.length > 0}>Create exam</Button>
+          <p className="text-[12.5px] text-ink-muted">{t("exams_created_as_draft_note")}</p>
+          <Button type="submit" loading={busy} disabled={feasibility.length > 0}>{t("exams_create_exam")}</Button>
         </div>
       </form>
     </Card>
@@ -807,6 +824,7 @@ function ExamBuilder({ subjects, onDone }: { subjects: Subject[]; onDone: () => 
 }
 
 function RuleEditor({ rules, onChange }: { rules: SelectionRule[]; onChange: (rules: SelectionRule[]) => void }) {
+  const t = useTranslations("examsOps");
   return (
     <div className="space-y-2">
       {rules.map((rule, index) => (
@@ -816,8 +834,8 @@ function RuleEditor({ rules, onChange }: { rules: SelectionRule[]; onChange: (ru
             value={rule.question_type}
             onChange={(e) => onChange(rules.map((r, i) => i === index ? { ...r, question_type: e.target.value as QuestionType } : r))}
           >
-            {Object.entries(TYPE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            {Object.keys(TYPE_LABEL).map((value) => (
+              <option key={value} value={value}>{t(`qtype_${value}`)}</option>
             ))}
           </Select>
           <Select
@@ -825,10 +843,10 @@ function RuleEditor({ rules, onChange }: { rules: SelectionRule[]; onChange: (ru
             value={rule.difficulty ?? ""}
             onChange={(e) => onChange(rules.map((r, i) => i === index ? { ...r, difficulty: (e.target.value || null) as Difficulty | null } : r))}
           >
-            <option value="">Any difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="">{t("difficulty_any")}</option>
+            <option value="easy">{t("difficulty_easy")}</option>
+            <option value="medium">{t("difficulty_medium")}</option>
+            <option value="hard">{t("difficulty_hard")}</option>
           </Select>
           <Input
             type="number"
@@ -839,13 +857,13 @@ function RuleEditor({ rules, onChange }: { rules: SelectionRule[]; onChange: (ru
           />
           {rules.length > 1 && (
             <Button type="button" variant="ghost" size="sm" onClick={() => onChange(rules.filter((_, i) => i !== index))}>
-              Remove
+              {t("remove")}
             </Button>
           )}
         </div>
       ))}
       <Button type="button" variant="secondary" size="sm" className="mt-1" onClick={() => onChange([...rules, { question_type: "short_answer" as QuestionType, difficulty: null, count: 1 }])}>
-        Add rule
+        {t("exams_add_rule")}
       </Button>
     </div>
   );
@@ -894,6 +912,7 @@ function ToggleRow({
 
 /* ------------------------------------------------------------------ enrolment */
 function EnrollmentButton({ exam }: { exam: Exam }) {
+  const t = useTranslations("examsOps");
   const [open, setOpen] = useState(false);
   const [enrolled, setEnrolled] = useState<EnrollmentRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
@@ -912,11 +931,11 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
       setEnrolled(rows);
       setCandidates(roster);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not load enrolments", "rose");
+      toast(err instanceof ApiError ? err.message : t("exams_error_load_enrolments"), "rose");
     } finally {
       setLoading(false);
     }
-  }, [exam.id]);
+  }, [exam.id, t]);
 
   useEffect(() => {
     if (open) void load();
@@ -933,7 +952,7 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
       setSelected(new Set());
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not enrol", "rose");
+      toast(err instanceof ApiError ? err.message : t("exams_error_enrol"), "rose");
     } finally {
       setBusy(false);
     }
@@ -942,10 +961,10 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
   async function remove(candidateId: string) {
     try {
       await api.delete(`/exams/${exam.id}/enrollments/${candidateId}`);
-      toast("Enrolment removed", "neutral");
+      toast(t("exams_toast_enrolment_removed"), "neutral");
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not remove the enrolment", "rose");
+      toast(err instanceof ApiError ? err.message : t("exams_error_remove_enrolment"), "rose");
     }
   }
 
@@ -960,7 +979,7 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
   return (
     <>
       <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Candidates
+        {t("exams_candidates")}
       </Button>
 
       {open && (
@@ -971,11 +990,11 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
           <div className="w-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
             <Card className="animate-rise max-h-[82vh] overflow-y-auto">
               <SectionTitle
-                title="Assigned candidates"
-                hint={`Only enrolled candidates can see or sit ${exam.title}.`}
+                title={t("exams_assigned_candidates")}
+                hint={t("exams_assigned_candidates_hint", { title: exam.title })}
                 action={
                   <Button size="sm" variant="secondary" onClick={() => setOpen(false)}>
-                    Close
+                    {t("close")}
                   </Button>
                 }
               />
@@ -987,12 +1006,12 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
                   {/* -------------------------------------------- enrolled */}
                   <div>
                     <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-muted">
-                      Enrolled ({enrolled.length})
+                      {t("exams_enrolled_count", { count: enrolled.length })}
                     </p>
                     {enrolled.length === 0 ? (
                       <EmptyState
-                        title="Nobody assigned"
-                        body="This paper is invisible to every candidate until you assign someone."
+                        title={t("exams_nobody_assigned")}
+                        body={t("exams_nobody_assigned_body")}
                       />
                     ) : (
                       <ul className="divide-y divide-line rounded-[11px] border border-line">
@@ -1014,18 +1033,18 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
                                       : "rose"
                                 }
                               >
-                                {row.login_access}
+                                {t(`access_${row.login_access}`)}
                               </Badge>
                             )}
                             {row.has_attempted ? (
-                              <Badge tone="accent">sat</Badge>
+                              <Badge tone="accent">{t("exams_badge_sat")}</Badge>
                             ) : (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => remove(row.candidate_id)}
                               >
-                                Remove
+                                {t("remove")}
                               </Button>
                             )}
                           </li>
@@ -1037,20 +1056,20 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
                   {/* ------------------------------------------- available */}
                   <div>
                     <p className="mb-2 text-[12px] font-medium uppercase tracking-wide text-ink-muted">
-                      Add candidates
+                      {t("exams_add_candidates")}
                     </p>
-                    <Field label="Search">
+                    <Field label={t("search")}>
                       <Input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Name or email"
+                        placeholder={t("name_or_email")}
                       />
                     </Field>
 
                     <div className="mt-3 max-h-64 overflow-y-auto rounded-[11px] border border-line">
                       {available.length === 0 ? (
                         <p className="px-3 py-6 text-center text-[12.5px] text-ink-muted">
-                          Everyone matching is already enrolled.
+                          {t("exams_everyone_enrolled")}
                         </p>
                       ) : (
                         <ul className="divide-y divide-line">
@@ -1090,8 +1109,9 @@ function EnrollmentButton({ exam }: { exam: Exam }) {
 
                     <div className="mt-3 flex justify-end">
                       <Button size="sm" loading={busy} disabled={selected.size === 0} onClick={assign}>
-                        Assign {selected.size > 0 ? `${selected.size} ` : ""}candidate
-                        {selected.size === 1 ? "" : "s"}
+                        {selected.size > 0
+                          ? t("exams_assign_n_candidates", { count: selected.size })
+                          : t("exams_assign_candidates")}
                       </Button>
                     </div>
                   </div>

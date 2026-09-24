@@ -28,17 +28,18 @@ import type {
   ProctorReview, Exam, ExaminerStats, GradingSummary, LoginRequestRow,
 } from "@/lib/types";
 
-/* ─── Greeting based on time of day ─────────────────────────────── */
-function greeting(): string {
+/* ─── Greeting based on time of day (returns an examsOps key) ───── */
+function greetingKey(): "greeting_morning" | "greeting_afternoon" | "greeting_evening" {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return "greeting_morning";
+  if (h < 17) return "greeting_afternoon";
+  return "greeting_evening";
 }
 
 export default function ExaminerDashboard() {
   const { user } = useRequireAuth(["examiner", "admin"]);
   const t = useTranslations("examiner");
+  const tx = useTranslations("examsOps");
   const [stats, setStats] = useState<ExaminerStats | null>(null);
   const [summaries, setSummaries] = useState<GradingSummary[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
@@ -106,33 +107,21 @@ export default function ExaminerDashboard() {
           <div>
             <div className="mb-1 flex items-center gap-2">
               <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold tracking-wide text-accent uppercase">
-                Examiner
+                {tx("examiner_badge")}
               </span>
               {needsRuling.length > 0 && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-soft px-2.5 py-0.5 text-[11px] font-bold text-amber-ink border border-amber/20">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber animate-pulse" />
-                  {needsRuling.length} need{needsRuling.length === 1 ? "s" : ""} ruling
+                  {tx("examiner_needs_ruling", { count: needsRuling.length })}
                 </span>
               )}
             </div>
             <h1 className="text-[22px] font-extrabold tracking-tight text-ink sm:text-[26px]">
-              {greeting()}, {user.full_name.split(" ")[0]} 👋
+              {tx("examiner_greeting", { greeting: tx(greetingKey()), name: user.full_name.split(" ")[0] })} 👋
             </h1>
             <p className="mt-1 text-[13.5px] text-ink-muted max-w-md">
               {t("examiner_workspace_body")}
             </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Link href="/dashboard/questions/ai-generate">
-              <Button variant="secondary" size="sm">
-                <SparkleIcon /> AI Generate
-              </Button>
-            </Link>
-            <Link href="/dashboard/exams/create">
-              <Button size="sm">
-                <PlusIcon /> {t("create_exam_button")}
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
@@ -153,10 +142,10 @@ export default function ExaminerDashboard() {
         <KPIBanner items={[
           { label: t("total_assessments"),      value: stats.my_exams,                   tone: "accent" },
           { label: t("active_assessments"),     value: stats.active_assessments,          tone: "green",
-            trend: stats.active_assessments > 0 ? { value: "Live now", up: true } : undefined },
+            trend: stats.active_assessments > 0 ? { value: tx("examiner_trend_live_now"), up: true } : undefined },
           { label: t("completed_assessments"),  value: stats.completed_assessments,       tone: "neutral" },
           { label: t("pending_result_reviews"), value: stats.pending_grading,             tone: stats.pending_grading > 0 ? "amber" : "neutral",
-            trend: stats.pending_grading > 0 ? { value: "Needs review", up: false } : undefined },
+            trend: stats.pending_grading > 0 ? { value: tx("examiner_trend_needs_review"), up: false } : undefined },
           { label: t("published_results"),      value: stats.published_results_count,     tone: "mint" },
           { label: t("total_candidates"),       value: stats.total_candidates,            tone: "purple" },
         ]} />
@@ -166,11 +155,11 @@ export default function ExaminerDashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
 
         {/* LEFT: Exams */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-ink">{t("recent_exams_heading")}</h2>
             <Link href="/dashboard/exams" className="text-[12.5px] font-semibold text-accent hover:underline">
-              {t("view_all")} →
+              {t("view_all")}
             </Link>
           </div>
 
@@ -197,7 +186,7 @@ export default function ExaminerDashboard() {
           ) : (
             <div className="space-y-2.5">
               {exams.map((exam) => (
-                <ExamCard key={exam.id} exam={exam} t={t} />
+                <ExamCard key={exam.id} exam={exam} />
               ))}
             </div>
           )}
@@ -208,7 +197,7 @@ export default function ExaminerDashboard() {
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-[15px] font-bold text-ink">{t("grading_queue_heading")}</h2>
                 <Link href="/dashboard/grading" className="text-[12.5px] font-semibold text-accent hover:underline">
-                  {t("review")} →
+                  {t("review")}
                 </Link>
               </div>
               <div className="space-y-2.5">
@@ -239,9 +228,9 @@ export default function ExaminerDashboard() {
                               <ProgressBar value={pct} tone={urgent ? "amber" : "accent"} size="sm" />
                             </div>
                             <p className="mt-1 text-[11px] text-ink-muted">
-                              {summary.reviewed} graded · {summary.pending_review} left
+                              {tx("examiner_graded_left", { graded: summary.reviewed, left: summary.pending_review })}
                               {idx === 0 && urgent && (
-                                <span className="ml-2 font-semibold text-amber">⚡ Highest priority</span>
+                                <span className="ml-2 font-semibold text-amber">{tx("examiner_highest_priority")}</span>
                               )}
                             </p>
                           </div>
@@ -265,7 +254,7 @@ export default function ExaminerDashboard() {
         </div>
 
         {/* RIGHT: Flagged + Requests + Quick actions */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
 
           {/* Flagged Sessions */}
           <div>
@@ -279,7 +268,7 @@ export default function ExaminerDashboard() {
                 )}
               </h2>
               <Link href="/dashboard/proctoring" className="text-[12.5px] font-semibold text-accent hover:underline">
-                {t("review")} →
+                {t("review")}
               </Link>
             </div>
 
@@ -297,7 +286,7 @@ export default function ExaminerDashboard() {
               <div className="space-y-2">
                 {needsRuling.length > 0 && (
                   <Alert tone="amber">
-                    {t("flagged_alert", { count: needsRuling.length, plural: needsRuling.length === 1 ? "" : "s" })}
+                    {tx("examiner_flagged_alert", { count: needsRuling.length })}
                   </Alert>
                 )}
                 {flagged.slice(0, 4).map((session) => {
@@ -321,7 +310,7 @@ export default function ExaminerDashboard() {
                                 {session.candidate_name}
                               </p>
                               <Badge tone={tone} size="xs">
-                                {session.integrity_verdict === "pending" ? t("needs_ruling") : session.integrity_verdict}
+                                {session.integrity_verdict === "pending" ? t("needs_ruling") : tx(`verdict_${session.integrity_verdict}`)}
                               </Badge>
                             </div>
                             <p className="truncate text-[11.5px] text-ink-muted">{session.exam_title}</p>
@@ -357,7 +346,7 @@ export default function ExaminerDashboard() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-bold text-ink">
-                    {t("pending_requests", { count: loginRequests.length, plural: loginRequests.length === 1 ? "request" : "requests" })}
+                    {tx("examiner_pending_requests", { count: loginRequests.length })}
                   </p>
                   <p className="mt-0.5 text-[12px] text-ink-muted">{t("candidates_awaiting_access")}</p>
                 </div>
@@ -397,19 +386,19 @@ export default function ExaminerDashboard() {
 
           {/* System Status */}
           <Card className="!p-4">
-            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-ink-muted">Platform Status</p>
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-ink-muted">{tx("examiner_platform_status")}</p>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <StatusDot tone="green" label="Exam Runner" />
-                <span className="text-[11px] text-ink-muted">Operational</span>
+                <StatusDot tone="green" label={tx("examiner_exam_runner")} />
+                <span className="text-[11px] text-ink-muted">{tx("examiner_operational")}</span>
               </div>
               <div className="flex items-center justify-between">
-                <StatusDot tone="green" label="AI Proctoring" />
-                <span className="text-[11px] text-ink-muted">Operational</span>
+                <StatusDot tone="green" label={tx("examiner_ai_proctoring")} />
+                <span className="text-[11px] text-ink-muted">{tx("examiner_operational")}</span>
               </div>
               <div className="flex items-center justify-between">
-                <StatusDot tone="green" label="Grading Queue" />
-                <span className="text-[11px] text-ink-muted">Operational</span>
+                <StatusDot tone="green" label={t("grading_queue_heading")} />
+                <span className="text-[11px] text-ink-muted">{tx("examiner_operational")}</span>
               </div>
             </div>
           </Card>
@@ -420,7 +409,8 @@ export default function ExaminerDashboard() {
 }
 
 /* ─── Enhanced Exam Card ─────────────────────────────────────────── */
-function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslations> }) {
+function ExamCard({ exam }: { exam: Exam }) {
+  const tx = useTranslations("examsOps");
   const router = useRouter();
   const statusTone: Record<string, "green" | "amber" | "neutral" | "rose"> = {
     published: "green", draft: "amber", closed: "neutral",
@@ -456,25 +446,25 @@ function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslation
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge tone={exam.exam_type === "corporate" ? "accent" : "neutral"} size="xs">
-              {exam.exam_type === "corporate" ? "Corp" : "Acad"}
+              {exam.exam_type === "corporate" ? tx("examiner_corp_short") : tx("examiner_acad_short")}
             </Badge>
             <Badge tone={statusTone[exam.status] ?? "neutral"} size="xs">
-              {exam.status}
+              {tx(`status_${exam.status}`)}
             </Badge>
           </div>
         </div>
 
         <div className="mt-3 flex items-center gap-3 text-[11.5px] text-ink-muted">
           <span className="flex items-center gap-1">
-            <span>📋</span> {exam.total_questions} Q
+            <span>📋</span> {tx("examiner_q_count", { count: exam.total_questions })}
           </span>
           <span className="flex items-center gap-1">
-            <span>⏱</span> {exam.duration_minutes} min
+            <span>⏱</span> {tx("examiner_min_count", { count: exam.duration_minutes })}
           </span>
           {isLive && exam.ends_at && (
             <span className="flex items-center gap-1 font-semibold text-green">
               <span>🔴</span>
-              Closes in <Countdown target={exam.ends_at} />
+              {tx("examiner_closes_in")} <Countdown target={exam.ends_at} />
             </span>
           )}
           <span className="ml-auto flex items-center gap-3">
@@ -483,7 +473,7 @@ function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslation
               onClick={(e) => e.stopPropagation()}
               className="font-semibold text-accent hover:underline"
             >
-              {exam.exam_type === "corporate" ? "Ranking →" : "Results →"}
+              {exam.exam_type === "corporate" ? tx("examiner_ranking_link") : tx("examiner_results_link")}
             </Link>
             {exam.exam_type === "academic" && (
               <Link
@@ -491,7 +481,7 @@ function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslation
                 onClick={(e) => e.stopPropagation()}
                 className="font-semibold text-accent hover:underline"
               >
-                Analytics →
+                {tx("examiner_analytics_link")}
               </Link>
             )}
           </span>
@@ -502,14 +492,6 @@ function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslation
 }
 
 /* ─── Inline Icons ───────────────────────────────────────────────── */
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2} strokeLinecap="round" aria-hidden>
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
 function SparkleIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"

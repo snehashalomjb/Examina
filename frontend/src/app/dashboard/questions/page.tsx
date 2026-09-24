@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -62,6 +63,7 @@ const SHELVES: { key: Shelf; label: string }[] = [
 
 export default function QuestionBankPage() {
   const { user } = useRequireAuth(["examiner", "admin"]);
+  const t = useTranslations("questionBank");
   // "Create Question" from the dashboard lands here with the editor already open,
   // rather than on a list the examiner then has to find a button on.
   const searchParams = useSearchParams();
@@ -95,9 +97,9 @@ export default function QuestionBankPage() {
     try {
       setSubjects(await api.get<Subject[]>("/subjects"));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load subjects.");
+      setError(err instanceof ApiError ? err.message : t("error_load_subjects"));
     }
-  }, []);
+  }, [t]);
 
   const loadTypeCounts = useCallback(async () => {
     try {
@@ -137,7 +139,7 @@ export default function QuestionBankPage() {
       );
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load questions.");
+      setError(err instanceof ApiError ? err.message : t("error_load_questions"));
     } finally {
       setLoading(false);
     }
@@ -152,6 +154,7 @@ export default function QuestionBankPage() {
     search,
     shelf,
     user,
+    t,
   ]);
 
   const loadTopics = useCallback(async () => {
@@ -199,17 +202,17 @@ export default function QuestionBankPage() {
       toast(response.detail, "neutral");
       void loadQuestions();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not delete", "rose");
+      toast(err instanceof ApiError ? err.message : t("error_delete"), "rose");
     }
   }
 
   async function duplicate(question: Question) {
     try {
       await api.post(`/questions/${question.id}/duplicate`, {});
-      toast("Copied into your own questions", "mint");
+      toast(t("toast_duplicated"), "mint");
       void loadQuestions();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not duplicate", "rose");
+      toast(err instanceof ApiError ? err.message : t("error_duplicate"), "rose");
     }
   }
 
@@ -223,10 +226,10 @@ export default function QuestionBankPage() {
   async function setStatus(question: Question, status: QuestionStatus) {
     try {
       await api.patch(`/questions/${question.id}`, { status });
-      toast(status === "archived" ? "Archived" : "Restored to the bank", "neutral");
+      toast(status === "archived" ? t("toast_archived") : t("toast_restored"), "neutral");
       void loadQuestions();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not update", "rose");
+      toast(err instanceof ApiError ? err.message : t("error_update"), "rose");
     }
   }
 
@@ -247,31 +250,31 @@ export default function QuestionBankPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-[20px] font-bold tracking-tight text-ink sm:text-[24px]">
-            Question Bank
+            {t("page_title")}
           </h1>
           <p className="mt-1 text-[13px] text-ink-muted sm:text-[14px]">
             {questions.length > 0
-              ? `${questions.length} question${questions.length === 1 ? "" : "s"} across ${subjects.length} subjects`
-              : "Five question types, tagged by subject and difficulty."}
+              ? t("page_subtitle_count", { count: questions.length, subjects: subjects.length })
+              : t("page_subtitle_empty")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard/questions/ai-generate">
             <Button size="sm" variant="secondary">
-              ✨ AI Generate
+              ✨ {t("btn_ai_generate")}
             </Button>
           </Link>
           <Button size="sm" variant="secondary" onClick={() => setImportingFile((v) => !v)}>
-            {importingFile ? "Close Import" : "📥 Import File"}
+            {importingFile ? t("btn_close_import") : `📥 ${t("btn_import_file")}`}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setImportingPdf((v) => !v)}>
-            {importingPdf ? "Close PDF Import" : "📄 PDF → AI"}
+            {importingPdf ? t("btn_close_pdf_import") : `📄 ${t("btn_pdf_to_ai")}`}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => setManagingSubjects((v) => !v)}>
-            {managingSubjects ? "Close Subjects" : "Manage Subjects"}
+            {managingSubjects ? t("btn_close_subjects") : t("manage_subjects")}
           </Button>
           <Button size="sm" onClick={() => setComposing((v) => !v)}>
-            {composing ? "Close Composer" : "+ New Question"}
+            {composing ? t("btn_close_composer") : `+ ${t("btn_new_question")}`}
           </Button>
         </div>
       </div>
@@ -299,9 +302,9 @@ export default function QuestionBankPage() {
         <Card>
           <div className="mb-4 flex items-center justify-between gap-2">
             <h2 className="text-[15px] font-semibold tracking-tight text-ink">
-              Create question
+              {t("create_question")}
             </h2>
-            <Badge tone="neutral">saved to your bank</Badge>
+            <Badge tone="neutral">{t("badge_saved_to_bank")}</Badge>
           </div>
           <QuestionEditor
             subjects={subjects}
@@ -316,7 +319,7 @@ export default function QuestionBankPage() {
       )}
 
       {editing && (
-        <Modal open onClose={() => setEditing(null)} title="Edit question" size="xl">
+        <Modal open onClose={() => setEditing(null)} title={t("edit_question")} size="xl">
           <QuestionEditor
             subjects={subjects}
             question={editing}
@@ -346,7 +349,7 @@ export default function QuestionBankPage() {
                   : "text-ink-muted hover:bg-surface hover:text-ink",
               )}
             >
-              {tab.label}
+              {t(`shelf_${tab.key}`)}
             </button>
           ))}
         </div>
@@ -358,10 +361,10 @@ export default function QuestionBankPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Search questions..."
+            placeholder={`🔍 ${t("search_placeholder")}`}
           />
           <Select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
-            <option value="">All subjects</option>
+            <option value="">{t("all_subjects")}</option>
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.code} — {s.name}
@@ -372,33 +375,33 @@ export default function QuestionBankPage() {
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as QuestionType | "")}
           >
-            <option value="">All types</option>
-            {Object.entries(TYPE_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            <option value="">{t("all_types")}</option>
+            {Object.keys(TYPE_LABEL).map((value) => (
+              <option key={value} value={value}>{t(`type_${value}`)}</option>
             ))}
           </Select>
           <Select
             value={difficultyFilter}
             onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | "")}
           >
-            <option value="">Any difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="">{t("any_difficulty")}</option>
+            <option value="easy">{t("difficulty_easy")}</option>
+            <option value="medium">{t("difficulty_medium")}</option>
+            <option value="hard">{t("difficulty_hard")}</option>
           </Select>
           <Select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as QuestionCategory | "")}
           >
-            <option value="">All categories</option>
+            <option value="">{t("all_categories")}</option>
             {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
               <option key={value} value={value}>
-                {CATEGORY_LABEL[value]}
+                {t(`category_${value}`)}
               </option>
             ))}
           </Select>
           <Select value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)}>
-            <option value="">Any topic</option>
+            <option value="">{t("any_topic")}</option>
             {topics.map((topic) => (
               <option key={topic} value={topic}>
                 {topic}
@@ -411,10 +414,10 @@ export default function QuestionBankPage() {
             step="0.5"
             value={marksFilter}
             onChange={(e) => setMarksFilter(e.target.value)}
-            placeholder="Marks"
+            placeholder={t("marks")}
           />
           <Select value={tagFilter} onChange={(e) => setTagFilter(e.target.value)}>
-            <option value="">Any tag</option>
+            <option value="">{t("any_tag")}</option>
             {allTags.map((tag) => (
               <option key={tag} value={tag}>{tag}</option>
             ))}
@@ -441,7 +444,7 @@ export default function QuestionBankPage() {
               }}
               className="justify-self-start rounded-[8px] px-3 py-2 text-[12.5px] font-medium text-rose transition hover:bg-rose-soft"
             >
-              ✕ Clear filters
+              ✕ {t("clear_filters")}
             </button>
           )}
         </div>
@@ -452,7 +455,7 @@ export default function QuestionBankPage() {
               .sort(([, a], [, b]) => b - a)
               .map(([qtype, count]) => (
                 <Badge key={qtype} tone="neutral" size="xs">
-                  {TYPE_LABEL[qtype as QuestionType] ?? qtype}: {count}
+                  {qtype in TYPE_LABEL ? t(`type_${qtype}`) : qtype}: {count}
                 </Badge>
               ))}
           </div>
@@ -460,13 +463,13 @@ export default function QuestionBankPage() {
 
         <p className="mb-3 flex items-center gap-2 text-[12.5px] text-ink-muted">
           {loading ? (
-            "Loading…"
+            t("loading")
           ) : (
             <>
               <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
                 {questions.length}
               </span>
-              {questions.length === 1 ? "question" : "questions"}
+              {t("question_noun", { count: questions.length })}
             </>
           )}
         </p>
@@ -479,9 +482,9 @@ export default function QuestionBankPage() {
           </div>
         ) : questions.length === 0 ? (
           <EmptyState
-            title="No questions here yet"
-            body="Add your first question, or relax the filters."
-            action={<Button size="sm" onClick={() => setComposing(true)}>New question</Button>}
+            title={t("empty_bank_title")}
+            body={t("empty_bank_body")}
+            action={<Button size="sm" onClick={() => setComposing(true)}>{t("btn_new_question")}</Button>}
           />
         ) : (
           <ul className="space-y-2">
@@ -502,22 +505,22 @@ export default function QuestionBankPage() {
                         question.question_type === "true_false" ? "bg-amber-soft text-amber" :
                         "bg-sunken text-ink-muted",
                       )}>
-                        {TYPE_LABEL[question.question_type]}
+                        {t(`type_${question.question_type}`)}
                       </span>
-                      <Badge tone={DIFFICULTY_TONE[question.difficulty]} size="xs">{question.difficulty}</Badge>
-                      <Badge tone="neutral" size="xs">{question.marks} marks</Badge>
+                      <Badge tone={DIFFICULTY_TONE[question.difficulty]} size="xs">{t(`difficulty_${question.difficulty}`)}</Badge>
+                      <Badge tone="neutral" size="xs">{t("marks_count", { count: question.marks })}</Badge>
                       {question.negative_marks > 0 && (
                         <Badge tone="rose" size="xs">−{question.negative_marks}</Badge>
                       )}
-                      {!question.is_active && <Badge tone="amber" size="xs">retired</Badge>}
+                      {!question.is_active && <Badge tone="amber" size="xs">{t("badge_retired")}</Badge>}
                       {question.status === "archived" && (
-                        <Badge tone="neutral" size="xs">archived</Badge>
+                        <Badge tone="neutral" size="xs">{t("badge_archived")}</Badge>
                       )}
                       {question.source === "ai_generated" && (
-                        <Badge tone="purple" size="xs">AI generated</Badge>
+                        <Badge tone="purple" size="xs">{t("source_ai_generated")}</Badge>
                       )}
                       {question.source === "imported" && (
-                        <Badge tone="amber" size="xs">imported</Badge>
+                        <Badge tone="amber" size="xs">{t("badge_imported")}</Badge>
                       )}
                       {question.topic && <Badge tone="neutral" size="xs">{question.topic}</Badge>}
                       {question.tags?.map((tag) => (
@@ -525,7 +528,7 @@ export default function QuestionBankPage() {
                       ))}
                       {question.created_by_name && (
                         <span className="text-[11px] text-ink-muted">
-                          by {question.created_by_name}
+                          {t("by_author", { name: question.created_by_name })}
                         </span>
                       )}
                     </div>
@@ -557,7 +560,7 @@ export default function QuestionBankPage() {
                     {question.model_answer && (
                       <details className="mt-2.5">
                         <summary className="cursor-pointer text-[12.5px] font-medium text-accent">
-                          Model answer
+                          {t("model_answer")}
                         </summary>
                         <p className="mt-1.5 whitespace-pre-wrap rounded-[8px] bg-sunken/60 p-3 text-[12.5px] leading-relaxed text-ink-soft">
                           {question.model_answer}
@@ -566,24 +569,24 @@ export default function QuestionBankPage() {
                     )}
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-1 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+                  <div className="flex max-w-full flex-wrap items-center gap-1 transition-opacity duration-200 sm:shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
                     <Button size="sm" variant="ghost" onClick={() => setPreviewing(question)}>
-                      Preview
+                      {t("btn_preview")}
                     </Button>
                     {mayEdit(question) ? (
                       <Button size="sm" variant="ghost" onClick={() => setEditing(question)}>
-                        Edit
+                        {t("btn_edit")}
                       </Button>
                     ) : (
                       <span
                         className="px-2 text-[11.5px] text-ink-muted"
-                        title="Another examiner wrote this. Duplicate it to make your own copy."
+                        title={t("read_only_hint")}
                       >
-                        read-only
+                        {t("read_only")}
                       </span>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => void duplicate(question)}>
-                      Duplicate
+                      {t("btn_duplicate")}
                     </Button>
                     {mayEdit(question) &&
                       (question.status === "archived" ? (
@@ -592,7 +595,7 @@ export default function QuestionBankPage() {
                           variant="ghost"
                           onClick={() => void setStatus(question, "published")}
                         >
-                          Restore
+                          {t("btn_restore")}
                         </Button>
                       ) : (
                         <Button
@@ -600,7 +603,7 @@ export default function QuestionBankPage() {
                           variant="ghost"
                           onClick={() => void setStatus(question, "archived")}
                         >
-                          Archive
+                          {t("btn_archive")}
                         </Button>
                       ))}
                     {mayEdit(question) && (
@@ -610,7 +613,7 @@ export default function QuestionBankPage() {
                         className="text-rose hover:bg-rose-soft hover:text-rose-ink"
                         onClick={() => remove(question)}
                       >
-                        Delete
+                        {t("btn_delete")}
                       </Button>
                     )}
                   </div>
@@ -648,6 +651,7 @@ const MAX_PDF_MB = 20;
  * drafts are kept.
  */
 function PdfImportSection({ subjects }: { subjects: Subject[] }) {
+  const t = useTranslations("questionBank");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [chosenSubjectId, setChosenSubjectId] = useState("");
@@ -669,12 +673,12 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
     setResult(null);
     if (candidate.type !== "application/pdf") {
       setFile(null);
-      setError("That is not a PDF. Export or print the document to PDF first.");
+      setError(t("pdf_error_not_pdf"));
       return;
     }
     if (candidate.size > MAX_PDF_MB * 1024 * 1024) {
       setFile(null);
-      setError(`That PDF is ${(candidate.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_PDF_MB} MB.`);
+      setError(t("pdf_error_too_large", { size: (candidate.size / 1024 / 1024).toFixed(1), limit: MAX_PDF_MB }));
       return;
     }
     setError(null);
@@ -684,7 +688,7 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!file) {
-      setError("Choose a PDF first.");
+      setError(t("pdf_error_choose"));
       return;
     }
     setBusy(true);
@@ -709,9 +713,9 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
         form,
       );
       setResult(imported);
-      toast(`${imported.drafts.length} draft(s) from ${imported.filename} — review them next`, "mint");
+      toast(t("pdf_toast_drafts", { count: imported.drafts.length, filename: imported.filename }), "mint");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not import that PDF.");
+      setError(err instanceof ApiError ? err.message : t("pdf_error_import"));
     } finally {
       setBusy(false);
     }
@@ -721,11 +725,11 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
     <section aria-labelledby="pdf-import-heading">
       <Card>
         <SectionTitle
-          title="Import from PDF"
-          hint="Upload a syllabus, past paper or lecture notes. Every draft goes to the review queue — nothing reaches the bank unapproved."
+          title={t("pdf_title")}
+          hint={t("pdf_hint")}
         />
         <h2 id="pdf-import-heading" className="sr-only">
-          Import questions from a PDF
+          {t("pdf_sr_heading")}
         </h2>
 
         <form onSubmit={submit} className="space-y-4">
@@ -765,16 +769,16 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
                   {file.name}
                 </span>
                 <span className="text-[12px] text-ink-muted">
-                  {(file.size / 1024).toFixed(0)} KB · click to choose a different file
+                  {t("pdf_file_chosen_hint", { size: (file.size / 1024).toFixed(0) })}
                 </span>
               </>
             ) : (
               <>
                 <span className="text-[13.5px] font-semibold text-ink">
-                  Drop a PDF here, or click to browse
+                  {t("pdf_drop_here")}
                 </span>
                 <span className="text-[12px] text-ink-muted">
-                  Digital PDFs only, up to {MAX_PDF_MB} MB. A scan has no text layer to read.
+                  {t("pdf_drop_hint", { limit: MAX_PDF_MB })}
                 </span>
               </>
             )}
@@ -782,38 +786,38 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
 
           {/* ─── Generation settings ───────────────────────── */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Category">
+            <Field label={t("category")}>
               <Select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as QuestionCategory)}
               >
-                {Object.entries(CATEGORY_LABEL).map(([value, label]) => (
+                {Object.keys(CATEGORY_LABEL).map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {t(`category_${value}`)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="Question type">
+            <Field label={t("question_type")}>
               <Select value={type} onChange={(e) => setType(e.target.value as QuestionType)}>
                 {PDF_QUESTION_TYPES.map((value) => (
                   <option key={value} value={value}>
-                    {TYPE_LABEL[value]}
+                    {t(`type_${value}`)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="Difficulty">
+            <Field label={t("difficulty")}>
               <Select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as Difficulty)}
               >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+                <option value="easy">{t("difficulty_easy")}</option>
+                <option value="medium">{t("difficulty_medium")}</option>
+                <option value="hard">{t("difficulty_hard")}</option>
               </Select>
             </Field>
-            <Field label="How many" hint="1–20 drafts.">
+            <Field label={t("how_many")} hint={t("pdf_how_many_hint")}>
               <Input
                 type="number"
                 min="1"
@@ -826,12 +830,12 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Subject" hint="Optional. Tags the drafts for the bank.">
+            <Field label={t("subject")} hint={t("pdf_subject_hint")}>
               <Select
                 value={chosenSubjectId}
                 onChange={(e) => setChosenSubjectId(e.target.value)}
               >
-                <option value="">— None —</option>
+                <option value="">{t("option_none")}</option>
                 {subjects.map((subject) => (
                   <option key={subject.id} value={subject.id}>
                     {subject.code} — {subject.name}
@@ -839,26 +843,26 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
                 ))}
               </Select>
             </Field>
-            <Field label="Topic" hint="Optional. Narrows the generator to one part of the document.">
+            <Field label={t("topic")} hint={t("pdf_topic_hint")}>
               <Input
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. Normalisation"
+                placeholder={t("pdf_topic_placeholder")}
                 maxLength={120}
               />
             </Field>
           </div>
 
           <Field
-            label="Extra instructions"
-            hint="Optional. Added to the generation prompt."
+            label={t("extra_instructions")}
+            hint={t("pdf_extra_hint")}
           >
             <Textarea
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
               rows={2}
               maxLength={500}
-              placeholder="e.g. 'Only chapters 3 and 4. Avoid definition-recall questions.'"
+              placeholder={t("pdf_extra_placeholder")}
             />
           </Field>
 
@@ -870,12 +874,12 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
             {result && (
               <Link href="/dashboard/questions/ai-generate">
                 <Button type="button" variant="secondary">
-                  Review {result.drafts.length} draft{result.drafts.length === 1 ? "" : "s"}
+                  {t("pdf_review_drafts", { count: result.drafts.length })}
                 </Button>
               </Link>
             )}
             <Button type="submit" loading={busy} disabled={!file}>
-              {busy ? "Reading PDF…" : "Extract questions"}
+              {busy ? t("pdf_reading") : t("pdf_extract")}
             </Button>
           </div>
         </form>
@@ -886,30 +890,28 @@ function PdfImportSection({ subjects }: { subjects: Subject[] }) {
 
 /** What was actually read, so the examiner can judge the drafts before opening them. */
 function PdfImportSummary({ result }: { result: PdfImportResult }) {
+  const t = useTranslations("questionBank");
   return (
     <div className="space-y-3 rounded-[12px] border border-line bg-sunken/50 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="mint">{result.drafts.length} drafts</Badge>
-        <Badge tone="neutral">{result.pages} pages read</Badge>
-        <Badge tone="neutral">{result.characters.toLocaleString()} characters</Badge>
+        <Badge tone="mint">{t("drafts_count", { count: result.drafts.length })}</Badge>
+        <Badge tone="neutral">{t("pdf_pages_read", { count: result.pages })}</Badge>
+        <Badge tone="neutral">{t("pdf_characters", { count: result.characters })}</Badge>
         {result.empty_pages > 0 && (
-          <Badge tone="amber">{result.empty_pages} pages had no text</Badge>
+          <Badge tone="amber">{t("pdf_empty_pages", { count: result.empty_pages })}</Badge>
         )}
         <span className="truncate text-[12px] text-ink-muted">{result.filename}</span>
       </div>
 
       {!result.source_grounded && (
-        <Alert tone="amber" title="These drafts are not from your PDF">
-          No AI provider is configured, so the offline stub produced template questions
-          instead. Read every draft before approving it — set an API key to generate from
-          the document itself.
+        <Alert tone="amber" title={t("pdf_not_grounded_title")}>
+          {t("pdf_not_grounded_body")}
         </Alert>
       )}
 
       {result.truncated && (
-        <Alert tone="amber" title="Only part of the document was used">
-          The PDF was longer than one generation prompt allows. Import it again with a
-          topic set to reach the later sections.
+        <Alert tone="amber" title={t("pdf_truncated_title")}>
+          {t("pdf_truncated_body")}
         </Alert>
       )}
     </div>
@@ -926,6 +928,7 @@ function SubjectManager({
   typeCounts: Record<string, Record<string, number>>;
   onChanged: () => void;
 }) {
+  const t = useTranslations("questionBank");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -940,12 +943,12 @@ function SubjectManager({
     setError(null);
     try {
       await api.post("/subjects", { code: code.trim().toUpperCase(), name: name.trim() });
-      toast(`Subject ${code.toUpperCase()} created`, "mint");
+      toast(t("subject_created", { code: code.toUpperCase() }), "mint");
       setCode("");
       setName("");
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the subject.");
+      setError(err instanceof ApiError ? err.message : t("error_create_subject"));
     } finally {
       setBusy(false);
     }
@@ -961,11 +964,11 @@ function SubjectManager({
     setSavingId(subject.id);
     try {
       await api.patch(`/subjects/${subject.id}`, { name: editName.trim() });
-      toast("Subject renamed", "mint");
+      toast(t("subject_renamed"), "mint");
       setEditingId(null);
       onChanged();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not rename the subject", "rose");
+      toast(err instanceof ApiError ? err.message : t("error_rename_subject"), "rose");
     } finally {
       setSavingId(null);
     }
@@ -973,27 +976,27 @@ function SubjectManager({
 
   return (
     <Card>
-      <SectionTitle title="Manage Subjects" hint="Add a subject, or rename an existing one. Questions and exams are grouped by subject." />
+      <SectionTitle title={t("manage_subjects")} hint={t("manage_subjects_hint")} />
 
       <form onSubmit={submit} className="mb-5 flex flex-wrap items-end gap-3">
         <div className="w-[160px]">
-          <Field label="Code">
+          <Field label={t("subject_code")}>
             <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CS101" required minLength={2} />
           </Field>
         </div>
         <div className="min-w-[240px] flex-1">
-          <Field label="Name">
+          <Field label={t("subject_name")}>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Computer Science Fundamentals"
+              placeholder={t("subject_name_placeholder")}
               required
               minLength={2}
             />
           </Field>
         </div>
         <Button type="submit" loading={busy}>
-          Add Subject
+          {t("add_subject")}
         </Button>
       </form>
       {error && (
@@ -1006,9 +1009,9 @@ function SubjectManager({
         <table className="w-full min-w-[520px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-muted">
-              <th className="pb-2 pr-3 font-medium">Code</th>
-              <th className="pb-2 pr-3 font-medium">Name</th>
-              <th className="pb-2 pr-3 font-medium">Questions</th>
+              <th className="pb-2 pr-3 font-medium">{t("subject_code")}</th>
+              <th className="pb-2 pr-3 font-medium">{t("subject_name")}</th>
+              <th className="pb-2 pr-3 font-medium">{t("questions")}</th>
               <th className="pb-2 text-right font-medium"></th>
             </tr>
           </thead>
@@ -1030,15 +1033,15 @@ function SubjectManager({
                     {editingId === subject.id ? (
                       <div className="flex justify-end gap-1.5">
                         <Button size="sm" loading={savingId === subject.id} onClick={() => saveEdit(subject)}>
-                          Save
+                          {t("btn_save")}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          Cancel
+                          {t("btn_cancel")}
                         </Button>
                       </div>
                     ) : (
                       <Button size="sm" variant="ghost" onClick={() => startEdit(subject)}>
-                        Edit
+                        {t("btn_edit")}
                       </Button>
                     )}
                   </td>

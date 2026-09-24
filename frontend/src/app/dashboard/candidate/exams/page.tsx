@@ -27,12 +27,28 @@ const STATUS_TONE: Record<SessionStatus, "accent" | "mint" | "amber" | "rose"> =
   terminated: "rose",
 };
 
+/** Server `reason` strings (exam_sessions.py) are English; map the known ones to keys. */
+function translateReason(
+  reason: string | null | undefined,
+  startsAt: string | null | undefined,
+  tc: ReturnType<typeof useTranslations>,
+): string | null {
+  if (!reason) return null;
+  if (reason === "Attempt in progress") return tc("reason_attempt_in_progress");
+  if (reason === "Already attempted") return tc("reason_already_attempted");
+  if (reason === "This exam is closed") return tc("reason_exam_closed");
+  if (reason === "The exam window has closed") return tc("reason_window_closed");
+  if (reason.startsWith("Opens ")) return tc("reason_opens", { date: formatDate(startsAt) });
+  return reason;
+}
+
 /**
  * My Exams — every paper assigned to this candidate.
  */
 export default function MyExamsPage() {
   const { user } = useRequireAuth(["candidate"]);
   const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   const [exams, setExams] = useState<CandidateExamCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +63,7 @@ export default function MyExamsPage() {
         if (!cancelled) setExams(data);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load your exams.");
+          setError(err instanceof ApiError ? err.message : tc("error_load_exams"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -158,7 +174,7 @@ export default function MyExamsPage() {
                             {card.title}
                           </p>
                           <Badge tone={card.exam_type === "corporate" ? "purple" : "accent"}>
-                            {card.exam_type === "corporate" ? "💼 Corporate" : "🎓 Academic"}
+                            {card.exam_type === "corporate" ? tc("badge_corporate") : tc("badge_academic")}
                           </Badge>
                         </div>
                         <p className="text-[12px] text-ink-muted mt-0.5">
@@ -233,6 +249,7 @@ function Section({
 }
 
 function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof useTranslations> }) {
+  const tc = useTranslations("candidatePages");
   const isCorp = card.exam_type === "corporate";
 
   return (
@@ -281,7 +298,7 @@ function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof u
 
         <dl className="mt-4 grid grid-cols-3 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
           {[
-            [t("duration_label"), `${card.duration_minutes} min`],
+            [t("duration_label"), tc("minutes_short", { count: card.duration_minutes })],
             [t("questions_label"), String(card.total_questions)],
             [t("closes_label"), formatDate(card.ends_at, false)],
           ].map(([label, value]) => (
@@ -313,7 +330,7 @@ function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof u
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/60 pt-3">
-        <p className="text-[11.5px] text-ink-muted">{card.reason ?? t("ready_for_sitting")}</p>
+        <p className="text-[11.5px] text-ink-muted">{translateReason(card.reason, card.starts_at, tc) ?? t("ready_for_sitting")}</p>
         <Link href={`/dashboard/candidate/exams/${card.exam_id}`}>
           <Button size="sm" variant={card.can_start ? "primary" : "secondary"}>
             {card.can_start ? t("start_resume") : t("view_details")}

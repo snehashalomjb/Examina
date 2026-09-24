@@ -9,6 +9,7 @@
  */
 
 import { forwardRef, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 /* ═══════════════════════════════════════════════════════════════════
    UTILITIES
@@ -35,7 +36,10 @@ export function Card({
   /** "default" = border + soft shadow | "elevated" = stronger shadow | "flat" = border only | "glow" = accent glow */
   variant?: "default" | "elevated" | "flat" | "glow";
 }) {
-  const base = "rounded-[14px] bg-surface";
+  // min-w-0: a card is usually a grid or flex item, whose default minimum width is its
+  // content's. A long truncated title would otherwise stop the card shrinking and push
+  // the whole page wider than a phone screen.
+  const base = "min-w-0 rounded-[14px] bg-surface";
   const variants = {
     default: "border border-line shadow-[var(--shadow-card)]",
     elevated: "border border-line shadow-[var(--shadow-lift)]",
@@ -499,6 +503,7 @@ export function Modal({
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
 }) {
+  const tc = useTranslations("common");
   const sizeClasses = {
     sm: "max-w-sm",
     md: "max-w-lg",
@@ -542,7 +547,7 @@ export function Modal({
             <button
               onClick={onClose}
               className="rounded-[8px] p-1.5 text-ink-muted hover:bg-sunken hover:text-ink transition"
-              aria-label="Close"
+              aria-label={tc("close")}
             >
               <CloseIcon />
             </button>
@@ -694,10 +699,17 @@ export function ToastHost() {
    HELPERS
 ═══════════════════════════════════════════════════════════════════ */
 
+/** The active app locale, as `LocaleProvider` mirrors it onto `<html lang>`; undefined
+ * (the runtime default) on the server or before it is set. */
+function activeLocale(): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  return document.documentElement.lang || undefined;
+}
+
 export function formatDate(value: string | null | undefined, withTime = true): string {
   if (!value) return "—";
   const date = new Date(value);
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString(activeLocale(), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -765,7 +777,7 @@ export function CountUp({
     }, interval);
     return () => clearInterval(t);
   }, [end, duration]);
-  return <>{prefix}{display.toLocaleString()}{suffix}</>;
+  return <>{prefix}{display.toLocaleString(activeLocale())}{suffix}</>;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -870,12 +882,14 @@ export function Countdown({
   target: string | null | undefined;
   onExpire?: () => void;
 }) {
+  const t = useTranslations("adminShell");
+  const expiredLabel = t("countdown_expired");
   const [remaining, setRemaining] = useState("");
   useEffect(() => {
     if (!target) { setRemaining("—"); return; }
     const tick = () => {
       const diff = new Date(target).getTime() - Date.now();
-      if (diff <= 0) { setRemaining("Expired"); onExpire?.(); return; }
+      if (diff <= 0) { setRemaining(expiredLabel); onExpire?.(); return; }
       const h = Math.floor(diff / 3_600_000);
       const m = Math.floor((diff % 3_600_000) / 60_000);
       const s = Math.floor((diff % 60_000) / 1_000);
@@ -885,7 +899,7 @@ export function Countdown({
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, [target, onExpire]);
+  }, [target, onExpire, expiredLabel]);
   return <>{remaining}</>;
 }
 

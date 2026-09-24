@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -41,6 +42,7 @@ export interface CandidateSelectorProps {
 }
 
 export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) {
+  const tp = useTranslations("createExamPage");
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [assigned, setAssigned] = useState<EnrollmentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
       onChange?.(enrolled.length);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load candidates.");
+      setError(err instanceof ApiError ? err.message : tp("cand_could_not_load"));
     } finally {
       setLoading(false);
     }
@@ -104,7 +106,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
       setSelected([]);
       await load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not assign those candidates.", "rose");
+      toast(err instanceof ApiError ? err.message : tp("cand_could_not_assign"), "rose");
     } finally {
       setBusy(false);
     }
@@ -117,7 +119,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
       await api.delete(`/exams/${examId}/enrollments/${candidateId}`);
       await load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not remove that candidate.", "rose");
+      toast(err instanceof ApiError ? err.message : tp("cand_could_not_remove"), "rose");
     } finally {
       setBusy(false);
     }
@@ -147,8 +149,8 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
 
     if (unmatched.length) {
       setError(
-        `No candidate account for: ${unmatched.slice(0, 8).join(", ")}` +
-          (unmatched.length > 8 ? ` and ${unmatched.length - 8} more` : ""),
+        tp("cand_no_account_for", { emails: unmatched.slice(0, 8).join(", ") }) +
+          (unmatched.length > 8 ? ` ${tp("cand_and_n_more", { count: unmatched.length - 8 })}` : ""),
       );
     } else {
       setError(null);
@@ -158,9 +160,8 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
 
   if (!examId) {
     return (
-      <Alert tone="amber" title="Save the draft first">
-        Candidates are assigned to an exam, so the exam has to exist before anyone can
-        be assigned to it.
+      <Alert tone="amber" title={tp("cand_save_draft_first_title")}>
+        {tp("cand_save_draft_first_body")}
       </Alert>
     );
   }
@@ -172,13 +173,13 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <h3 className="text-[15px] font-semibold tracking-tight text-ink">
-              Assigned candidates
+              {tp("cand_assigned_title")}
             </h3>
             <Badge tone={assigned.length ? "mint" : "amber"}>{assigned.length}</Badge>
           </div>
           {assigned.some((row) => row.login_access !== "approved") && (
             <span className="text-[12px] text-amber-ink">
-              Some assigned candidates cannot sign in yet.
+              {tp("cand_some_cannot_sign_in")}
             </span>
           )}
         </div>
@@ -187,8 +188,8 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
           <Skeleton className="h-20 rounded-[10px]" />
         ) : assigned.length === 0 ? (
           <EmptyState
-            title="Nobody is assigned yet"
-            body="Only assigned candidates ever see this exam."
+            title={tp("cand_nobody_assigned_title")}
+            body={tp("cand_nobody_assigned_body")}
           />
         ) : (
           <ul className="divide-y divide-line">
@@ -205,13 +206,13 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
                   {row.login_access && (
                     <Badge tone={ACCESS_TONE[row.login_access]}>
                       {row.login_access === "approved"
-                        ? "can sign in"
+                        ? tp("cand_can_sign_in")
                         : row.login_access === "pending"
-                          ? "login pending"
-                          : "login rejected"}
+                          ? tp("cand_login_pending")
+                          : tp("cand_login_rejected")}
                     </Badge>
                   )}
-                  {row.has_attempted && <Badge tone="accent">has sat it</Badge>}
+                  {row.has_attempted && <Badge tone="accent">{tp("cand_has_sat_it")}</Badge>}
                   <span className="hidden text-[11.5px] text-ink-muted sm:inline">
                     {formatDate(row.assigned_at, false)}
                   </span>
@@ -221,12 +222,12 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
                     disabled={busy || row.has_attempted}
                     title={
                       row.has_attempted
-                        ? "This candidate has already sat the exam, so their assignment stays."
+                        ? tp("cand_already_sat_hint")
                         : undefined
                     }
                     onClick={() => void unassign(row.candidate_id)}
                   >
-                    Remove
+                    {tp("cand_remove")}
                   </Button>
                 </div>
               </li>
@@ -238,17 +239,19 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
       {/* --------------------------------------------------------------- roster */}
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[15px] font-semibold tracking-tight text-ink">Add candidates</h3>
+          <h3 className="text-[15px] font-semibold tracking-tight text-ink">
+            {tp("cand_add_title")}
+          </h3>
           <Button size="sm" variant="secondary" onClick={() => setPasting((v) => !v)}>
-            {pasting ? "Close list import" : "Paste a list"}
+            {pasting ? tp("cand_close_list_import") : tp("cand_paste_list")}
           </Button>
         </div>
 
         {pasting && (
           <div className="mb-4 space-y-2 rounded-[10px] border border-line bg-sunken/40 p-3">
             <Field
-              label="Candidate emails"
-              hint="One per line, or separated by commas. Emails with no account are reported."
+              label={tp("cand_emails_label")}
+              hint={tp("cand_emails_hint")}
             >
               <Textarea
                 value={pasted}
@@ -259,7 +262,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
             </Field>
             <div className="flex justify-end">
               <Button size="sm" loading={busy} onClick={assignPasted}>
-                Assign from list
+                {tp("cand_assign_from_list")}
               </Button>
             </div>
           </div>
@@ -269,7 +272,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email"
+            placeholder={tp("cand_search_placeholder")}
           />
           <label className="flex items-center gap-2 text-[13px] text-ink-soft">
             <input
@@ -278,7 +281,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
               onChange={(e) => setApprovedOnly(e.target.checked)}
               className="h-4 w-4 rounded border-line-strong"
             />
-            Approved candidates only
+            {tp("cand_approved_only")}
           </label>
         </div>
 
@@ -301,7 +304,9 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
               }
               className="h-4 w-4 rounded border-line-strong"
             />
-            {selected.length ? `${selected.length} selected` : `${shown.length} available`}
+            {selected.length
+              ? tp("cand_n_selected", { count: selected.length })
+              : tp("cand_n_available", { count: shown.length })}
           </label>
           <Button
             size="sm"
@@ -309,7 +314,7 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
             loading={busy}
             onClick={() => void assign(selected)}
           >
-            Assign {selected.length || ""}
+            {selected.length ? tp("cand_assign_n", { count: selected.length }) : tp("cand_assign")}
           </Button>
         </div>
 
@@ -322,11 +327,11 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
         ) : shown.length === 0 ? (
           <div className="mt-3">
             <EmptyState
-              title="Nobody left to assign"
+              title={tp("cand_nobody_left_title")}
               body={
                 approvedOnly
-                  ? "Everyone approved is already assigned. Untick the filter to see accounts still waiting on login access."
-                  : "Every candidate account is already assigned to this exam."
+                  ? tp("cand_nobody_left_approved_body")
+                  : tp("cand_nobody_left_all_body")
               }
             />
           </div>
@@ -366,17 +371,20 @@ export function CandidateSelector({ examId, onChange }: CandidateSelectorProps) 
                     {candidate.login_access ? (
                       <Badge tone={ACCESS_TONE[candidate.login_access]}>
                         {candidate.login_access === "approved"
-                          ? "approved"
+                          ? tp("cand_approved")
                           : candidate.login_access === "pending"
-                            ? "login pending"
-                            : "login rejected"}
+                            ? tp("cand_login_pending")
+                            : tp("cand_login_rejected")}
                       </Badge>
                     ) : (
-                      <Badge tone="neutral">no login request</Badge>
+                      <Badge tone="neutral">{tp("cand_no_login_request")}</Badge>
                     )}
                     {candidate.attempts > 0 && (
                       <span className="text-[11.5px] text-ink-muted">
-                        {candidate.completed}/{candidate.attempts} completed
+                        {tp("cand_completed_of", {
+                          completed: candidate.completed,
+                          attempts: candidate.attempts,
+                        })}
                       </span>
                     )}
                   </div>

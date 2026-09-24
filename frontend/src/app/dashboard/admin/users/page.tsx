@@ -33,6 +33,8 @@ const ACCESS_TONE: Record<AccessStatus, "mint" | "amber" | "rose"> = {
 
 export default function AccessControlPage() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
+  const tc = useTranslations("common");
   const { user } = useRequireAuth(["admin"]);
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -55,7 +57,7 @@ export default function AccessControlPage() {
       setUsers(await api.get<AdminUser[]>(`/admin/users?${query.toString()}`));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load users.");
+      setError(err instanceof ApiError ? err.message : ta("error_load_users"));
     } finally {
       setLoading(false);
     }
@@ -73,20 +75,20 @@ export default function AccessControlPage() {
         access_status: status,
         note: `Set to ${status} by an administrator`,
       });
-      toast(`${target.full_name} — access ${status}`, status === "approved" ? "mint" : "amber");
+      toast(ta("toast_access_changed", { name: target.full_name, status: ta(`status_${status}`) }), status === "approved" ? "mint" : "amber");
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change access", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_change_access"), "rose");
     }
   }
 
   async function setActive(target: AdminUser, isActive: boolean) {
     try {
       await api.patch(`/admin/users/${target.id}/active?is_active=${isActive}`);
-      toast(`${target.full_name} ${isActive ? "reactivated" : "deactivated"}`, "neutral");
+      toast(ta(isActive ? "toast_reactivated" : "toast_deactivated", { name: target.full_name }), "neutral");
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not update the account", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_update_account"), "rose");
     }
   }
 
@@ -95,11 +97,11 @@ export default function AccessControlPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Access control"
-        body="Approval happens here and nowhere else. Examiners cannot author, grade or view proctoring — and candidates cannot see or sit an exam — until you approve them."
+        title={ta("users_hero_title")}
+        body={ta("users_hero_body")}
         action={
           <Button size="sm" onClick={() => setCreating((open) => !open)}>
-            {creating ? "Close" : "Create user"}
+            {creating ? ta("close") : ta("create_user")}
           </Button>
         }
       />
@@ -111,7 +113,7 @@ export default function AccessControlPage() {
       <Card>
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div className="min-w-[220px] flex-1">
-            <Field label="Search">
+            <Field label={ta("search")}>
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -120,7 +122,7 @@ export default function AccessControlPage() {
             </Field>
           </div>
           <div className="w-[170px]">
-            <Field label="Role">
+            <Field label={ta("role")}>
               <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as UserRole | "")}>
                 <option value="">{t("all_roles")}</option>
                 <option value="candidate">{t("candidate")}</option>
@@ -130,7 +132,7 @@ export default function AccessControlPage() {
             </Field>
           </div>
           <div className="w-[170px]">
-            <Field label="Access">
+            <Field label={ta("access")}>
               <Select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as AccessStatus | "")}
@@ -151,7 +153,7 @@ export default function AccessControlPage() {
             ))}
           </div>
         ) : users.length === 0 ? (
-          <EmptyState title="No users match" body="Adjust the filters or clear the search." />
+          <EmptyState title={ta("no_users_match")} body={ta("no_users_match_body")} />
         ) : (
           <div className="-mx-5 overflow-x-auto px-5">
             <table className="w-full min-w-[760px] border-collapse text-left">
@@ -175,20 +177,20 @@ export default function AccessControlPage() {
                         <p className="text-[12px] text-ink-muted">{row.email}</p>
                       </td>
                       <td className="py-3 pr-3">
-                        <Badge tone={row.role === "admin" ? "accent" : "neutral"}>{row.role}</Badge>
+                        <Badge tone={row.role === "admin" ? "accent" : "neutral"}>{tc(`role_${row.role}`)}</Badge>
                       </td>
                       <td className="py-3 pr-3">
-                        <Badge tone={ACCESS_TONE[row.access_status]}>{row.access_status}</Badge>
+                        <Badge tone={ACCESS_TONE[row.access_status]}>{ta(`status_${row.access_status}`)}</Badge>
                         {row.access_changed_by_email && (
                           <p className="mt-0.5 text-[11px] text-ink-muted">
-                            by {row.access_changed_by_email}
+                            {ta("by_name", { name: row.access_changed_by_email })}
                           </p>
                         )}
                       </td>
                       <td className="py-3 pr-3 text-[12.5px] text-ink-soft">
                         {row.role === "candidate"
-                          ? `${row.session_count} attempt${row.session_count === 1 ? "" : "s"}`
-                          : `${row.exam_count} exam${row.exam_count === 1 ? "" : "s"}`}
+                          ? ta("activity_attempts", { count: row.session_count })
+                          : ta("activity_exams", { count: row.exam_count })}
                       </td>
                       <td className="py-3 pr-3 text-[12.5px] text-ink-muted">
                         {formatDate(row.last_login_at, false)}
@@ -197,7 +199,7 @@ export default function AccessControlPage() {
                         <div className="flex justify-end gap-1.5">
                           {row.role !== "admin" && row.access_status !== "approved" && (
                             <Button size="sm" onClick={() => setAccess(row, "approved")}>
-                              Approve
+                              {ta("approve")}
                             </Button>
                           )}
                           {row.role !== "admin" && row.access_status === "approved" && (
@@ -206,12 +208,12 @@ export default function AccessControlPage() {
                               variant="secondary"
                               onClick={() => setAccess(row, "revoked")}
                             >
-                              Revoke
+                              {ta("revoke")}
                             </Button>
                           )}
                           {!self && (
                             <Button size="sm" variant="ghost" onClick={() => setResetting(row)}>
-                              Reset password
+                              {ta("reset_password")}
                             </Button>
                           )}
                           {!self && (
@@ -220,7 +222,7 @@ export default function AccessControlPage() {
                               variant="ghost"
                               onClick={() => setActive(row, !row.is_active)}
                             >
-                              {row.is_active ? "Deactivate" : "Reactivate"}
+                              {row.is_active ? ta("deactivate") : ta("reactivate")}
                             </Button>
                           )}
                         </div>
@@ -246,6 +248,7 @@ function ResetPasswordModal({
   target: AdminUser | null;
   onClose: () => void;
 }) {
+  const ta = useTranslations("adminShell");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -262,24 +265,27 @@ function ResetPasswordModal({
     setError(null);
     try {
       await api.post(`/admin/users/${target.id}/reset-password`, { new_password: password });
-      toast(`Password reset for ${target.full_name}`, "mint");
+      toast(ta("toast_password_reset", { name: target.full_name }), "mint");
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not reset the password.");
+      setError(err instanceof ApiError ? err.message : ta("error_reset_password"));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <Modal open={Boolean(target)} onClose={onClose} title="Reset password" size="sm">
+    <Modal open={Boolean(target)} onClose={onClose} title={ta("reset_password")} size="sm">
       {target && (
         <form onSubmit={submit} className="space-y-4">
           <p className="text-[13px] text-ink-muted">
-            Set a new password for <strong className="text-ink">{target.full_name}</strong> (
-            {target.email}). They are not notified — share the new password with them yourself.
+            {ta.rich("reset_password_body", {
+              name: target.full_name,
+              email: target.email,
+              strong: (chunks) => <strong className="text-ink">{chunks}</strong>,
+            })}
           </p>
-          <Field label="New password" hint="At least 8 characters, with a letter and a digit.">
+          <Field label={ta("new_password")} hint={ta("password_hint")}>
             <Input
               type="text"
               value={password}
@@ -292,10 +298,10 @@ function ResetPasswordModal({
           {error && <Alert tone="rose">{error}</Alert>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
+              {ta("cancel")}
             </Button>
             <Button type="submit" loading={busy}>
-              Reset password
+              {ta("reset_password")}
             </Button>
           </div>
         </form>
@@ -305,6 +311,8 @@ function ResetPasswordModal({
 }
 
 function CreateUserCard({ onCreated }: { onCreated: () => void }) {
+  const ta = useTranslations("adminShell");
+  const tc = useTranslations("common");
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -324,13 +332,13 @@ function CreateUserCard({ onCreated }: { onCreated: () => void }) {
         role,
         access_status: "approved",
       });
-      toast(`${fullName} created and approved`, "mint");
+      toast(ta("toast_user_created", { name: fullName }), "mint");
       setEmail("");
       setFullName("");
       setPassword("");
       onCreated();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create the user.");
+      setError(err instanceof ApiError ? err.message : ta("error_create_user"));
     } finally {
       setBusy(false);
     }
@@ -339,17 +347,17 @@ function CreateUserCard({ onCreated }: { onCreated: () => void }) {
   return (
     <Card>
       <SectionTitle
-        title="Create a user"
-        hint="Accounts you create here are approved immediately. This is the only route to an administrator account."
+        title={ta("create_user_title")}
+        hint={ta("create_user_hint")}
       />
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
-        <Field label="Full name">
+        <Field label={ta("full_name")}>
           <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required minLength={2} />
         </Field>
-        <Field label="Email">
+        <Field label={ta("email")}>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </Field>
-        <Field label="Temporary password" hint="At least 8 characters, with a letter and a digit.">
+        <Field label={ta("temporary_password")} hint={ta("password_hint")}>
           <Input
             type="text"
             value={password}
@@ -358,11 +366,11 @@ function CreateUserCard({ onCreated }: { onCreated: () => void }) {
             minLength={8}
           />
         </Field>
-        <Field label="Role">
+        <Field label={ta("role")}>
           <Select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-            <option value="examiner">Examiner</option>
-            <option value="candidate">Candidate</option>
-            <option value="admin">Admin</option>
+            <option value="examiner">{tc("role_examiner")}</option>
+            <option value="candidate">{tc("role_candidate")}</option>
+            <option value="admin">{tc("role_admin")}</option>
           </Select>
         </Field>
         {error && (
@@ -372,7 +380,7 @@ function CreateUserCard({ onCreated }: { onCreated: () => void }) {
         )}
         <div className="sm:col-span-2">
           <Button type="submit" loading={busy}>
-            Create user
+            {ta("create_user")}
           </Button>
         </div>
       </form>

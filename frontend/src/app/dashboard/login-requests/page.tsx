@@ -43,6 +43,7 @@ const TONE: Record<LoginAccessStatus, "amber" | "mint" | "rose"> = {
  */
 export default function LoginRequestsPage() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth(["admin", "examiner"]);
   const [rows, setRows] = useState<LoginRequestRow[]>([]);
   const [tab, setTab] = useState<LoginAccessStatus | "all">("pending");
@@ -57,7 +58,7 @@ export default function LoginRequestsPage() {
       setRows(await api.get<LoginRequestRow[]>(`/login-requests${query}`));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load login requests.");
+      setError(err instanceof ApiError ? err.message : ta("error_load_login_requests"));
     } finally {
       setLoading(false);
     }
@@ -75,14 +76,16 @@ export default function LoginRequestsPage() {
       });
       toast(
         approve
-          ? `${row.first_name} can now use the platform`
-          : `${row.first_name}'s access was ${row.status === "approved" ? "revoked" : "refused"}`,
+          ? ta("toast_can_use_platform", { name: row.first_name })
+          : ta(row.status === "approved" ? "toast_access_was_revoked" : "toast_access_was_refused", {
+              name: row.first_name,
+            }),
         approve ? "mint" : "amber",
       );
       setNotes((current) => ({ ...current, [row.id]: "" }));
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not record the decision", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_record_decision"), "rose");
     } finally {
       setBusyId(null);
     }
@@ -165,13 +168,19 @@ export default function LoginRequestsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-[14px] font-semibold text-ink">{row.full_name}</p>
-                        <Badge tone={TONE[row.status]}>{row.status}</Badge>
+                        <Badge tone={TONE[row.status]}>{ta(`status_${row.status}`)}</Badge>
                       </div>
                       <p className="mt-0.5 text-[12.5px] text-ink-muted">{row.email}</p>
                       <p className="mt-1 text-[12px] text-ink-muted">
-                        Requested {formatDate(row.requested_at)}
+                        {ta("requested_on", { date: formatDate(row.requested_at) })}
                         {row.reviewed_at && row.reviewed_by_name && (
-                          <> · decided by {row.reviewed_by_name} on {formatDate(row.reviewed_at)}</>
+                          <>
+                            {" · "}
+                            {ta("decided_by_on", {
+                              name: row.reviewed_by_name,
+                              date: formatDate(row.reviewed_at),
+                            })}
+                          </>
                         )}
                       </p>
 

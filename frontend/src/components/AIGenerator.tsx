@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -28,7 +29,6 @@ import {
 import { ApiError, api } from "@/lib/api";
 import {
   CATEGORY_LABEL,
-  QUESTION_TYPE_LABEL,
   type AiDraft,
   type Difficulty,
   type QuestionCategory,
@@ -69,6 +69,7 @@ export interface AIGeneratorProps {
 }
 
 export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGeneratorProps) {
+  const t = useTranslations("questionBank");
   const [chosenSubject, setChosenSubject] = useState(subjectId ?? "");
   const [category, setCategory] = useState<QuestionCategory>("technical");
   const [topic, setTopic] = useState("");
@@ -97,11 +98,11 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
       const data = await api.get<AiDraft[]>("/questions/ai-drafts?status=pending&mine=true");
       setDrafts(data);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load pending drafts.");
+      setError(err instanceof ApiError ? err.message : t("ai_error_load_drafts"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadDrafts();
@@ -109,7 +110,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
 
   function toggleType(type: QuestionType) {
     setTypes((current) =>
-      current.includes(type) ? current.filter((t) => t !== type) : [...current, type],
+      current.includes(type) ? current.filter((x) => x !== type) : [...current, type],
     );
   }
 
@@ -119,11 +120,11 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
       // notion of which course "Normalisation" belongs to, and the draft ends up
       // untethered from any syllabus. The wizard never hits this: it locks the subject
       // to the exam's before this component ever mounts.
-      setError("Choose a subject — questions are generated for it, not in the abstract.");
+      setError(t("ai_error_choose_subject"));
       return;
     }
     if (!types.length) {
-      setError("Pick at least one question type.");
+      setError(t("ai_error_pick_type"));
       return;
     }
     setGenerating(true);
@@ -143,9 +144,9 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
         extra_instructions: extra.trim() || null,
       });
       setDrafts((current) => [...created, ...current]);
-      toast(`${created.length} draft(s) ready for your review`, "accent");
+      toast(t("ai_toast_generated", { count: created.length }), "accent");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Generation failed.");
+      setError(err instanceof ApiError ? err.message : t("ai_error_generation"));
     } finally {
       setGenerating(false);
     }
@@ -162,10 +163,10 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
       });
       setDrafts((current) => current.filter((d) => d.id !== draft.id));
       setSelected((current) => current.filter((id) => id !== draft.id));
-      toast(examId ? "Approved and added to the exam" : "Approved into your bank", "mint");
+      toast(examId ? t("ai_toast_approved_exam") : t("ai_toast_approved_bank"), "mint");
       onApproved?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not approve that draft.");
+      setError(err instanceof ApiError ? err.message : t("ai_error_approve"));
     } finally {
       setBusyId(null);
     }
@@ -177,7 +178,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
       await api.put(`/questions/ai-drafts/${draft.id}/reject`, { reason });
       setDrafts((current) => current.filter((d) => d.id !== draft.id));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not reject that draft.");
+      setError(err instanceof ApiError ? err.message : t("ai_error_reject"));
     } finally {
       setBusyId(null);
     }
@@ -192,9 +193,9 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
         { feedback: feedback.trim() || null },
       );
       setDrafts((current) => [replacement, ...current.filter((d) => d.id !== draft.id)]);
-      toast("Regenerated — review the new attempt", "accent");
+      toast(t("ai_toast_regenerated"), "accent");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not regenerate that draft.");
+      setError(err instanceof ApiError ? err.message : t("ai_error_regenerate"));
     } finally {
       setBusyId(null);
     }
@@ -217,15 +218,15 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
       {/* ------------------------------------------------------------- the request */}
       <Card>
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <h3 className="text-[15px] font-semibold tracking-tight text-ink">Generate questions</h3>
-          <Badge tone="purple">AI assists, you decide</Badge>
+          <h3 className="text-[15px] font-semibold tracking-tight text-ink">{t("ai_generate_questions")}</h3>
+          <Badge tone="purple">{t("ai_badge_assists")}</Badge>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
           {!subjectId && (
-            <Field label="Subject" required hint="Questions are generated for this subject's syllabus.">
+            <Field label={t("subject")} required hint={t("ai_subject_hint")}>
               <Select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)}>
-                <option value="">Choose a subject…</option>
+                <option value="">{t("choose_subject")}</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} — {s.name}
@@ -234,37 +235,37 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
               </Select>
             </Field>
           )}
-          <Field label="Category">
+          <Field label={t("category")}>
             <Select
               value={category}
               onChange={(e) => setCategory(e.target.value as QuestionCategory)}
             >
               {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
                 <option key={value} value={value}>
-                  {CATEGORY_LABEL[value]}
+                  {t(`category_${value}`)}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Topic" hint="e.g. Neural Networks">
+          <Field label={t("topic")} hint={t("ai_topic_hint")}>
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="What the questions are about"
+              placeholder={t("ai_topic_placeholder")}
               maxLength={120}
             />
           </Field>
-          <Field label="Difficulty">
+          <Field label={t("difficulty")}>
             <Select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as Difficulty)}
             >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
+              <option value="easy">{t("difficulty_easy")}</option>
+              <option value="medium">{t("difficulty_medium")}</option>
+              <option value="hard">{t("difficulty_hard")}</option>
             </Select>
           </Field>
-          <Field label="How many" hint="Split across the types you pick.">
+          <Field label={t("how_many")} hint={t("ai_how_many_hint")}>
             <Input
               type="number"
               min="1"
@@ -273,7 +274,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
               onChange={(e) => setCount(e.target.value)}
             />
           </Field>
-          <Field label="Marks each">
+          <Field label={t("ai_marks_each")}>
             <Input
               type="number"
               min="0.5"
@@ -282,18 +283,18 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
               onChange={(e) => setMarksEach(e.target.value)}
             />
           </Field>
-          <Field label="Language" hint="Blank means English.">
+          <Field label={t("ai_language")} hint={t("ai_language_hint")}>
             <Input
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
-              placeholder="e.g. Tamil"
+              placeholder={t("ai_language_placeholder")}
               maxLength={40}
             />
           </Field>
         </div>
 
         <div className="mt-4">
-          <p className="mb-2 text-[13px] font-medium text-ink-soft">Question types</p>
+          <p className="mb-2 text-[13px] font-medium text-ink-soft">{t("question_types")}</p>
           <div className="flex flex-wrap gap-2">
             {GENERATABLE.map((type) => (
               <button
@@ -307,7 +308,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
                     : "border-line-strong bg-surface text-ink-soft hover:border-accent/60",
                 )}
               >
-                {QUESTION_TYPE_LABEL[type]}
+                {t(`type_${type}`)}
               </button>
             ))}
           </div>
@@ -315,22 +316,22 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field
-            label="Syllabus or learning objectives"
-            hint="Pasted here, the questions are drawn from this rather than from general knowledge."
+            label={t("ai_syllabus")}
+            hint={t("ai_syllabus_hint")}
           >
             <Textarea
               value={syllabus}
               onChange={(e) => setSyllabus(e.target.value)}
               rows={4}
-              placeholder="Unit 3: perceptrons, activation functions, backpropagation…"
+              placeholder={t("ai_syllabus_placeholder")}
             />
           </Field>
-          <Field label="Additional instructions">
+          <Field label={t("ai_additional_instructions")}>
             <Textarea
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
               rows={4}
-              placeholder="Avoid questions that need a calculator. Keep options under 12 words."
+              placeholder={t("ai_additional_placeholder")}
               maxLength={500}
             />
           </Field>
@@ -348,7 +349,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
             disabled={!effectiveSubject}
             onClick={() => void generate()}
           >
-            Generate questions
+            {t("ai_generate_questions")}
           </Button>
         </div>
       </Card>
@@ -358,7 +359,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h3 className="text-[15px] font-semibold tracking-tight text-ink">
-              Awaiting your review
+              {t("ai_awaiting_review")}
             </h3>
             <Badge tone="amber">{drafts.length}</Badge>
           </div>
@@ -375,7 +376,7 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
                   }
                   className="h-4 w-4 rounded border-line-strong"
                 />
-                Select all
+                {t("select_all")}
               </label>
               <Button
                 size="sm"
@@ -383,7 +384,9 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
                 loading={bulkBusy}
                 onClick={() => void approveSelected()}
               >
-                Approve {selected.length || ""} {examId ? "into exam" : "into bank"}
+                {examId
+                  ? t("ai_approve_selected_exam", { count: selected.length })
+                  : t("ai_approve_selected_bank", { count: selected.length })}
               </Button>
             </div>
           )}
@@ -397,8 +400,8 @@ export function AIGenerator({ subjects, examId, subjectId, onApproved }: AIGener
           </div>
         ) : drafts.length === 0 ? (
           <EmptyState
-            title="No drafts waiting"
-            body="Generated questions land here first. Nothing reaches an exam until you approve it."
+            title={t("ai_no_drafts_title")}
+            body={t("ai_no_drafts_body")}
           />
         ) : (
           <ul className="space-y-3">
@@ -461,6 +464,7 @@ function DraftCard({
   onRegenerate: (feedback: string) => void;
   onEdit: () => void;
 }) {
+  const t = useTranslations("questionBank");
   const payload = draft.payload as DraftPayload;
   const [feedback, setFeedback] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
@@ -493,11 +497,11 @@ function DraftCard({
       <li className="rounded-[12px] border border-rose/30 bg-rose-soft/40 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[13.5px] font-medium text-ink">This draft failed to generate</p>
+            <p className="text-[13.5px] font-medium text-ink">{t("ai_draft_failed")}</p>
             <p className="mt-0.5 text-[12.5px] text-ink-muted">{draft.error}</p>
           </div>
           <Button size="sm" variant="ghost" loading={busy} onClick={() => onReject("Failed")}>
-            Dismiss
+            {t("btn_dismiss")}
           </Button>
         </div>
       </li>
@@ -519,7 +523,7 @@ function DraftCard({
           className="mt-1 h-4 w-4 shrink-0 rounded border-line-strong"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] leading-relaxed text-ink">{payload.body ?? "(empty)"}</p>
+          <p className="text-[14px] leading-relaxed text-ink">{payload.body ?? t("ai_empty_body")}</p>
 
           {Array.isArray(payload.options) && payload.options.length > 0 && (
             <ul className="mt-2 space-y-1">
@@ -535,7 +539,7 @@ function DraftCard({
                 >
                   <span className="font-semibold">{String.fromCharCode(65 + index)}</span>
                   <span className="flex-1">{option.text}</span>
-                  {option.is_correct && <Badge tone="mint">proposed answer</Badge>}
+                  {option.is_correct && <Badge tone="mint">{t("ai_proposed_answer")}</Badge>}
                 </li>
               ))}
             </ul>
@@ -543,17 +547,17 @@ function DraftCard({
 
           {payload.model_answer && (
             <p className="mt-2 rounded-[8px] border border-line bg-sunken/40 p-2.5 text-[13px] text-ink-soft">
-              <span className="font-semibold text-ink">Model answer: </span>
+              <span className="font-semibold text-ink">{t("model_answer_label")} </span>
               {payload.model_answer}
             </p>
           )}
 
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <Badge tone="purple">AI generated</Badge>
-            <Badge tone="neutral">{QUESTION_TYPE_LABEL[draft.question_type]}</Badge>
-            <Badge tone="neutral">{draft.difficulty}</Badge>
+            <Badge tone="purple">{t("source_ai_generated")}</Badge>
+            <Badge tone="neutral">{t(`type_${draft.question_type}`)}</Badge>
+            <Badge tone="neutral">{t(`difficulty_${draft.difficulty}`)}</Badge>
             {typeof payload.marks === "number" && (
-              <Badge tone="accent">{payload.marks} marks</Badge>
+              <Badge tone="accent">{t("marks_count", { count: payload.marks })}</Badge>
             )}
             {draft.topic && <Badge tone="neutral">{draft.topic}</Badge>}
             <span className="text-[11.5px] text-ink-muted">
@@ -564,15 +568,15 @@ function DraftCard({
 
           {duplicateOf && (
             <p className="mt-2 rounded-[8px] border border-amber/25 bg-amber-soft px-2.5 py-1.5 text-[12px] text-amber-ink">
-              ⚠ Looks like a question already in the bank: &ldquo;{duplicateOf.slice(0, 100)}
-              {duplicateOf.length > 100 ? "…" : ""}&rdquo;
+              ⚠ {t("ai_duplicate_warning", {
+                text: duplicateOf.slice(0, 100) + (duplicateOf.length > 100 ? "…" : ""),
+              })}
             </p>
           )}
 
           {payload.source_grounded === false && (
             <p className="mt-2 text-[12px] text-amber-ink">
-              Not drawn from your uploaded material — this came from the offline
-              generator, so check it against the syllabus yourself.
+              {t("ai_not_grounded")}
             </p>
           )}
         </div>
@@ -580,20 +584,20 @@ function DraftCard({
 
       {showFeedback && (
         <div className="mt-3 space-y-2 rounded-[10px] border border-line bg-sunken/40 p-3">
-          <Field label="What was wrong with it?" hint="Sent to the model and kept on the record.">
+          <Field label={t("ai_feedback_label")} hint={t("ai_feedback_hint")}>
             <Textarea
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               rows={2}
-              placeholder="Too easy, and option C repeats option A."
+              placeholder={t("ai_feedback_placeholder")}
             />
           </Field>
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => setShowFeedback(false)}>
-              Cancel
+              {t("btn_cancel")}
             </Button>
             <Button size="sm" loading={busy} onClick={() => onRegenerate(feedback)}>
-              Regenerate
+              {t("btn_regenerate")}
             </Button>
           </div>
         </div>
@@ -601,10 +605,10 @@ function DraftCard({
 
       <div className="mt-3 flex flex-wrap justify-end gap-2 border-t border-line/60 pt-3">
         <Button size="sm" variant="ghost" onClick={onEdit}>
-          Edit
+          {t("btn_edit")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowFeedback((v) => !v)}>
-          Regenerate
+          {t("btn_regenerate")}
         </Button>
         <Button
           size="sm"
@@ -612,10 +616,10 @@ function DraftCard({
           loading={busy}
           onClick={() => onReject("Not suitable")}
         >
-          Reject
+          {t("btn_reject")}
         </Button>
         <Button size="sm" loading={busy} onClick={onApprove}>
-          Approve {inExam ? "& add to exam" : "into bank"}
+          {inExam ? t("ai_approve_add_exam") : t("ai_approve_into_bank")}
         </Button>
       </div>
     </li>
@@ -637,6 +641,7 @@ function DraftEditor({
   onClose: () => void;
   onSave: (payload: DraftPayload) => Promise<void>;
 }) {
+  const t = useTranslations("questionBank");
   const original = draft.payload as DraftPayload;
   const [body, setBody] = useState(original.body ?? "");
   const [marks, setMarks] = useState(String(original.marks ?? 1));
@@ -651,16 +656,16 @@ function DraftEditor({
   const single = draft.question_type === "mcq" || draft.question_type === "true_false";
 
   return (
-    <Modal open onClose={onClose} title="Edit before approving" size="lg">
+    <Modal open onClose={onClose} title={t("ai_edit_before_approving")} size="lg">
       <div className="space-y-4">
-        <Field label="Question">
+        <Field label={t("question")}>
           <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} />
         </Field>
 
         {options.length > 0 && (
           <div>
             <p className="mb-2 text-[13px] font-medium text-ink-soft">
-              Options — tap a letter to set the correct answer
+              {t("ai_options_tap_letter")}
             </p>
             <div className="space-y-2">
               {options.map((option, index) => (
@@ -705,7 +710,7 @@ function DraftEditor({
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Marks">
+          <Field label={t("marks")}>
             <Input
               type="number"
               min="0"
@@ -714,7 +719,7 @@ function DraftEditor({
               onChange={(e) => setMarks(e.target.value)}
             />
           </Field>
-          <Field label="Negative marks">
+          <Field label={t("negative_marks")}>
             <Input
               type="number"
               min="0"
@@ -728,7 +733,7 @@ function DraftEditor({
         {(draft.question_type === "short_answer" ||
           draft.question_type === "long_answer" ||
           modelAnswer) && (
-          <Field label="Model answer">
+          <Field label={t("model_answer")}>
             <Textarea
               value={modelAnswer}
               onChange={(e) => setModelAnswer(e.target.value)}
@@ -737,7 +742,7 @@ function DraftEditor({
           </Field>
         )}
 
-        <Field label="Explanation">
+        <Field label={t("explanation")}>
           <Textarea
             value={explanation}
             onChange={(e) => setExplanation(e.target.value)}
@@ -747,7 +752,7 @@ function DraftEditor({
 
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {t("btn_cancel")}
           </Button>
           <Button
             loading={busy}
@@ -768,7 +773,7 @@ function DraftEditor({
               }
             }}
           >
-            Save & approve
+            {t("ai_save_approve")}
           </Button>
         </div>
       </div>

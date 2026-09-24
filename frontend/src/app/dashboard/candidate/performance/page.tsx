@@ -32,6 +32,8 @@ import type { CandidateStats, PerformanceAnalysis, Result } from "@/lib/types";
 export default function PerformancePage() {
   const { user } = useRequireAuth(["candidate"]);
   const t = useTranslations("results");
+  const tp = useTranslations("performance");
+  const tc = useTranslations("candidatePages");
   const [results, setResults] = useState<Result[]>([]);
   const [stats, setStats] = useState<CandidateStats | null>(null);
   /**
@@ -61,7 +63,7 @@ export default function PerformancePage() {
         setTopics(topicData);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "Could not load your performance.");
+          setError(err instanceof ApiError ? err.message : tc("error_load_performance"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -113,8 +115,8 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6">
       <Hero
-        title={t("performance_title")}
-        body={t("performance_body")}
+        title={tp("performance_title")}
+        body={tp("performance_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -222,7 +224,7 @@ export default function PerformancePage() {
                 ))}
               </ul>
               <p className="mt-4 text-[11.5px] leading-relaxed text-ink-muted">
-                {t("based_on_results", { count: results.length, plural: results.length === 1 ? "" : "s" })}
+                {tc("based_on_results", { count: results.length })}
               </p>
             </Card>
           </div>
@@ -244,7 +246,7 @@ export default function PerformancePage() {
                       <span className="shrink-0 text-[12.5px] text-ink-soft">
                         {Math.round(score.percentage)}%
                         <span className="ml-1.5 text-[11.5px] text-ink-muted">
-                          over {score.answers} answer{score.answers === 1 ? "" : "s"}
+                          {tc("over_answers", { count: score.answers })}
                         </span>
                       </span>
                     </div>

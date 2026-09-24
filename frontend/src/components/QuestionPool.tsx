@@ -58,7 +58,8 @@ export function QuestionPool({
   onOverrideMarks,
   onEdit,
 }: QuestionPoolProps) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Question | null>(null);
@@ -69,8 +70,8 @@ export function QuestionPool({
   if (!pool) {
     return (
       <EmptyState
-        title={t("empty_pool_title")}
-        body={t("empty_pool_body")}
+        title={tq("empty_pool_title")}
+        body={tq("empty_pool_body")}
       />
     );
   }
@@ -83,7 +84,7 @@ export function QuestionPool({
     try {
       await action();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That change could not be saved.");
+      setError(err instanceof ApiError ? err.message : t("pool_error_save"));
     } finally {
       setBusyId(null);
     }
@@ -111,7 +112,7 @@ export function QuestionPool({
     try {
       setPreview(await api.get<Question>(`/questions/${questionId}`));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load that question.");
+      setError(err instanceof ApiError ? err.message : t("pool_error_load_question"));
     }
   }
 
@@ -120,7 +121,7 @@ export function QuestionPool({
       <PoolSummary pool={pool} />
 
       {pool.problems.length > 0 && (
-        <Alert tone="amber" title={t("pool_cannot_publish_title")}>
+        <Alert tone="amber" title={tq("pool_cannot_publish_title")}>
           <ul className="list-inside list-disc space-y-0.5">
             {pool.problems.map((problem, index) => (
               // Index, not the string: two sections can report the identical shortfall
@@ -137,15 +138,14 @@ export function QuestionPool({
 
       {entries.length === 0 ? (
         <EmptyState
-          title={t("pool_is_empty_title")}
-          body={t("pool_is_empty_body")}
+          title={tq("pool_is_empty_title")}
+          body={tq("pool_is_empty_body")}
         />
       ) : (
         <>
           {!reorderable && (
             <p className="text-[12.5px] text-ink-muted">
-              Randomisation is on, so each candidate gets their own order — the pool
-              order below only affects how the paper preview reads.
+              {t("pool_randomised_note")}
             </p>
           )}
           <ul className="space-y-2">
@@ -174,9 +174,9 @@ export function QuestionPool({
                     <p className="line-clamp-2 text-[13.5px] text-ink">{entry.body}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <Badge tone="neutral">
-                        {QUESTION_TYPE_LABEL[entry.question_type]}
+                        {t(`type_${entry.question_type}`)}
                       </Badge>
-                      <Badge tone={DIFFICULTY_TONE[entry.difficulty]}>{entry.difficulty}</Badge>
+                      <Badge tone={DIFFICULTY_TONE[entry.difficulty]}>{t(`difficulty_${entry.difficulty}`)}</Badge>
                       {editingMarks === entry.question_id ? (
                         <span className="flex items-center gap-1">
                           <Input
@@ -197,14 +197,14 @@ export function QuestionPool({
                               );
                             }}
                           >
-                            Set
+                            {t("pool_set")}
                           </Button>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => setEditingMarks(null)}
                           >
-                            Cancel
+                            {t("btn_cancel")}
                           </Button>
                         </span>
                       ) : (
@@ -217,24 +217,24 @@ export function QuestionPool({
                               entry.marks_override === null ? "" : String(entry.marks_override),
                             );
                           }}
-                          title={editable ? "Re-weight for this exam only" : undefined}
+                          title={editable ? t("pool_reweight_hint") : undefined}
                         >
                           <Badge tone={entry.marks_override === null ? "accent" : "purple"}>
-                            {entry.effective_marks} marks
-                            {entry.marks_override !== null && " (overridden)"}
+                            {t("marks_count", { count: entry.effective_marks })}
+                            {entry.marks_override !== null && ` ${t("pool_overridden")}`}
                           </Badge>
                         </button>
                       )}
                       {entry.topic && <Badge tone="neutral">{entry.topic}</Badge>}
                       {entry.source === "ai_generated" && <Badge tone="purple">AI</Badge>}
-                      {entry.source === "imported" && <Badge tone="amber">imported</Badge>}
-                      {entry.exam_only && <Badge tone="neutral">this exam only</Badge>}
+                      {entry.source === "imported" && <Badge tone="amber">{t("badge_imported")}</Badge>}
+                      {entry.exam_only && <Badge tone="neutral">{t("pool_exam_only")}</Badge>}
                       {!entry.has_answer_key && (
-                        <Badge tone="rose">no answer key</Badge>
+                        <Badge tone="rose">{t("pool_no_answer_key")}</Badge>
                       )}
                       {entry.created_by_name && (
                         <span className="text-[11.5px] text-ink-muted">
-                          by {entry.created_by_name}
+                          {t("by_author", { name: entry.created_by_name })}
                         </span>
                       )}
                     </div>
@@ -249,7 +249,7 @@ export function QuestionPool({
                           variant="ghost"
                           disabled={index === 0}
                           onClick={() => move(index, -1)}
-                          aria-label="Move up"
+                          aria-label={t("pool_move_up")}
                         >
                           ↑
                         </Button>
@@ -259,7 +259,7 @@ export function QuestionPool({
                           variant="ghost"
                           disabled={index === entries.length - 1}
                           onClick={() => move(index, 1)}
-                          aria-label="Move down"
+                          aria-label={t("pool_move_down")}
                         >
                           ↓
                         </Button>
@@ -271,7 +271,7 @@ export function QuestionPool({
                       variant="ghost"
                       onClick={() => void openPreview(entry.question_id)}
                     >
-                      Preview
+                      {t("btn_preview")}
                     </Button>
                     {editable && onEdit && (
                       <Button
@@ -280,7 +280,7 @@ export function QuestionPool({
                         variant="ghost"
                         onClick={() => onEdit(entry.question_id)}
                       >
-                        Edit
+                        {t("btn_edit")}
                       </Button>
                     )}
                     {editable && (
@@ -292,7 +292,7 @@ export function QuestionPool({
                           void run(entry.question_id, () => onRemove(entry.question_id))
                         }
                       >
-                        Remove
+                        {t("btn_remove")}
                       </Button>
                     )}
                   </div>
@@ -310,37 +310,41 @@ export function QuestionPool({
 
 /** Totals and distributions - the numbers the spec asks to be visible before publishing. */
 export function PoolSummary({ pool }: { pool: ExamPool }) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
   const { stats } = pool;
   return (
     <Card className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Metric label="In the pool" value={String(stats.total_questions)} />
+        <Metric label={t("pool_in_pool")} value={String(stats.total_questions)} />
         <Metric
-          label="On each paper"
+          label={t("pool_on_each_paper")}
           value={String(pool.required_count)}
-          hint="Set by the selection rules"
+          hint={t("pool_on_each_paper_hint")}
         />
-        <Metric label="Pool marks" value={String(stats.total_marks)} />
+        <Metric label={t("pool_marks")} value={String(stats.total_marks)} />
         <Metric
-          label="Ready to publish"
-          value={pool.can_publish ? "Yes" : "Not yet"}
+          label={t("pool_ready_to_publish")}
+          value={pool.can_publish ? t("yes") : t("not_yet")}
           tone={pool.can_publish ? "mint" : "amber"}
         />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Distribution
-          title={t("pool_by_type")}
+          title={tq("pool_by_type")}
           rows={Object.entries(stats.by_type).map(([key, count]) => [
-            QUESTION_TYPE_LABEL[key as keyof typeof QUESTION_TYPE_LABEL] ?? key,
+            key in QUESTION_TYPE_LABEL ? t(`type_${key}`) : key,
             count,
           ])}
           total={stats.total_questions}
         />
         <Distribution
-          title={t("pool_by_difficulty")}
-          rows={Object.entries(stats.by_difficulty).map(([key, count]) => [key, count])}
+          title={tq("pool_by_difficulty")}
+          rows={Object.entries(stats.by_difficulty).map(([key, count]) => [
+            t.has(`difficulty_${key}`) ? t(`difficulty_${key}`) : key,
+            count,
+          ])}
           total={stats.total_questions}
         />
       </div>

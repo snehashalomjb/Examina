@@ -11,6 +11,7 @@
  */
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Badge, Button, Field, Input, Select, cx } from "@/components/ui";
 import { CATEGORY_LABEL, QUESTION_TYPE_LABEL } from "@/lib/types";
@@ -36,6 +37,8 @@ export function BlueprintBuilder({
   subjects: Subject[];
   onApply: (rows: BlueprintRow[]) => Promise<BlueprintRowResult[] | null>;
 }) {
+  const t = useTranslations("createExam");
+  const tp = useTranslations("createExamPage");
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
   const [results, setResults] = useState<BlueprintRowResult[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +70,7 @@ export function BlueprintBuilder({
         topic: row.topic?.trim() || null,
         tags: row.tagsText
           .split(",")
-          .map((t) => t.trim())
+          .map((tag) => tag.trim())
           .filter(Boolean),
         count: row.count,
       }));
@@ -80,10 +83,7 @@ export function BlueprintBuilder({
 
   return (
     <div className="space-y-4">
-      <p className="text-[12.5px] text-ink-muted">
-        Name what you want - a subject, a type, a difficulty and a count - and the pool
-        fills itself from the bank. Leave a field blank to mean &ldquo;any&rdquo;.
-      </p>
+      <p className="text-[12.5px] text-ink-muted">{tp("bp_intro")}</p>
 
       <div className="space-y-2">
         {rows.map((row, index) => (
@@ -91,69 +91,69 @@ export function BlueprintBuilder({
             key={index}
             className="grid grid-cols-2 gap-2 rounded-[10px] border border-line bg-surface p-3 sm:grid-cols-3 lg:grid-cols-7"
           >
-            <Field label="Section title">
+            <Field label={tp("bp_section_title")}>
               <Input
                 value={row.title}
                 onChange={(e) => updateRow(index, { title: e.target.value })}
-                placeholder="e.g. Python"
+                placeholder={tp("bp_section_title_placeholder")}
               />
             </Field>
-            <Field label="Subject">
+            <Field label={tp("bp_subject")}>
               <Select
                 value={row.subject_id ?? ""}
                 onChange={(e) => updateRow(index, { subject_id: e.target.value || undefined })}
               >
-                <option value="">Any subject</option>
+                <option value="">{t("rule_any_subject")}</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>{s.code}</option>
                 ))}
               </Select>
             </Field>
-            <Field label="Category">
+            <Field label={t("step_category")}>
               <Select
                 value={row.category ?? ""}
                 onChange={(e) =>
                   updateRow(index, { category: (e.target.value || undefined) as QuestionCategory })
                 }
               >
-                <option value="">Any category</option>
+                <option value="">{t("rule_any_category")}</option>
                 {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
-                  <option key={value} value={value}>{CATEGORY_LABEL[value]}</option>
+                  <option key={value} value={value}>{tp(`qcat_${value}`)}</option>
                 ))}
               </Select>
             </Field>
-            <Field label="Type">
+            <Field label={tp("bp_type")}>
               <Select
                 value={row.question_type}
                 onChange={(e) => updateRow(index, { question_type: e.target.value as QuestionType })}
               >
                 {(Object.keys(QUESTION_TYPE_LABEL) as QuestionType[]).map((value) => (
-                  <option key={value} value={value}>{QUESTION_TYPE_LABEL[value]}</option>
+                  <option key={value} value={value}>{tp(`qtype_${value}`)}</option>
                 ))}
               </Select>
             </Field>
-            <Field label="Difficulty">
+            <Field label={tp("bp_difficulty")}>
               <Select
                 value={row.difficulty ?? ""}
                 onChange={(e) =>
                   updateRow(index, { difficulty: (e.target.value || undefined) as Difficulty })
                 }
               >
-                <option value="">Any</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+                <option value="">{tp("bp_any")}</option>
+                <option value="easy">{t("difficulty_easy")}</option>
+                <option value="medium">{t("difficulty_medium")}</option>
+                <option value="hard">{t("difficulty_hard")}</option>
               </Select>
             </Field>
-            <Field label="Tags">
+            <Field label={tp("bp_tags")}>
               <Input
                 value={row.tagsText}
                 onChange={(e) => updateRow(index, { tagsText: e.target.value })}
-                placeholder="OOP, Classes"
+                placeholder={tp("bp_tags_placeholder")}
               />
             </Field>
             <div className="flex items-end gap-1.5">
-              <Field label="Count">
+              <Field label={tp("bp_count")}>
                 <Input
                   type="number"
                   min={1}
@@ -168,6 +168,8 @@ export function BlueprintBuilder({
                 className="text-rose hover:bg-rose-soft"
                 onClick={() => removeRow(index)}
                 disabled={rows.length === 1}
+                aria-label={tp("bp_remove_row")}
+                title={tp("bp_remove_row")}
               >
                 ✕
               </Button>
@@ -178,10 +180,10 @@ export function BlueprintBuilder({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={addRow}>
-          + Add row
+          {tp("bp_add_row")}
         </Button>
         <Button type="button" size="sm" disabled={!valid} loading={busy} onClick={() => void generate()}>
-          Generate from Question Bank
+          {tp("bp_generate")}
         </Button>
       </div>
 
@@ -200,8 +202,11 @@ export function BlueprintBuilder({
                 <span className="font-medium text-ink">{result.title}</span>
                 <Badge tone={short ? "amber" : "mint"} size="xs">
                   {short
-                    ? `${result.matched}/${result.requested} available in the bank`
-                    : `${result.added}/${result.requested} added`}
+                    ? tp("bp_result_available", {
+                        matched: result.matched,
+                        requested: result.requested,
+                      })
+                    : tp("bp_result_added", { added: result.added, requested: result.requested })}
                 </Badge>
               </li>
             );

@@ -41,33 +41,33 @@ const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "Overview",
     items: [
-      { href: "/dashboard/admin",              label: "Dashboard",     roles: ["admin"],               icon: IconDashboard },
-      { href: "/dashboard/examiner",           label: "Dashboard",     roles: ["examiner"],            icon: IconDashboard },
-      { href: "/dashboard/candidate",          label: "Dashboard",     roles: ["candidate"],           icon: IconDashboard },
-      { href: "/dashboard/candidate/exams",    label: "My Exams",      roles: ["candidate"],           icon: IconExam },
-      { href: "/dashboard/results",            label: "Results",       roles: ["candidate"],           icon: IconResults },
-      { href: "/dashboard/candidate/performance", label: "Performance", roles: ["candidate"],          icon: IconPerformance },
+      { href: "/dashboard/admin",              label: "nav_dashboard",     roles: ["admin"],               icon: IconDashboard },
+      { href: "/dashboard/examiner",           label: "nav_dashboard",     roles: ["examiner"],            icon: IconDashboard },
+      { href: "/dashboard/candidate",          label: "nav_dashboard",     roles: ["candidate"],           icon: IconDashboard },
+      { href: "/dashboard/candidate/exams",    label: "nav_my_exams",      roles: ["candidate"],           icon: IconExam },
+      { href: "/dashboard/results",            label: "nav_results",       roles: ["candidate"],           icon: IconResults },
+      { href: "/dashboard/candidate/performance", label: "nav_performance", roles: ["candidate"],          icon: IconPerformance },
     ],
   },
   {
     section: "Assessment",
     items: [
-      { href: "/dashboard/exams",              label: "Exams",         roles: ["admin", "examiner"],   icon: IconExam,     needsApproval: true },
-      { href: "/dashboard/exams/create",       label: "Create Exam",   roles: ["admin", "examiner"],   icon: PlusCircleIcon, needsApproval: true },
-      { href: "/dashboard/questions",          label: "Question Bank", roles: ["admin", "examiner"],   icon: IconBank,     needsApproval: true },
-      { href: "/dashboard/questions/ai-generate", label: "AI Tools",   roles: ["admin", "examiner"],  icon: SparkleIcon,  needsApproval: true, badge: "AI" },
-      { href: "/dashboard/grading",            label: "Grading",       roles: ["admin", "examiner"],   icon: IconGrading,  needsApproval: true },
-      { href: "/dashboard/proctoring",         label: "Proctoring",    roles: ["admin", "examiner"],   icon: IconShield,   needsApproval: true },
-      { href: "/dashboard/live",               label: "Live Console",  roles: ["admin", "examiner"],   icon: IconDashboard, needsApproval: true, badge: "LIVE" },
+      { href: "/dashboard/exams",              label: "nav_exams",         roles: ["admin", "examiner"],   icon: IconExam,     needsApproval: true },
+      { href: "/dashboard/exams/create",       label: "nav_create_exam",   roles: ["admin", "examiner"],   icon: PlusCircleIcon, needsApproval: true },
+      { href: "/dashboard/questions",          label: "nav_question_bank", roles: ["admin", "examiner"],   icon: IconBank,     needsApproval: true },
+      { href: "/dashboard/questions/ai-generate", label: "nav_ai_tools",   roles: ["admin", "examiner"],  icon: SparkleIcon,  needsApproval: true, badge: "AI" },
+      { href: "/dashboard/grading",            label: "nav_grading",       roles: ["admin", "examiner"],   icon: IconGrading,  needsApproval: true },
+      { href: "/dashboard/proctoring",         label: "nav_proctoring",    roles: ["admin", "examiner"],   icon: IconShield,   needsApproval: true },
+      { href: "/dashboard/live",               label: "nav_live_console",  roles: ["admin", "examiner"],   icon: IconDashboard, needsApproval: true, badge: "LIVE" },
     ],
   },
   {
     section: "People",
     items: [
-      { href: "/dashboard/candidates",         label: "Candidates",    roles: ["admin", "examiner"],   icon: IconUsers,    needsApproval: true },
-      { href: "/dashboard/admin/users?role=examiner", label: "Examiners", roles: ["admin"],            icon: IconUsers },
-      { href: "/dashboard/login-requests",     label: "Login Requests", roles: ["admin", "examiner"],  icon: BellIcon,     needsApproval: true },
-      { href: "/dashboard/admin/users",        label: "User Management", roles: ["admin"],             icon: IconShield },
+      { href: "/dashboard/candidates",         label: "nav_candidates",    roles: ["admin", "examiner"],   icon: IconUsers,    needsApproval: true },
+      { href: "/dashboard/admin/users?role=examiner", label: "nav_examiners", roles: ["admin"],            icon: IconUsers },
+      { href: "/dashboard/login-requests",     label: "nav_login_requests", roles: ["admin", "examiner"],  icon: BellIcon,     needsApproval: true },
+      { href: "/dashboard/admin/users",        label: "nav_user_management", roles: ["admin"],             icon: IconShield },
     ],
   },
   {
@@ -75,25 +75,25 @@ const NAV: { section: string; items: NavItem[] }[] = [
     // proctoring, exams) plus what can honestly be exported today.
     section: "Reports",
     items: [
-      { href: "/dashboard/admin/reports?tab=exams",       label: "Exam Reports",        roles: ["admin"], icon: IconExam },
-      { href: "/dashboard/admin/reports?tab=candidates",  label: "Candidate Reports",   roles: ["admin"], icon: IconUsers },
-      { href: "/dashboard/admin/reports?tab=proctoring",  label: "Proctoring Reports",  roles: ["admin"], icon: IconShield },
-      { href: "/dashboard/admin/reports?tab=performance", label: "Performance Reports", roles: ["admin"], icon: IconPerformance },
-      { href: "/dashboard/admin/reports?tab=export",      label: "Export Reports",      roles: ["admin"], icon: IconResults },
+      { href: "/dashboard/admin/reports?tab=exams",       label: "nav_exam_reports",        roles: ["admin"], icon: IconExam },
+      { href: "/dashboard/admin/reports?tab=candidates",  label: "nav_candidate_reports",   roles: ["admin"], icon: IconUsers },
+      { href: "/dashboard/admin/reports?tab=proctoring",  label: "nav_proctoring_reports",  roles: ["admin"], icon: IconShield },
+      { href: "/dashboard/admin/reports?tab=performance", label: "nav_performance_reports", roles: ["admin"], icon: IconPerformance },
+      { href: "/dashboard/admin/reports?tab=export",      label: "nav_export_reports",      roles: ["admin"], icon: IconResults },
     ],
   },
   {
     section: "System",
     items: [
-      { href: "/dashboard/admin/audit",          label: "Audit Logs",    roles: ["admin"], icon: IconResults },
-      { href: "/dashboard/admin/system-health",  label: "System Health", roles: ["admin"], icon: IconMonitor },
+      { href: "/dashboard/admin/audit",          label: "nav_audit_logs",    roles: ["admin"], icon: IconResults },
+      { href: "/dashboard/admin/system-health",  label: "nav_system_health", roles: ["admin"], icon: IconMonitor },
     ],
   },
   {
     // Profile is no longer its own nav entry - the logo opens it instead, everywhere.
     section: "Account",
     items: [
-      { href: "/dashboard/settings",           label: "Settings",      roles: ["candidate", "examiner", "admin"], icon: IconSettings },
+      { href: "/dashboard/settings",           label: "nav_settings",      roles: ["candidate", "examiner", "admin"], icon: IconSettings },
     ],
   },
 ];
@@ -104,34 +104,15 @@ const ROLE_LABEL_KEY: Record<UserRole, string> = {
   candidate: "role_candidate",
 };
 
-// Only the items with a stable (query-string-free) href are translated in this pass -
-// the rest (e.g. "Examiners", "Create Exam", per-tab report links) keep their English
-// label for now, translatable later by adding a row here plus the matching message key.
-const NAV_LABEL_KEY: Record<string, { ns: "dashboard" | "common"; key: string }> = {
-  "/dashboard/admin": { ns: "common", key: "dashboard" },
-  "/dashboard/examiner": { ns: "common", key: "dashboard" },
-  "/dashboard/candidate": { ns: "common", key: "dashboard" },
-  "/dashboard/candidate/exams": { ns: "dashboard", key: "nav_my_exams" },
-  "/dashboard/results": { ns: "dashboard", key: "nav_results" },
-  "/dashboard/candidate/performance": { ns: "dashboard", key: "nav_performance" },
-  "/dashboard/exams": { ns: "dashboard", key: "nav_exams" },
-  "/dashboard/questions": { ns: "dashboard", key: "nav_questions" },
-  "/dashboard/grading": { ns: "dashboard", key: "nav_grading" },
-  "/dashboard/proctoring": { ns: "dashboard", key: "nav_proctoring" },
-  "/dashboard/candidates": { ns: "dashboard", key: "nav_candidates" },
-  "/dashboard/admin/users": { ns: "dashboard", key: "nav_users" },
-  "/dashboard/login-requests": { ns: "dashboard", key: "nav_login_requests" },
-  "/dashboard/admin/audit": { ns: "dashboard", key: "nav_audit" },
-  "/dashboard/admin/system-health": { ns: "dashboard", key: "nav_system_health" },
-  "/dashboard/settings": { ns: "common", key: "settings" },
-};
-
+// Every NAV item's `label` is an "adminShell" message key; sections map to one here.
+// `section` itself stays English - it is an identifier the header code groups by.
 const SECTION_LABEL_KEY: Record<string, string> = {
   Overview: "section_overview",
   Assessment: "section_assessment",
   People: "section_people",
   Reports: "section_reports",
   System: "section_system",
+  Account: "section_account",
 };
 
 const ROLE_GRADIENT: Record<UserRole, string> = {
@@ -145,14 +126,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { signOut } = useAuth();
   const t = useTranslations("dashboard");
   const tc = useTranslations("common");
-  const navLabel = (item: NavItem) => {
-    const mapped = NAV_LABEL_KEY[item.href];
-    if (!mapped) return item.label;
-    return mapped.ns === "common" ? tc(mapped.key) : t(mapped.key);
-  };
+  const ta = useTranslations("adminShell");
+  const navLabel = (item: NavItem) => ta(item.label);
   const sectionLabel = (section: string) => {
     const key = SECTION_LABEL_KEY[section];
-    return key ? t(key) : section;
+    return key ? ta(key) : section;
+  };
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return ta("greeting_morning");
+    if (hour < 18) return ta("greeting_afternoon");
+    return ta("greeting_evening");
   };
   const roleLabel = (role: UserRole) => tc(ROLE_LABEL_KEY[role]);
   const pathname = usePathname();
@@ -257,7 +241,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 return (
                   <span
                     key={item.href}
-                    title="Awaiting administrator approval"
+                    title={ta("awaiting_admin_approval")}
                     className="flex cursor-not-allowed items-center gap-3 rounded-[9px] px-3 py-2.5 text-[13px] opacity-35"
                     style={{ color: "var(--color-sidebar-text)" }}
                   >
@@ -303,7 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white"
                       style={{ background: "linear-gradient(135deg, #dc2626, #ef4444)" }}>
                       <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                      LIVE
+                      {ta("badge_live")}
                     </span>
                   )}
                 </Link>
@@ -374,7 +358,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return (
             <span
               key={item.href}
-              title="Awaiting administrator approval"
+              title={ta("awaiting_admin_approval")}
               className="flex cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] opacity-35"
               style={{ color: "var(--color-sidebar-text)" }}
             >
@@ -408,7 +392,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white"
                 style={{ background: "linear-gradient(135deg, #dc2626, #ef4444)" }}>
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                LIVE
+                {ta("badge_live")}
               </span>
             )}
           </Link>
@@ -441,7 +425,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex flex-1 items-center">
               <Brand />
             </div>
-            <nav className="flex shrink-0 items-center gap-1 overflow-x-auto">
+            <nav className="hidden shrink-0 items-center gap-1 md:flex">
               {candidateNavItems.map((item) => {
                 const Icon = item.icon;
                 const isSectionRoot = item.href === "/dashboard/candidate";
@@ -467,12 +451,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LanguageSelector />
               {!approved && (
                 <Badge tone={user.access_status === "pending" ? "amber" : "rose"} size="xs">
-                  {user.access_status === "pending" ? "Pending approval" : "Access revoked"}
+                  {user.access_status === "pending" ? ta("pending_approval") : ta("access_revoked")}
                 </Badge>
               )}
               <Link
                 href="/dashboard/profile"
-                title={approved ? "Your profile — Active" : "Your profile"}
+                title={approved ? ta("your_profile_active") : ta("your_profile")}
                 className={cx(
                   "hidden h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-sm transition-transform hover:scale-105 sm:flex",
                   `bg-gradient-to-br ${ROLE_GRADIENT[user.role]}`,
@@ -490,6 +474,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Button>
             </div>
           </div>
+          {/* Phones: the links get their own scrollable row, so they never push the
+              language switch and sign-out off the right edge of the header. */}
+          <nav className="flex items-center gap-1 overflow-x-auto border-t border-line px-3 py-1.5 md:hidden">
+            {candidateNavItems.map((item) => {
+              const Icon = item.icon;
+              const isSectionRoot = item.href === "/dashboard/candidate";
+              const active = isSectionRoot
+                ? pathname === item.href
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cx(
+                    "flex shrink-0 items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[12.5px] font-medium transition-all whitespace-nowrap",
+                    active ? "bg-accent text-white shadow-sm" : "text-ink-soft hover:bg-sunken hover:text-ink"
+                  )}
+                >
+                  <Icon size={13} />
+                  {navLabel(item)}
+                </Link>
+              );
+            })}
+          </nav>
         </header>
 
         <main className="min-w-0 flex-1 px-4 py-4 lg:px-7 lg:py-5">
@@ -524,7 +532,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={triggerClass(isActive("/dashboard/examiner", true))}
                 style={{ color: isActive("/dashboard/examiner", true) ? "white" : "var(--color-sidebar-text)" }}
               >
-                {tc("dashboard")}
+                {ta("nav_dashboard")}
               </Link>
 
               <div className="relative">
@@ -537,7 +545,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(assessmentActive)}
                   style={{ color: assessmentActive || openMenu === "assessment" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
+                  {ta("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
                 </button>
                 {openMenu === "assessment" && dropdownPanel(assessmentItems, () => setOpenMenu(null))}
               </div>
@@ -552,7 +560,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(peopleActive)}
                   style={{ color: peopleActive || openMenu === "people" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_people")} <ChevronIcon open={openMenu === "people"} />
+                  {ta("section_people")} <ChevronIcon open={openMenu === "people"} />
                 </button>
                 {openMenu === "people" && dropdownPanel(peopleItems, () => setOpenMenu(null))}
               </div>
@@ -565,7 +573,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setMobileOpen(true)}
                 className="flex h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:hidden"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Open navigation"
+                aria-label={ta("open_navigation")}
               >
                 <HamburgerIcon />
               </button>
@@ -575,7 +583,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Notifications */}
               <Link
                 href="/dashboard/login-requests"
-                title={t("nav_login_requests")}
+                title={ta("nav_login_requests")}
                 className="hidden h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:flex"
                 style={{ color: "var(--color-sidebar-text)" }}
               >
@@ -585,7 +593,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Profile: the avatar itself is a direct link, no dropdown needed. */}
               <Link
                 href="/dashboard/profile"
-                title="View profile"
+                title={ta("view_profile")}
                 className="ml-1 hidden items-center gap-2.5 rounded-[9px] px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
               >
                 <Avatar name={user.full_name} src={user.avatar_url} size={34} shape="circle" />
@@ -628,7 +636,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setMobileOpen(false)}
                   className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                   style={{ color: "var(--color-sidebar-text)" }}
-                  aria-label="Close navigation"
+                  aria-label={ta("close_navigation")}
                 >
                   <CloseIcon />
                 </button>
@@ -671,7 +679,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={triggerClass(isActive("/dashboard/admin", true))}
                 style={{ color: isActive("/dashboard/admin", true) ? "white" : "var(--color-sidebar-text)" }}
               >
-                {tc("dashboard")}
+                {ta("nav_dashboard")}
               </Link>
 
               <div className="relative">
@@ -684,7 +692,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(adminAssessmentActive)}
                   style={{ color: adminAssessmentActive || openMenu === "assessment" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
+                  {ta("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
                 </button>
                 {openMenu === "assessment" && dropdownPanel(adminAssessmentItems, () => setOpenMenu(null))}
               </div>
@@ -699,7 +707,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(monitoringActive)}
                   style={{ color: monitoringActive || openMenu === "monitoring" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_monitoring")} <ChevronIcon open={openMenu === "monitoring"} />
+                  {ta("section_monitoring")} <ChevronIcon open={openMenu === "monitoring"} />
                 </button>
                 {openMenu === "monitoring" && dropdownPanel(monitoringItems, () => setOpenMenu(null))}
               </div>
@@ -714,7 +722,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(peopleActive)}
                   style={{ color: peopleActive || openMenu === "people" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_people")} <ChevronIcon open={openMenu === "people"} />
+                  {ta("section_people")} <ChevronIcon open={openMenu === "people"} />
                 </button>
                 {openMenu === "people" && dropdownPanel(peopleItems, () => setOpenMenu(null))}
               </div>
@@ -729,7 +737,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(reportsActive)}
                   style={{ color: reportsActive || openMenu === "reports" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_reports")} <ChevronIcon open={openMenu === "reports"} />
+                  {ta("section_reports")} <ChevronIcon open={openMenu === "reports"} />
                 </button>
                 {openMenu === "reports" && dropdownPanel(reportsItems, () => setOpenMenu(null))}
               </div>
@@ -744,7 +752,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   className={triggerClass(systemActive)}
                   style={{ color: systemActive || openMenu === "system" ? "white" : "var(--color-sidebar-text)" }}
                 >
-                  {t("section_system")} <ChevronIcon open={openMenu === "system"} />
+                  {ta("section_system")} <ChevronIcon open={openMenu === "system"} />
                 </button>
                 {openMenu === "system" && dropdownPanel(systemItems, () => setOpenMenu(null))}
               </div>
@@ -757,7 +765,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setMobileOpen(true)}
                 className="flex h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:hidden"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Open navigation"
+                aria-label={ta("open_navigation")}
               >
                 <HamburgerIcon />
               </button>
@@ -767,7 +775,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Notifications */}
               <Link
                 href="/dashboard/login-requests"
-                title={t("nav_login_requests")}
+                title={ta("nav_login_requests")}
                 className="hidden h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:flex"
                 style={{ color: "var(--color-sidebar-text)" }}
               >
@@ -777,7 +785,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {/* Profile: the avatar itself is a direct link, no dropdown needed. */}
               <Link
                 href="/dashboard/profile"
-                title="View profile"
+                title={ta("view_profile")}
                 className="ml-1 hidden items-center gap-2.5 rounded-[9px] px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
               >
                 <Avatar name={user.full_name} src={user.avatar_url} size={34} shape="circle" />
@@ -820,7 +828,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setMobileOpen(false)}
                   className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                   style={{ color: "var(--color-sidebar-text)" }}
-                  aria-label="Close navigation"
+                  aria-label={ta("close_navigation")}
                 >
                   <CloseIcon />
                 </button>
@@ -885,7 +893,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setMobileOpen(false)}
                 className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Close navigation"
+                aria-label={ta("close_navigation")}
               >
                 <CloseIcon />
               </button>
@@ -916,7 +924,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               type="button"
               onClick={() => setMobileOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-ink-soft hover:bg-sunken hover:border-accent/30 transition lg:hidden"
-              aria-label="Open navigation"
+              aria-label={ta("open_navigation")}
             >
               <HamburgerIcon />
             </button>
@@ -934,7 +942,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </span>{" "}
                 👋
               </p>
-              <p className="text-[11px] text-ink-muted font-medium">{roleLabel(user.role)} {t("workspace")}</p>
+              <p className="text-[11px] text-ink-muted font-medium">{ta("role_workspace", { role: roleLabel(user.role) })}</p>
             </div>
           </div>
 
@@ -943,11 +951,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Access status badge */}
             {user.role !== "admin" && !approved && (
               <Badge tone={user.access_status === "pending" ? "amber" : "rose"} size="xs">
-                {user.access_status === "pending" ? "Pending approval" : "Access revoked"}
+                {user.access_status === "pending" ? ta("pending_approval") : ta("access_revoked")}
               </Badge>
             )}
             {user.role !== "admin" && approved && (
-              <Badge tone="green" size="xs">Active</Badge>
+              <Badge tone="green" size="xs">{ta("status_active")}</Badge>
             )}
             {/* User avatar with gradient */}
             <div className={cx(
@@ -972,13 +980,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     </div>
   );
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
 }
 
 /* ─── Inline icon components ────────────────────────────────────── */

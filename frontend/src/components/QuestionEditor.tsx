@@ -147,7 +147,8 @@ export function QuestionEditor({
   onCancel,
   stayOpen = false,
 }: QuestionEditorProps) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
   const editing = question !== null;
   /** What the form starts from. Only `question` decides whether the save is an edit. */
   const source = question ?? seed;
@@ -300,12 +301,12 @@ export function QuestionEditor({
       setSelectedLocales((current) => Array.from(new Set([...current, ...targets])));
       setGenerateNotice(
         result.provider === "stub"
-          ? "No translation model is configured, so this only copied the English text — edit each field by hand before saving."
-          : "Generated. Review and edit before saving — nothing is saved yet.",
+          ? t("editor_translate_stub_notice")
+          : t("editor_translate_done_notice"),
       );
     } catch (err) {
       setGenerateError(
-        err instanceof ApiError ? err.message : "Could not generate translations. Try again.",
+        err instanceof ApiError ? err.message : t("editor_translate_error"),
       );
     } finally {
       setGenerating(false);
@@ -379,29 +380,29 @@ export function QuestionEditor({
   /** Live mirror of the server's rules, so the examiner is told before they submit. */
   const problems = useMemo(() => {
     const found: string[] = [];
-    if (!subjectId) found.push("Pick a subject.");
-    if (!body.trim() && !image) found.push("Write the question, or attach a figure.");
+    if (!subjectId) found.push(t("editor_problem_subject"));
+    if (!body.trim() && !image) found.push(t("editor_problem_body"));
     if (objective) {
       const filled = options.filter((o) => o.text.trim());
-      if (filled.length < 2) found.push("Give at least two options.");
-      if (correctCount === 0) found.push("Mark the correct answer.");
-      if (singleAnswer && correctCount > 1) found.push("Only one option may be correct.");
+      if (filled.length < 2) found.push(t("editor_problem_two_options"));
+      if (correctCount === 0) found.push(t("editor_problem_mark_correct"));
+      if (singleAnswer && correctCount > 1) found.push(t("editor_problem_one_correct"));
     }
     if (needsModelAnswer && !modelAnswer.trim()) {
-      found.push("A written question needs a model answer to grade against.");
+      found.push(t("editor_problem_model_answer"));
     }
     if (type === "numerical" && numericAnswer.trim() === "") {
-      found.push("Give the expected numerical answer.");
+      found.push(t("editor_problem_numeric"));
     }
     if (type === "fill_blank" && !acceptedAnswers.trim()) {
-      found.push("List at least one accepted answer.");
+      found.push(t("editor_problem_accepted"));
     }
     if (type === "coding" && languages.length === 0) {
-      found.push("Pick at least one programming language.");
+      found.push(t("editor_problem_language"));
     }
-    if (!isContainer && Number(marks) <= 0) found.push("Marks must be greater than zero.");
+    if (!isContainer && Number(marks) <= 0) found.push(t("editor_problem_marks"));
     if (minWords && maxWords && Number(minWords) > Number(maxWords)) {
-      found.push("The minimum word count is above the maximum.");
+      found.push(t("editor_problem_word_bounds"));
     }
     return found;
   }, [
@@ -422,6 +423,7 @@ export function QuestionEditor({
     marks,
     minWords,
     maxWords,
+    t,
   ]);
 
   // A true/false question is two fixed options - "Option C" has no meaning there.
@@ -479,7 +481,7 @@ export function QuestionEditor({
     try {
       setImage(await api.upload<QuestionImage>("/questions/images", form));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not upload that image.");
+      setError(err instanceof ApiError ? err.message : t("editor_error_upload_image"));
     }
   }
 
@@ -626,7 +628,7 @@ export function QuestionEditor({
       let saved: Question;
       if (editing && question) {
         saved = await api.patch<Question>(`/questions/${question.id}`, payload);
-        toast("Question updated", "mint");
+        toast(t("editor_toast_updated"), "mint");
       } else {
         // Only a brand-new question carries these: an edit never moves a question
         // between the bank and an exam, which would surprise anyone reusing it.
@@ -638,16 +640,16 @@ export function QuestionEditor({
         toast(
           addToExam && examId
             ? saveToBank
-              ? "Added to the exam and saved to your bank"
-              : "Added to this exam only"
-            : "Question saved to your bank",
+              ? t("editor_toast_added_exam_and_bank")
+              : t("editor_toast_added_exam_only")
+            : t("editor_toast_saved_bank"),
           "mint",
         );
       }
       onSaved?.(saved);
       if (stayOpen && !editing) reset();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the question.");
+      setError(err instanceof ApiError ? err.message : t("editor_error_save"));
     } finally {
       setBusy(null);
     }
@@ -655,8 +657,8 @@ export function QuestionEditor({
 
   if (subjects.length === 0) {
     return (
-      <Alert tone="amber" title={t("create_subject_first_title")}>
-        Every question belongs to a subject. Add one before writing questions.
+      <Alert tone="amber" title={tq("create_subject_first_title")}>
+        {t("editor_no_subjects_body")}
       </Alert>
     );
   }
@@ -671,7 +673,7 @@ export function QuestionEditor({
     >
       {/* ---------------------------------------------------------- classification */}
       <div className="grid gap-4 sm:grid-cols-4">
-        <Field label="Subject" required>
+        <Field label={t("subject")} required>
           <Select
             value={subjectId}
             onChange={(e) => setChosenSubjectId(e.target.value)}
@@ -685,7 +687,7 @@ export function QuestionEditor({
             ))}
           </Select>
         </Field>
-        <Field label="Question type" required>
+        <Field label={t("question_type")} required>
           <Select
             value={type}
             onChange={(e) => changeType(e.target.value as QuestionType)}
@@ -693,20 +695,20 @@ export function QuestionEditor({
           >
             {(Object.keys(QUESTION_TYPE_LABEL) as QuestionType[]).map((value) => (
               <option key={value} value={value}>
-                {QUESTION_TYPE_LABEL[value]}
+                {t(`type_${value}`)}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Difficulty">
+        <Field label={t("difficulty")}>
           <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
-            <option value="easy">{t("difficulty_easy")}</option>
-            <option value="medium">{t("difficulty_medium")}</option>
-            <option value="hard">{t("difficulty_hard")}</option>
+            <option value="easy">{tq("difficulty_easy")}</option>
+            <option value="medium">{tq("difficulty_medium")}</option>
+            <option value="hard">{tq("difficulty_hard")}</option>
           </Select>
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Marks" required={!isContainer}>
+          <Field label={t("marks")} required={!isContainer}>
             <Input
               type="number"
               min="0"
@@ -716,7 +718,7 @@ export function QuestionEditor({
               disabled={isContainer}
             />
           </Field>
-          <Field label="Negative">
+          <Field label={t("negative")}>
             <Input
               type="number"
               min="0"
@@ -729,27 +731,27 @@ export function QuestionEditor({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Category" hint="The bank shelf. Corporate sections select on this.">
+        <Field label={t("category")} hint={t("editor_category_hint")}>
           <Select
             value={category}
             onChange={(e) => setCategory(e.target.value as QuestionCategory)}
           >
             {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
               <option key={value} value={value}>
-                {CATEGORY_LABEL[value]}
+                {t(`category_${value}`)}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Topic" hint="e.g. Neural Networks, Percentages, Blood Relations.">
+        <Field label={t("topic")} hint={t("editor_topic_hint")}>
           <Input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder={t("placeholder_free_text")}
+            placeholder={tq("placeholder_free_text")}
             maxLength={120}
           />
         </Field>
-        <Field label="Tags" hint="Used for searching the bank and for blueprint rules.">
+        <Field label={t("tags")} hint={t("editor_tags_hint")}>
           <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-surface p-1.5">
             {tagList.map((tag) => (
               <span
@@ -760,7 +762,7 @@ export function QuestionEditor({
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
-                  aria-label={`Remove tag ${tag}`}
+                  aria-label={t("editor_remove_tag", { tag })}
                   className="text-purple-700/70 hover:text-purple-700"
                 >
                   ×
@@ -780,7 +782,7 @@ export function QuestionEditor({
                 }
               }}
               onBlur={() => addTag(tagInput)}
-              placeholder={tagList.length ? "" : t("placeholder_tags")}
+              placeholder={tagList.length ? "" : tq("placeholder_tags")}
               className="min-w-[100px] flex-1 border-0 bg-transparent px-1 py-0.5 text-[13px] outline-none"
             />
             <datalist id="question-tag-suggestions">
@@ -794,9 +796,9 @@ export function QuestionEditor({
 
       {/* ---------------------------------------------------------------- the ask */}
       <Field
-        label={isContainer ? "Passage introduction" : "Question"}
+        label={isContainer ? t("editor_passage_intro") : t("question")}
         required={!image}
-        hint={image ? "Optional when the figure carries the question." : undefined}
+        hint={image ? t("editor_body_optional_hint") : undefined}
       >
         <Textarea
           value={body}
@@ -804,27 +806,27 @@ export function QuestionEditor({
           rows={isContainer ? 4 : 3}
           placeholder={
             isContainer
-              ? "A heading for the passage. The passage text itself goes below."
-              : "Write the question exactly as the candidate should read it."
+              ? t("editor_passage_intro_placeholder")
+              : t("editor_body_placeholder")
           }
         />
       </Field>
 
       {checkingDuplicate && (
-        <p className="text-[12px] text-ink-muted">Checking the bank for a similar question…</p>
+        <p className="text-[12px] text-ink-muted">{t("editor_checking_duplicate")}</p>
       )}
       {duplicateMatches.length > 0 && (
         <Alert tone="amber">
-          This looks like a question already in the bank:{" "}
-          <span className="font-medium">
-            &ldquo;{duplicateMatches[0].body.slice(0, 120)}
-            {duplicateMatches[0].body.length > 120 ? "…" : ""}&rdquo;
-          </span>
-          . Saving is still fine if this one is meant to be different.
+          {t.rich("editor_duplicate_warning", {
+            text:
+              duplicateMatches[0].body.slice(0, 120) +
+              (duplicateMatches[0].body.length > 120 ? "…" : ""),
+            q: (chunks) => <span className="font-medium">{chunks}</span>,
+          })}
         </Alert>
       )}
 
-      <Field label="Figure" hint="Optional. Shown above the question during the exam.">
+      <Field label={t("editor_figure")} hint={t("editor_figure_hint")}>
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="file"
@@ -840,11 +842,11 @@ export function QuestionEditor({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={image.thumbnail_url}
-                alt="Uploaded figure preview"
+                alt={t("editor_figure_alt")}
                 className="h-14 w-auto rounded-lg border border-line object-contain"
               />
               <Button type="button" variant="ghost" size="sm" onClick={() => setImage(null)}>
-                Remove
+                {t("btn_remove")}
               </Button>
             </span>
           )}
@@ -871,16 +873,16 @@ export function QuestionEditor({
       {/* ------------------------------------------------------ per-type answer key */}
       {type === "numerical" && (
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Expected answer" required>
+          <Field label={t("editor_expected_answer")} required>
             <Input
               type="number"
               step="any"
               value={numericAnswer}
               onChange={(e) => setNumericAnswer(e.target.value)}
-              placeholder={t("placeholder_numeric")}
+              placeholder={tq("placeholder_numeric")}
             />
           </Field>
-          <Field label="Tolerance" hint="Plus or minus. An answer this far out still scores.">
+          <Field label={t("editor_tolerance")} hint={t("editor_tolerance_hint")}>
             <Input
               type="number"
               step="any"
@@ -889,33 +891,33 @@ export function QuestionEditor({
               onChange={(e) => setTolerance(e.target.value)}
             />
           </Field>
-          <Field label="Unit" hint="Shown to the candidate, never marked.">
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={t("placeholder_unit")} />
+          <Field label={t("editor_unit")} hint={t("editor_unit_hint")}>
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={tq("placeholder_unit")} />
           </Field>
         </div>
       )}
 
       {type === "fill_blank" && (
         <div className="space-y-3">
-          <Field label="Accepted answers" required hint="One per line. Any of them scores full marks.">
+          <Field label={t("accepted_answers")} required hint={t("editor_accepted_hint")}>
             <Textarea
               value={acceptedAnswers}
               onChange={(e) => setAcceptedAnswers(e.target.value)}
               rows={3}
-              placeholder={"water\nH2O"}
+              placeholder={t("editor_accepted_placeholder")}
             />
           </Field>
           <Checkbox
             checked={caseSensitive}
             onChange={setCaseSensitive}
-            label="Match capitalisation exactly"
+            label={t("editor_case_sensitive")}
           />
         </div>
       )}
 
       {type === "coding" && (
         <div className="space-y-4 rounded-[12px] border border-line bg-sunken/40 p-4">
-          <Field label="Languages" required hint="What the candidate may answer in.">
+          <Field label={t("languages")} required hint={t("editor_languages_hint")}>
             <div className="flex flex-wrap gap-4">
               {CODING_LANGUAGES.map((language) => (
                 <Checkbox
@@ -928,35 +930,35 @@ export function QuestionEditor({
             </div>
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Input format" required>
+            <Field label={t("editor_input_format")} required>
               <Textarea
                 value={inputFormat}
                 onChange={(e) => setInputFormat(e.target.value)}
                 rows={2}
-                placeholder={t("placeholder_input_format")}
+                placeholder={tq("placeholder_input_format")}
               />
             </Field>
-            <Field label="Output format" required>
+            <Field label={t("editor_output_format")} required>
               <Textarea
                 value={outputFormat}
                 onChange={(e) => setOutputFormat(e.target.value)}
                 rows={2}
-                placeholder={t("placeholder_output_format")}
+                placeholder={tq("placeholder_output_format")}
               />
             </Field>
           </div>
-          <Field label="Constraints" required>
+          <Field label={t("constraints")} required>
             <Input
               value={constraints}
               onChange={(e) => setConstraints(e.target.value)}
-              placeholder={t("placeholder_constraints")}
+              placeholder={tq("placeholder_constraints")}
             />
           </Field>
           <div>
             <p className="mb-2 text-[13px] font-medium text-ink-soft">
-              Test cases{" "}
+              {t("editor_test_cases")}{" "}
               <span className="font-normal text-ink-muted">
-                — the first pair is shown to the candidate as the worked example
+                {t("editor_test_cases_hint")}
               </span>
             </p>
             <div className="space-y-2">
@@ -970,7 +972,7 @@ export function QuestionEditor({
                         c.map((s, i) => (i === index ? { ...s, input: e.target.value } : s)),
                       )
                     }
-                    placeholder={index === 0 ? t("placeholder_sample_input") : `Input ${index + 1}`}
+                    placeholder={index === 0 ? tq("placeholder_sample_input") : t("editor_input_n", { n: index + 1 })}
                   />
                   <Textarea
                     rows={2}
@@ -980,7 +982,7 @@ export function QuestionEditor({
                         c.map((s, i) => (i === index ? { ...s, output: e.target.value } : s)),
                       )
                     }
-                    placeholder={index === 0 ? t("placeholder_output") : `Output ${index + 1}`}
+                    placeholder={index === 0 ? tq("placeholder_output") : t("editor_output_n", { n: index + 1 })}
                   />
                   {sampleCases.length > 1 && (
                     <Button
@@ -989,7 +991,7 @@ export function QuestionEditor({
                       size="sm"
                       onClick={() => setSampleCases((c) => c.filter((_, i) => i !== index))}
                     >
-                      Remove
+                      {t("btn_remove")}
                     </Button>
                   )}
                 </div>
@@ -1002,34 +1004,34 @@ export function QuestionEditor({
               className="mt-2"
               onClick={() => setSampleCases((c) => [...c, { input: "", output: "" }])}
             >
-              Add test case
+              {t("editor_add_test_case")}
             </Button>
           </div>
         </div>
       )}
 
       {isContainer && (
-        <Field label="Passage text" hint="Shown above every question attached to this passage.">
+        <Field label={t("editor_passage_text")} hint={t("editor_passage_text_hint")}>
           <Textarea
             value={passageText}
             onChange={(e) => setPassageText(e.target.value)}
             rows={8}
-            placeholder={t("placeholder_passage")}
+            placeholder={tq("placeholder_passage")}
           />
         </Field>
       )}
 
       {type === "image_upload" && (
         <div className="space-y-3">
-          <Field label="Instructions to the candidate" hint="Shown beside the upload control.">
+          <Field label={t("editor_upload_instructions")} hint={t("editor_upload_instructions_hint")}>
             <Textarea
               value={uploadInstructions}
               onChange={(e) => setUploadInstructions(e.target.value)}
               rows={2}
-              placeholder={t("placeholder_upload_instructions")}
+              placeholder={tq("placeholder_upload_instructions")}
             />
           </Field>
-          <Field label="Allowed formats">
+          <Field label={t("editor_allowed_formats")}>
             <div className="flex flex-wrap gap-4">
               {IMAGE_FORMATS.map((format) => (
                 <Checkbox
@@ -1048,58 +1050,57 @@ export function QuestionEditor({
       {takesRubric && (
         <div className="space-y-4 rounded-[12px] border border-line bg-sunken/40 p-4">
           <p className="text-[12.5px] text-ink-muted">
-            Examiner-only. None of this reaches the candidate during the exam — it is what
-            the grader scores against and what you read while reviewing.
+            {t("editor_examiner_only_note")}
           </p>
           <Field
-            label={type === "image_upload" ? "Expected answer" : "Model answer"}
+            label={type === "image_upload" ? t("editor_expected_answer") : t("model_answer")}
             required={needsModelAnswer}
           >
             <Textarea
               value={modelAnswer}
               onChange={(e) => setModelAnswer(e.target.value)}
               rows={4}
-              placeholder={t("placeholder_model_answer")}
+              placeholder={tq("placeholder_model_answer")}
             />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Key points" hint="One per line. The grader reports which were hit.">
+            <Field label={t("editor_key_points")} hint={t("editor_key_points_hint")}>
               <Textarea
                 value={keyPoints}
                 onChange={(e) => setKeyPoints(e.target.value)}
                 rows={4}
-                placeholder={"Defines the term\nGives an example\nStates a limitation"}
+                placeholder={t("editor_key_points_placeholder")}
               />
             </Field>
-            <Field label="Marking scheme" hint="Free text. How marks are apportioned.">
+            <Field label={t("editor_marking_scheme")} hint={t("editor_marking_scheme_hint")}>
               <Textarea
                 value={rubricNotes}
                 onChange={(e) => setRubricNotes(e.target.value)}
                 rows={4}
-                placeholder="2 marks for the definition, 2 for a worked example, 1 for the caveat."
+                placeholder={t("editor_marking_scheme_placeholder")}
               />
             </Field>
           </div>
           {needsModelAnswer && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Minimum words" hint="Shown to the candidate; never blocks a save.">
+              <Field label={t("editor_min_words")} hint={t("editor_min_words_hint")}>
                 <Input
                   type="number"
                   min="0"
                   step="10"
                   value={minWords}
                   onChange={(e) => setMinWords(e.target.value)}
-                  placeholder={t("placeholder_min_words")}
+                  placeholder={tq("placeholder_min_words")}
                 />
               </Field>
-              <Field label="Maximum words" hint="Enforced — a longer answer is refused.">
+              <Field label={t("editor_max_words")} hint={t("editor_max_words_hint")}>
                 <Input
                   type="number"
                   min="1"
                   step="10"
                   value={maxWords}
                   onChange={(e) => setMaxWords(e.target.value)}
-                  placeholder={t("placeholder_max_words")}
+                  placeholder={tq("placeholder_max_words")}
                 />
               </Field>
             </div>
@@ -1107,12 +1108,12 @@ export function QuestionEditor({
         </div>
       )}
 
-      <Field label="Explanation" hint="Optional. Released with the result, never during the exam.">
+      <Field label={t("explanation")} hint={t("editor_explanation_hint")}>
         <Textarea
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
           rows={2}
-          placeholder={t("placeholder_explanation")}
+          placeholder={tq("placeholder_explanation")}
         />
       </Field>
 
@@ -1139,7 +1140,7 @@ export function QuestionEditor({
 
       {/* --------------------------------------------------------------- save block */}
       {problems.length > 0 && (
-        <Alert tone="amber" title={t("alert_not_ready_to_save")}>
+        <Alert tone="amber" title={tq("alert_not_ready_to_save")}>
           <ul className="list-inside list-disc space-y-0.5">
             {problems.map((problem, index) => (
               <li key={index}>{problem}</li>
@@ -1154,22 +1155,22 @@ export function QuestionEditor({
           <Checkbox
             checked={saveToBank}
             onChange={setSaveToBank}
-            label="Save to my Question Bank"
+            label={t("editor_save_to_bank")}
             hint={
               saveToBank
-                ? "Reusable in future exams."
-                : "This exam only — it will not appear in the bank."
+                ? t("editor_save_to_bank_hint_on")
+                : t("editor_save_to_bank_hint_off")
             }
           />
         ) : (
           <span className="text-[12px] text-ink-muted">
-            {editing ? "Editing an existing question." : "Saved to your Question Bank."}
+            {editing ? t("editor_editing_existing") : t("editor_saved_to_bank_note")}
           </span>
         )}
         <div className="flex gap-2">
           {onCancel && (
             <Button type="button" variant="ghost" onClick={onCancel}>
-              Cancel
+              {t("btn_cancel")}
             </Button>
           )}
           {examId && !editing && (
@@ -1180,7 +1181,7 @@ export function QuestionEditor({
               disabled={busy !== null || problems.length > 0}
               onClick={() => void save(false)}
             >
-              Save to bank only
+              {t("editor_save_bank_only")}
             </Button>
           )}
           <Button
@@ -1188,7 +1189,7 @@ export function QuestionEditor({
             loading={busy !== null}
             disabled={busy !== null || problems.length > 0}
           >
-            {editing ? "Save changes" : examId ? "Save & add to exam" : "Save question"}
+            {editing ? t("editor_save_changes") : examId ? t("editor_save_add_exam") : t("editor_save_question")}
           </Button>
         </div>
       </div>
@@ -1220,7 +1221,8 @@ function OptionsAndKey({
   onRemove: (index: number) => void;
   onAdd: () => void;
 }) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
   const letters = options.map((_, i) => String.fromCharCode(65 + i));
   const chosen = options
     .map((option, index) => (option.is_correct ? letters[index] : null))
@@ -1229,7 +1231,7 @@ function OptionsAndKey({
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 text-[13px] font-medium text-ink-soft">{t("label_options")}</p>
+        <p className="mb-2 text-[13px] font-medium text-ink-soft">{tq("label_options")}</p>
         <div className="space-y-2">
           {options.map((option, index) => (
             <div key={index} className="flex items-center gap-2">
@@ -1239,12 +1241,12 @@ function OptionsAndKey({
               <Input
                 value={option.text}
                 onChange={(e) => onChangeText(index, e.target.value)}
-                placeholder={`Option ${letters[index]}`}
+                placeholder={t("option_letter", { letter: letters[index] })}
                 disabled={type === "true_false"}
               />
               {options.length > 2 && type !== "true_false" && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(index)}>
-                  Remove
+                  {t("btn_remove")}
                 </Button>
               )}
             </div>
@@ -1252,17 +1254,17 @@ function OptionsAndKey({
         </div>
         {options.length < 6 && type !== "true_false" && (
           <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={onAdd}>
-            Add option
+            {t("editor_add_option")}
           </Button>
         )}
       </div>
 
       <div className="rounded-[12px] border border-accent-border bg-accent-soft/40 p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-semibold text-ink">{t("label_correct_answer")}</p>
-          <Badge tone="accent">examiner only</Badge>
+          <p className="text-[13px] font-semibold text-ink">{tq("label_correct_answer")}</p>
+          <Badge tone="accent">{t("editor_examiner_only")}</Badge>
           <span className="text-[12px] text-ink-muted">
-            {singleAnswer ? "Select the correct option." : "Select every correct option."}
+            {singleAnswer ? t("editor_select_correct_single") : t("editor_select_correct_multi")}
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1292,15 +1294,15 @@ function OptionsAndKey({
               </span>
               <span className="font-semibold">{letters[index]}</span>
               <span className="max-w-[16rem] truncate">
-                {option.text.trim() || "empty option"}
+                {option.text.trim() || t("editor_empty_option")}
               </span>
             </button>
           ))}
         </div>
         <p className="mt-2 text-[12px] text-ink-muted">
           {chosen.length
-            ? `Marked correct: ${chosen.join(", ")}. Stored on the server and never sent to a candidate's browser.`
-            : "Nothing marked correct yet — the question cannot be saved until you choose."}
+            ? t("editor_marked_correct", { letters: chosen.join(", ") })
+            : t("editor_nothing_marked")}
         </p>
       </div>
     </div>
@@ -1340,14 +1342,15 @@ function TranslationsPanel({
   generateError: string | null;
   generateNotice: string | null;
 }) {
+  const t = useTranslations("questionBank");
   const letters = options.map((_, i) => String.fromCharCode(65 + i));
   return (
     <div className="space-y-4 rounded-[12px] border border-line bg-sunken/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[13px] font-semibold text-ink">Available Translations</p>
+          <p className="text-[13px] font-semibold text-ink">{t("editor_translations_title")}</p>
           <p className="text-[12px] text-ink-muted">
-            English above is the master version. Check a language to add or edit its text.
+            {t("editor_translations_hint")}
           </p>
         </div>
         <Button
@@ -1357,16 +1360,16 @@ function TranslationsPanel({
           loading={generating}
           disabled={!canGenerate || generating}
           onClick={onGenerate}
-          title={canGenerate ? undefined : "Save the question first, then generate translations."}
+          title={canGenerate ? undefined : t("editor_translations_save_first")}
         >
-          Generate Translations
+          {t("editor_generate_translations")}
         </Button>
       </div>
 
       <div className="flex flex-wrap gap-3">
         <label className="flex items-center gap-1.5 text-[13px] text-ink-soft opacity-60">
           <input type="checkbox" checked disabled className="h-4 w-4 rounded border-line-strong" />
-          English
+          {LOCALE_NAMES.en}
         </label>
         {TRANSLATABLE_LOCALES.map((locale) => (
           <label key={locale} className="flex items-center gap-1.5 text-[13px] text-ink-soft">
@@ -1387,17 +1390,17 @@ function TranslationsPanel({
       {selectedLocales.map((locale) => (
         <div key={locale} className="space-y-3 rounded-[10px] border border-line bg-surface p-3">
           <p className="text-[12.5px] font-semibold text-ink">{LOCALE_NAMES[locale]}</p>
-          <Field label="Question">
+          <Field label={t("question")}>
             <Textarea
               value={qTranslations[locale]?.body ?? ""}
               onChange={(e) => onChangeQuestionField(locale, "body", e.target.value)}
               rows={2}
-              placeholder="Leave blank to fall back to English"
+              placeholder={t("editor_translation_fallback")}
             />
           </Field>
           {objective && (
             <div className="space-y-1.5">
-              <p className="text-[12px] font-medium text-ink-soft">Options</p>
+              <p className="text-[12px] font-medium text-ink-soft">{t("options")}</p>
               {options.map((option, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-line-strong bg-sunken text-[11px] font-semibold text-ink-soft">
@@ -1406,18 +1409,18 @@ function TranslationsPanel({
                   <Input
                     value={option.translations[locale] ?? ""}
                     onChange={(e) => onChangeOptionTranslation(index, locale, e.target.value)}
-                    placeholder={option.text || `Option ${letters[index]}`}
+                    placeholder={option.text || t("option_letter", { letter: letters[index] })}
                   />
                 </div>
               ))}
             </div>
           )}
-          <Field label="Explanation">
+          <Field label={t("explanation")}>
             <Textarea
               value={qTranslations[locale]?.explanation ?? ""}
               onChange={(e) => onChangeQuestionField(locale, "explanation", e.target.value)}
               rows={2}
-              placeholder="Leave blank to fall back to English"
+              placeholder={t("editor_translation_fallback")}
             />
           </Field>
         </div>
@@ -1458,15 +1461,16 @@ function Checkbox({
  * modal. Kept here so callers do not each invent their own framing.
  */
 export function QuestionEditorCard(props: QuestionEditorProps & { title?: string }) {
+  const t = useTranslations("questionBank");
   const { title, ...editorProps } = props;
   return (
     <Card>
       <div className="mb-4 flex items-center gap-2">
         <h3 className="text-[15px] font-semibold tracking-tight text-ink">
-          {title ?? (props.question ? "Edit question" : "Create question")}
+          {title ?? (props.question ? t("edit_question") : t("create_question"))}
         </h3>
         {props.question && (
-          <Badge tone="neutral">{QUESTION_TYPE_LABEL[props.question.question_type]}</Badge>
+          <Badge tone="neutral">{t(`type_${props.question.question_type}`)}</Badge>
         )}
       </div>
       <QuestionEditor {...editorProps} />
@@ -1476,8 +1480,8 @@ export function QuestionEditorCard(props: QuestionEditorProps & { title?: string
 
 /** Re-exported so callers can label a question's provenance without importing twice. */
 export function SourceBadge({ source }: { source: QuestionSource }) {
-  const t = useTranslations("question");
-  if (source === "ai_generated") return <Badge tone="purple">{t("badge_ai_generated")}</Badge>;
-  if (source === "imported") return <Badge tone="amber">{t("badge_imported")}</Badge>;
+  const tq = useTranslations("question");
+  if (source === "ai_generated") return <Badge tone="purple">{tq("badge_ai_generated")}</Badge>;
+  if (source === "imported") return <Badge tone="amber">{tq("badge_imported")}</Badge>;
   return null;
 }

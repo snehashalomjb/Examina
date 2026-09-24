@@ -22,6 +22,7 @@ import type { Exam, ExamAnalytics } from "@/lib/types";
 
 export default function AnalyticsPage() {
   const t = useTranslations("results");
+  const tx = useTranslations("examsOps");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const params = useParams<{ id: string }>();
   const examId = params.id;
@@ -45,25 +46,25 @@ export default function AnalyticsPage() {
           setAnalytics(analyticsData);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load analytics.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : tx("analytics_error_load"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [user, examId]);
+  }, [user, examId, tx]);
 
   if (!user) return null;
 
   return (
     <div className="space-y-6">
       <Hero
-        title={exam ? `Analytics — ${exam.title}` : "Exam Analytics"}
-        body={`${exam?.exam_type === "corporate" ? "Corporate" : "Academic"} exam performance statistics`}
+        title={exam ? tx("analytics_title_exam", { title: exam.title }) : tx("analytics_title")}
+        body={exam?.exam_type === "corporate" ? tx("analytics_body_corporate") : tx("analytics_body_academic")}
         action={
           <div className="flex gap-2">
             <Link href="/dashboard/exams">
-              <Button variant="secondary" size="sm">← Back to Exams</Button>
+              <Button variant="secondary" size="sm">{tx("back_to_exams")}</Button>
             </Link>
             {exam?.exam_type === "corporate" && (
               <Link href={`/dashboard/exams/${examId}/ranking`}>
@@ -91,27 +92,27 @@ export default function AnalyticsPage() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
-                label: "Total Sessions",
+                label: tx("analytics_total_sessions"),
                 value: analytics.total_sessions,
-                hint: `${analytics.completed_sessions} completed`,
+                hint: tx("analytics_completed_count", { count: analytics.completed_sessions }),
                 tone: "neutral" as const,
               },
               {
-                label: "Average Score",
+                label: tx("analytics_average_score"),
                 value: `${analytics.avg_percentage.toFixed(1)}%`,
-                hint: `Highest: ${analytics.highest_percentage.toFixed(1)}%`,
+                hint: tx("analytics_highest", { pct: analytics.highest_percentage.toFixed(1) }),
                 tone: analytics.avg_percentage >= 70 ? "mint" as const : analytics.avg_percentage >= 50 ? "amber" as const : "rose" as const,
               },
               {
-                label: "Pass Rate",
+                label: tx("analytics_pass_rate"),
                 value: `${analytics.pass_rate.toFixed(1)}%`,
-                hint: `Passing threshold: ${exam?.passing_percentage ?? 50}%`,
+                hint: tx("analytics_passing_threshold", { pct: exam?.passing_percentage ?? 50 }),
                 tone: analytics.pass_rate >= 70 ? "mint" as const : "amber" as const,
               },
               {
-                label: "Score Range",
+                label: tx("analytics_score_range"),
                 value: `${analytics.lowest_percentage.toFixed(1)}–${analytics.highest_percentage.toFixed(1)}%`,
-                hint: "Min to max across all sittings",
+                hint: tx("analytics_score_range_hint"),
                 tone: "accent" as const,
               },
             ].map(({ label, value, hint, tone }) => {
@@ -138,7 +139,7 @@ export default function AnalyticsPage() {
             <Card>
               <SectionTitle
                 title={t("scoreDistribution")}
-                hint={`${analytics.score_distribution.length} completed sessions`}
+                hint={tx("analytics_completed_sessions", { count: analytics.score_distribution.length })}
               />
               <ScoreHistogram scores={analytics.score_distribution} />
             </Card>
@@ -150,7 +151,7 @@ export default function AnalyticsPage() {
               <Card>
                 <SectionTitle
                   title={t("sectionWisePerformance")}
-                  hint="Average scores per section across all candidates"
+                  hint={tx("analytics_section_hint")}
                 />
                 <ul className="space-y-4">
                   {analytics.section_analytics.map((sec) => (
@@ -158,7 +159,7 @@ export default function AnalyticsPage() {
                       <div className="mb-1.5 flex items-baseline justify-between gap-2">
                         <p className="truncate text-[13.5px] font-medium text-ink">{sec.section_name}</p>
                         <span className="shrink-0 text-[12px] text-ink-muted">
-                          {sec.avg_percentage.toFixed(1)}% avg · {sec.pass_rate.toFixed(1)}% pass rate
+                          {tx("analytics_section_stats", { avg: sec.avg_percentage.toFixed(1), pass: sec.pass_rate.toFixed(1) })}
                         </span>
                       </div>
                       <ProgressBar
@@ -176,7 +177,7 @@ export default function AnalyticsPage() {
               <Card>
                 <SectionTitle
                   title={t("topicPerformance")}
-                  hint="Average scores by question topic"
+                  hint={tx("analytics_topic_hint")}
                 />
                 <ul className="space-y-3">
                   {analytics.topic_performance.slice(0, 10).map((topic) => (
@@ -194,7 +195,7 @@ export default function AnalyticsPage() {
                         />
                       </div>
                       <Badge>
-                        {topic.total_questions}q
+                        {tx("analytics_questions_short", { count: topic.total_questions })}
                       </Badge>
                     </li>
                   ))}

@@ -33,6 +33,8 @@ import type {
 
 export default function AdminDashboard() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
+  const tc = useTranslations("common");
   const { user } = useRequireAuth(["admin"]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [pending, setPending] = useState<AdminUser[]>([]);
@@ -88,13 +90,13 @@ export default function AdminDashboard() {
       });
       toast(
         status === "approved"
-          ? `${target.full_name} now has access`
-          : `${target.full_name}'s request was declined`,
+          ? ta("toast_access_granted", { name: target.full_name })
+          : ta("toast_request_declined", { name: target.full_name }),
         status === "approved" ? "green" : "amber",
       );
       void load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not update access", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_update_access"), "rose");
     }
   }
 
@@ -135,7 +137,7 @@ export default function AdminDashboard() {
           <div>
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-rose/20 bg-rose-soft px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-rose animate-pulse" />
-              <span className="text-[11px] font-bold tracking-wide uppercase text-rose-ink">Admin Control Centre</span>
+              <span className="text-[11px] font-bold tracking-wide uppercase text-rose-ink">{ta("admin_control_centre_badge")}</span>
             </div>
             <h1 className="text-[22px] font-extrabold tracking-tight text-ink sm:text-[26px]">
               {t("admin_control_center")}
@@ -147,19 +149,19 @@ export default function AdminDashboard() {
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <StatusDot
                   tone={health.database.status === "operational" ? "green" : "rose"}
-                  label="Database"
+                  label={ta("database")}
                 />
                 <StatusDot
                   tone={health.storage.status === "operational" ? "green" : health.storage.status === "unavailable" ? "rose" : "amber"}
-                  label="Storage"
+                  label={ta("storage")}
                 />
                 <StatusDot
                   tone={liveExams.length > 0 ? "green" : "neutral"}
-                  label={`${liveExams.length} live exam${liveExams.length !== 1 ? "s" : ""}`}
+                  label={ta("live_exams_count", { count: liveExams.length })}
                 />
                 <StatusDot
                   tone={pendingTotal > 0 ? "amber" : "green"}
-                  label={pendingTotal > 0 ? `${pendingTotal} pending` : "All approved"}
+                  label={pendingTotal > 0 ? ta("pending_count", { count: pendingTotal }) : ta("all_approved")}
                 />
               </div>
             )}
@@ -199,14 +201,14 @@ export default function AdminDashboard() {
           { label: t("total_candidates"),             value: stats.candidates,         tone: "accent" },
           { label: t("total_examiners"),              value: stats.examiners,          tone: "green" },
           { label: t("active_exams"),                 value: stats.live_exams,         tone: stats.live_exams > 0 ? "mint" : "neutral",
-            trend: stats.live_exams > 0 ? { value: "Live now", up: true } : undefined },
+            trend: stats.live_exams > 0 ? { value: ta("trend_live_now"), up: true } : undefined },
           { label: t("completed_exams"),              value: stats.completed_exams,    tone: "neutral" },
           { label: t("active_proctoring_sessions"),   value: stats.live_sessions,      tone: "purple" },
           { label: t("flagged_sessions"),             value: stats.flagged_sessions,   tone: stats.flagged_sessions > 0 ? "rose" : "neutral",
-            trend: stats.flagged_sessions > 0 ? { value: "Needs review", up: false } : undefined },
+            trend: stats.flagged_sessions > 0 ? { value: ta("trend_needs_review"), up: false } : undefined },
           { label: t("question_bank"),                value: stats.questions,          tone: "neutral" },
           { label: t("pending_requests"),             value: pendingTotal,             tone: pendingTotal > 0 ? "amber" : "neutral",
-            trend: pendingTotal > 0 ? { value: "Action needed", up: false } : undefined },
+            trend: pendingTotal > 0 ? { value: ta("trend_action_needed"), up: false } : undefined },
         ]} />
       )}
 
@@ -246,18 +248,18 @@ export default function AdminDashboard() {
                         <p className="truncate text-[13px] font-semibold text-ink">{row.exam_title}</p>
                       </div>
                       <p className="mt-0.5 truncate text-[11.5px] text-ink-muted pl-4">
-                        by {row.examiner_name}
+                        {ta("by_name", { name: row.examiner_name })}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3 text-[11.5px] text-ink-muted">
                       <span className="text-center">
                         <span className="block font-bold text-ink">{row.active_count}/{row.candidate_count}</span>
-                        <span>active</span>
+                        <span>{ta("label_active")}</span>
                       </span>
                       {row.flagged_count > 0 && (
                         <span className="text-center">
                           <span className="block font-bold text-rose">{row.flagged_count}</span>
-                          <span className="text-rose">flagged</span>
+                          <span className="text-rose">{ta("label_flagged")}</span>
                         </span>
                       )}
                       <span className="font-mono text-[12px]">{row.time_remaining_str}</span>
@@ -381,7 +383,7 @@ export default function AdminDashboard() {
                         {person.email} · {formatDate(person.created_at, false)}
                       </p>
                     </div>
-                    <Badge tone="amber" size="xs">{person.role}</Badge>
+                    <Badge tone="amber" size="xs">{tc(`role_${person.role}`)}</Badge>
                     <div className="flex shrink-0 gap-2">
                       <Button size="sm" variant="success" onClick={() => decide(person, "approved")}>
                         {t("approve")}
@@ -437,7 +439,7 @@ export default function AdminDashboard() {
                 { href: "/dashboard/questions",          label: t("question_bank"),     icon: "🗂️", color: "#0ea5e9" },
                 { href: "/dashboard/live",               label: t("live_proctoring"),   icon: "🔴", color: "#dc2626" },
                 { href: "/dashboard/admin/reports",      label: t("view_reports"),      icon: "📊", color: "#7c3aed" },
-                { href: "/dashboard/admin/system-health",label: "System Health",        icon: "🛡️", color: "#16a34a" },
+                { href: "/dashboard/admin/system-health",label: ta("nav_system_health"), icon: "🛡️", color: "#16a34a" },
               ].map((action) => (
                 <Link key={action.href} href={action.href}>
                   <button className="group w-full rounded-[12px] border border-line bg-surface p-3.5 text-left transition-all duration-200 hover:border-accent/25 hover:bg-accent-soft/20 hover:-translate-y-[1px] hover:shadow-sm">
@@ -455,20 +457,20 @@ export default function AdminDashboard() {
           {/* System Health Detail */}
           {health && (
             <Card>
-              <h2 className="mb-3 text-[14px] font-bold uppercase tracking-widest text-ink-muted">System Health</h2>
+              <h2 className="mb-3 text-[14px] font-bold uppercase tracking-widest text-ink-muted">{ta("nav_system_health")}</h2>
               <div className="space-y-2.5">
                 {[
-                  { label: "Database", status: health.database.status, detail: health.database.detail ?? undefined },
-                  { label: "Storage",  status: health.storage.status,  detail: health.storage.detail ?? undefined },
-                  { label: "API",      status: health.api.status,      detail: health.api.detail ?? undefined },
+                  { key: "database", label: ta("database"), status: health.database.status, detail: health.database.detail ?? undefined },
+                  { key: "storage", label: ta("storage"), status: health.storage.status,  detail: health.storage.detail ?? undefined },
+                  { key: "api", label: ta("api"), status: health.api.status,      detail: health.api.detail ?? undefined },
                 ].map((svc) => (
-                  <div key={svc.label} className="flex items-center justify-between rounded-[9px] bg-sunken px-3 py-2">
+                  <div key={svc.key} className="flex items-center justify-between rounded-[9px] bg-sunken px-3 py-2">
                     <StatusDot
                       tone={svc.status === "operational" ? "green" : svc.status === "degraded" ? "amber" : "rose"}
                       label={svc.label}
                     />
                     <span className="text-[11px] text-ink-muted font-medium">
-                      {svc.detail ?? (svc.status === "operational" ? "OK" : svc.status)}
+                      {svc.detail ?? (svc.status === "operational" ? ta("health_ok") : ta.has(`health_${svc.status}`) ? ta(`health_${svc.status}`) : svc.status)}
                     </span>
                   </div>
                 ))}

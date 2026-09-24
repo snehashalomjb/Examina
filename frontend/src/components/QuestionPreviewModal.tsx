@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { Badge, Modal, cx } from "@/components/ui";
 import type {
   CodingSpec,
@@ -9,7 +11,7 @@ import type {
   PassageSpec,
   Question,
 } from "@/lib/types";
-import { CATEGORY_LABEL, OPTION_BEARING_TYPES, QUESTION_TYPE_LABEL } from "@/lib/types";
+import { OPTION_BEARING_TYPES } from "@/lib/types";
 
 const DIFFICULTY_TONE: Record<Difficulty, "mint" | "amber" | "rose"> = {
   easy: "mint",
@@ -32,6 +34,7 @@ export function QuestionPreviewModal({
   question: Question | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("questionBank");
   if (!question) return null;
 
   const spec = question.spec;
@@ -41,22 +44,22 @@ export function QuestionPreviewModal({
   const passage = question.question_type === "passage" ? (spec as PassageSpec | null) : null;
 
   return (
-    <Modal open onClose={onClose} title="Question preview" size="lg">
+    <Modal open onClose={onClose} title={t("preview_title")} size="lg">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge tone="accent" size="xs">
-            {QUESTION_TYPE_LABEL[question.question_type]}
+            {t(`type_${question.question_type}`)}
           </Badge>
           <Badge tone={DIFFICULTY_TONE[question.difficulty]} size="xs">
-            {question.difficulty}
+            {t(`difficulty_${question.difficulty}`)}
           </Badge>
-          <Badge tone="neutral" size="xs">{CATEGORY_LABEL[question.category]}</Badge>
-          <Badge tone="neutral" size="xs">{question.marks} marks</Badge>
+          <Badge tone="neutral" size="xs">{t(`category_${question.category}`)}</Badge>
+          <Badge tone="neutral" size="xs">{t("marks_count", { count: question.marks })}</Badge>
           {question.negative_marks > 0 && (
             <Badge tone="rose" size="xs">−{question.negative_marks}</Badge>
           )}
-          {question.status === "archived" && <Badge tone="neutral" size="xs">archived</Badge>}
-          {question.status === "draft" && <Badge tone="amber" size="xs">draft</Badge>}
+          {question.status === "archived" && <Badge tone="neutral" size="xs">{t("badge_archived")}</Badge>}
+          {question.status === "draft" && <Badge tone="amber" size="xs">{t("badge_draft")}</Badge>}
           {question.topic && <Badge tone="neutral" size="xs">{question.topic}</Badge>}
         </div>
 
@@ -74,13 +77,13 @@ export function QuestionPreviewModal({
         {passage?.passage_text && (
           <div className="rounded-[10px] border border-line bg-sunken/60 p-3">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
-              Passage
+              {t("type_passage")}
             </p>
             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-soft">
               {passage.passage_text}
             </p>
             {passage.source && (
-              <p className="mt-1.5 text-[11.5px] text-ink-muted">Source: {passage.source}</p>
+              <p className="mt-1.5 text-[11.5px] text-ink-muted">{t("preview_source", { source: passage.source })}</p>
             )}
           </div>
         )}
@@ -100,7 +103,7 @@ export function QuestionPreviewModal({
                 <span className="font-semibold">{String.fromCharCode(65 + index)}</span>
                 <span className="flex-1">{option.text}</span>
                 {option.is_correct && (
-                  <span className="text-[11px] font-bold uppercase tracking-wide">correct</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">{t("preview_correct")}</span>
                 )}
               </li>
             ))}
@@ -108,7 +111,7 @@ export function QuestionPreviewModal({
         )}
 
         {numerical && (
-          <PreviewBlock label="Answer key">
+          <PreviewBlock label={t("preview_answer_key")}>
             <p className="text-[13px] text-ink">
               {numerical.answer}
               {numerical.unit ? ` ${numerical.unit}` : ""}
@@ -118,7 +121,7 @@ export function QuestionPreviewModal({
         )}
 
         {fillBlank && (
-          <PreviewBlock label="Accepted answers">
+          <PreviewBlock label={t("accepted_answers")}>
             <div className="flex flex-wrap gap-1.5">
               {fillBlank.accepted_answers.map((answer) => (
                 <Badge key={answer} tone="green" size="xs">{answer}</Badge>
@@ -128,18 +131,18 @@ export function QuestionPreviewModal({
         )}
 
         {coding && (
-          <PreviewBlock label="Coding brief">
+          <PreviewBlock label={t("preview_coding_brief")}>
             <dl className="space-y-1.5 text-[12.5px] text-ink-soft">
-              <SpecLine term="Languages" detail={coding.languages.join(", ")} />
-              <SpecLine term="Input" detail={coding.input_format} />
-              <SpecLine term="Output" detail={coding.output_format} />
-              <SpecLine term="Constraints" detail={coding.constraints} />
+              <SpecLine term={t("languages")} detail={coding.languages.join(", ")} />
+              <SpecLine term={t("preview_input")} detail={coding.input_format} />
+              <SpecLine term={t("preview_output")} detail={coding.output_format} />
+              <SpecLine term={t("constraints")} detail={coding.constraints} />
             </dl>
             <ul className="mt-2 space-y-1.5">
               {coding.sample_cases.map((sample, index) => (
                 <li key={index} className="rounded-[8px] bg-sunken/60 p-2 font-mono text-[12px]">
-                  <p className="text-ink-soft">in: {sample.input}</p>
-                  <p className="text-ink">out: {sample.output}</p>
+                  <p className="text-ink-soft">{t("preview_sample_in")} {sample.input}</p>
+                  <p className="text-ink">{t("preview_sample_out")} {sample.output}</p>
                 </li>
               ))}
             </ul>
@@ -147,7 +150,7 @@ export function QuestionPreviewModal({
         )}
 
         {question.model_answer && (
-          <PreviewBlock label="Model answer">
+          <PreviewBlock label={t("model_answer")}>
             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-soft">
               {question.model_answer}
             </p>
@@ -155,7 +158,7 @@ export function QuestionPreviewModal({
         )}
 
         {question.explanation && (
-          <PreviewBlock label="Explanation">
+          <PreviewBlock label={t("explanation")}>
             <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-soft">
               {question.explanation}
             </p>
@@ -172,7 +175,10 @@ export function QuestionPreviewModal({
 
         {(question.min_words || question.max_words) && (
           <p className="text-[12px] text-ink-muted">
-            Word bounds: {question.min_words ?? "—"} to {question.max_words ?? "—"}
+            {t("preview_word_bounds", {
+              min: question.min_words ?? "—",
+              max: question.max_words ?? "—",
+            })}
           </p>
         )}
       </div>

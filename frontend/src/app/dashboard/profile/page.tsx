@@ -23,15 +23,12 @@ import { ApiError, api } from "@/lib/api";
 import { useAuth, useRequireAuth } from "@/lib/auth";
 import type { LoginAccess } from "@/lib/types";
 
-const ROLE_LABEL = {
-  admin: "Admin",
-  examiner: "Examiner",
-  candidate: "Candidate",
-} as const;
-
 /** The signed-in user's own record, read from the authenticated session. */
 export default function ProfilePage() {
   const t = useTranslations("profile");
+  const ta = useTranslations("adminShell");
+  const loginStatusLabel = (status: string) =>
+    ta.has(`status_${status}`) ? ta(`status_${status}`) : status;
   const { user } = useRequireAuth();
   const { loginAccess, refreshUser } = useAuth();
   const [access, setAccess] = useState<LoginAccess | null>(null);
@@ -82,7 +79,7 @@ export default function ProfilePage() {
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
     if (!firstName.trim()) {
-      setSaveError("Enter your first name.");
+      setSaveError(ta("error_enter_first_name"));
       return;
     }
 
@@ -95,10 +92,10 @@ export default function ProfilePage() {
       });
       // Re-read the session so the header, sidebar and avatar follow the new name.
       await refreshUser();
-      toast("Profile updated", "mint");
+      toast(ta("toast_profile_updated"), "mint");
       setEditing(false);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Could not save your profile.");
+      setSaveError(err instanceof ApiError ? err.message : ta("error_save_profile"));
     } finally {
       setSaving(false);
     }
@@ -107,11 +104,11 @@ export default function ProfilePage() {
   async function changePassword(event: React.FormEvent) {
     event.preventDefault();
     if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      setPasswordError("New password must be at least 8 characters with a letter and a digit.");
+      setPasswordError(ta("error_password_rule"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError("New password and confirm password don't match.");
+      setPasswordError(ta("error_password_mismatch"));
       return;
     }
 
@@ -121,12 +118,12 @@ export default function ProfilePage() {
       await api.post("/auth/change-password", {
         new_password: newPassword,
       });
-      toast("Password updated", "mint");
+      toast(ta("password_updated"), "mint");
 
       setNewPassword("");
       setConfirmPassword("");
     } catch (err) {
-      setPasswordError(err instanceof ApiError ? err.message : "Could not change your password.");
+      setPasswordError(err instanceof ApiError ? err.message : ta("error_change_your_password"));
     } finally {
       setChangingPassword(false);
     }
@@ -143,9 +140,9 @@ export default function ProfilePage() {
       form.append("file", file);
       await api.upload("/auth/avatar", form);
       await refreshUser();
-      toast("Profile picture updated", "mint");
+      toast(ta("toast_avatar_updated"), "mint");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not upload that picture.", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_avatar_upload"), "rose");
     } finally {
       setUploadingAvatar(false);
     }
@@ -162,7 +159,7 @@ export default function ProfilePage() {
           <label className="group relative cursor-pointer">
             <Avatar name={user.full_name} src={user.avatar_url} size={56} />
             <span className="absolute inset-0 flex items-center justify-center rounded-[10px] bg-ink/50 text-[9px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
-              {uploadingAvatar ? "…" : "Change"}
+              {uploadingAvatar ? "…" : ta("avatar_change")}
             </span>
             <input
               type="file"
@@ -179,7 +176,7 @@ export default function ProfilePage() {
             <p className="text-[13px] text-ink-muted">{user.email}</p>
           </div>
           <div className="ml-auto flex flex-wrap gap-2">
-            <Badge tone="accent">{ROLE_LABEL[user.role]}</Badge>
+            <Badge tone="accent">{ta(`role_${user.role}`)}</Badge>
             {user.role === "candidate" && loginAccess && (
               <Badge
                 tone={
@@ -190,7 +187,7 @@ export default function ProfilePage() {
                       : "rose"
                 }
               >
-                login {loginAccess}
+                {ta("login_status_badge", { status: loginStatusLabel(loginAccess) })}
               </Badge>
             )}
           </div>
@@ -201,11 +198,11 @@ export default function ProfilePage() {
         <Card>
           <SectionTitle
             title={t("details_card")}
-            hint={editing ? "Change your name." : "From your user record."}
+            hint={editing ? ta("details_hint_editing") : ta("details_hint")}
             action={
               editing ? undefined : (
                 <Button variant="secondary" onClick={startEdit}>
-                  Edit profile
+                  {ta("edit_profile")}
                 </Button>
               )
             }
@@ -214,7 +211,7 @@ export default function ProfilePage() {
           {editing ? (
             <form onSubmit={saveProfile} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="First name">
+                <Field label={ta("first_name")}>
                   <Input
                     value={firstName}
                     onChange={(e) => {
@@ -226,7 +223,7 @@ export default function ProfilePage() {
                     required
                   />
                 </Field>
-                <Field label="Last name">
+                <Field label={ta("last_name")}>
                   <Input
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
@@ -237,15 +234,14 @@ export default function ProfilePage() {
               </div>
 
               <p className="text-[12px] leading-relaxed text-ink-muted">
-                Your email is your sign-in identity and your role is an administrator&apos;s
-                decision, so neither is edited here.
+                {ta("identity_note")}
               </p>
 
               {saveError && <Alert tone="rose">{saveError}</Alert>}
 
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>
-                  Save changes
+                  {ta("save_changes")}
                 </Button>
                 <Button
                   type="button"
@@ -255,7 +251,7 @@ export default function ProfilePage() {
                     setSaveError(null);
                   }}
                 >
-                  Cancel
+                  {ta("cancel")}
                 </Button>
               </div>
             </form>
@@ -263,18 +259,18 @@ export default function ProfilePage() {
             <dl className="divide-y divide-line">
               <Row
                 icon={<IconProfile size={15} />}
-                label="First name"
+                label={ta("first_name")}
                 value={user.first_name || "—"}
               />
               <Row
                 icon={<IconProfile size={15} />}
-                label="Last name"
+                label={ta("last_name")}
                 value={user.last_name || "—"}
               />
-              <Row label="Email" value={user.email} />
-              <Row label="Role" value={ROLE_LABEL[user.role]} />
-              <Row label="Registered" value={formatDate(user.created_at)} />
-              <Row label="Last sign-in" value={formatDate(user.last_login_at)} />
+              <Row label={ta("email")} value={user.email} />
+              <Row label={ta("role")} value={ta(`role_${user.role}`)} />
+              <Row label={ta("registered")} value={formatDate(user.created_at)} />
+              <Row label={ta("last_sign_in")} value={formatDate(user.last_login_at)} />
             </dl>
           )}
         </Card>
@@ -284,24 +280,24 @@ export default function ProfilePage() {
             title={t("access_card")}
             hint={
               user.role === "candidate"
-                ? "Your account and your permission to use the platform are separate."
-                : "What your role is allowed to reach."
+                ? ta("access_hint_candidate")
+                : ta("access_hint_other")
             }
           />
           <dl className="divide-y divide-line">
             <Row
               icon={<IconShield size={15} />}
-              label="Account"
+              label={ta("account")}
               value={
                 <Badge tone={user.is_active ? "mint" : "rose"}>
-                  {user.is_active ? "active" : "deactivated"}
+                  {user.is_active ? ta("account_active") : ta("account_deactivated")}
                 </Badge>
               }
             />
             {user.role === "candidate" ? (
               <>
                 <Row
-                  label="Login access"
+                  label={ta("login_access")}
                   value={
                     <Badge
                       tone={
@@ -312,19 +308,19 @@ export default function ProfilePage() {
                             : "rose"
                       }
                     >
-                      {loginAccess ?? "unknown"}
+                      {loginAccess ? loginStatusLabel(loginAccess) : ta("unknown")}
                     </Badge>
                   }
                 />
-                {access && <Row label="Requested" value={formatDate(access.requested_at)} />}
+                {access && <Row label={ta("requested")} value={formatDate(access.requested_at)} />}
                 {access?.reviewed_at && (
-                  <Row label="Decided" value={formatDate(access.reviewed_at)} />
+                  <Row label={ta("decided")} value={formatDate(access.reviewed_at)} />
                 )}
-                {access?.review_note && <Row label="Reviewer note" value={access.review_note} />}
+                {access?.review_note && <Row label={ta("reviewer_note")} value={access.review_note} />}
               </>
             ) : (
               <Row
-                label="Account approval"
+                label={ta("account_approval")}
                 value={
                   <Badge
                     tone={
@@ -335,7 +331,7 @@ export default function ProfilePage() {
                           : "rose"
                     }
                   >
-                    {user.access_status}
+                    {ta(`status_${user.access_status}`)}
                   </Badge>
                 }
               />
@@ -344,9 +340,7 @@ export default function ProfilePage() {
 
           {user.role === "candidate" && (
             <p className="mt-4 text-[12px] leading-relaxed text-ink-muted">
-              Your account was created active when you registered. Permission to use the
-              platform is granted separately by an administrator or an examiner who runs a
-              paper you are enrolled in.
+              {ta("candidate_access_note")}
             </p>
           )}
 
@@ -355,7 +349,7 @@ export default function ProfilePage() {
               href="/dashboard/settings"
               className="text-[12px] font-medium text-ink-muted hover:text-ink"
             >
-              Account settings →
+              {ta("account_settings_link")}
             </Link>
           </div>
         </Card>
@@ -365,7 +359,7 @@ export default function ProfilePage() {
         <SectionTitle title={t("change_password_title")} hint={t("change_password_hint")} />
         <form onSubmit={changePassword} className="max-w-md space-y-4">
 
-          <Field label="New password">
+          <Field label={ta("new_password")}>
             <Input
               type="password"
               value={newPassword}
@@ -377,7 +371,7 @@ export default function ProfilePage() {
               required
             />
           </Field>
-          <Field label="Confirm new password">
+          <Field label={ta("confirm_new_password")}>
             <Input
               type="password"
               value={confirmPassword}
@@ -393,7 +387,7 @@ export default function ProfilePage() {
           {passwordError && <Alert tone="rose">{passwordError}</Alert>}
 
           <Button type="submit" loading={changingPassword}>
-            Update password
+            {ta("update_password")}
           </Button>
         </form>
       </Card>

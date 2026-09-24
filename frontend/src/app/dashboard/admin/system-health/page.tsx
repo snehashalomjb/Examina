@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Hero } from "@/components/Hero";
 import { Alert, Badge, Button, Card, Skeleton } from "@/components/ui";
@@ -20,13 +21,14 @@ import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import type { ComponentHealth, SystemHealth } from "@/lib/types";
 
+// `label`/`hint` are "adminShell" message keys.
 const ROWS: { key: keyof SystemHealth; label: string; hint: string }[] = [
-  { key: "api", label: "API", hint: "This request answering at all is the check." },
-  { key: "database", label: "Database", hint: "A live query against Postgres." },
-  { key: "storage", label: "Storage", hint: "A live check against the object store." },
-  { key: "websocket", label: "WebSocket", hint: "Proctoring + live-monitoring sockets are registered routes." },
-  { key: "ai_proctoring", label: "AI Proctoring", hint: "Vision inference runs in the candidate's browser during a sitting." },
-  { key: "authentication", label: "Authentication", hint: "This page only loaded because a valid admin token was verified." },
+  { key: "api", label: "api", hint: "health_hint_api" },
+  { key: "database", label: "database", hint: "health_hint_database" },
+  { key: "storage", label: "storage", hint: "health_hint_storage" },
+  { key: "websocket", label: "health_websocket", hint: "health_hint_websocket" },
+  { key: "ai_proctoring", label: "health_ai_proctoring", hint: "health_hint_ai_proctoring" },
+  { key: "authentication", label: "health_authentication", hint: "health_hint_authentication" },
 ];
 
 function statusTone(status: string): "mint" | "amber" | "rose" | "neutral" {
@@ -37,6 +39,7 @@ function statusTone(status: string): "mint" | "amber" | "rose" | "neutral" {
 }
 
 export default function SystemHealthPage() {
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth(["admin"]);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,7 @@ export default function SystemHealthPage() {
       setHealth(await api.get<SystemHealth>("/admin/system-health"));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load system health.");
+      setError(err instanceof ApiError ? err.message : ta("error_load_health"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,11 +68,11 @@ export default function SystemHealthPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="System Health"
-        body="What is actually checkable from the server, and nothing invented for what isn't."
+        title={ta("health_title")}
+        body={ta("health_body")}
         action={
           <Button variant="secondary" size="sm" loading={refreshing} onClick={() => void load()}>
-            Refresh
+            {ta("refresh")}
           </Button>
         }
       />
@@ -89,14 +92,16 @@ export default function SystemHealthPage() {
               return (
                 <Card key={row.key}>
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[13.5px] font-semibold text-ink">{row.label}</p>
-                    <Badge tone={statusTone(component.status)}>{component.status}</Badge>
+                    <p className="text-[13.5px] font-semibold text-ink">{ta(row.label)}</p>
+                    <Badge tone={statusTone(component.status)}>
+                      {ta.has(`health_${component.status}`) ? ta(`health_${component.status}`) : component.status}
+                    </Badge>
                   </div>
                   <p className="mt-2 text-[12px] text-ink-muted">
-                    {component.detail ?? row.hint}
+                    {component.detail ?? ta(row.hint)}
                   </p>
                   <p className="mt-2 text-[10.5px] font-medium uppercase tracking-wide text-ink-placeholder">
-                    {component.basis === "checked" ? "Live check" : "Configuration"}
+                    {component.basis === "checked" ? ta("health_live_check") : ta("health_configuration")}
                   </p>
                 </Card>
               );

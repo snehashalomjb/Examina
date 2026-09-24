@@ -13,19 +13,10 @@ import type { AccessStatus, UserRole } from "@/lib/types";
  * neither can be let in by a peer. Showing an explanation beats a dashboard full of 403s.
  */
 
+/** "adminShell" message keys for what each role can do once approved. */
 const CAPABILITIES: Record<Exclude<UserRole, "admin">, string[]> = {
-  examiner: [
-    "Author MCQ, multi-select, short, long and handwritten-upload questions",
-    "Configure exams: duration, window, randomization and negative marking",
-    "Review provisional scores on written answers and override them",
-    "Watch live proctoring and inspect flagged sessions with snapshots",
-  ],
-  candidate: [
-    "See the exams published for you and the window each one opens in",
-    "Sit a randomized paper generated for you alone, with autosave throughout",
-    "Upload photographed handwritten answers where a question asks for them",
-    "Read your result with question-level feedback once it is published",
-  ],
+  examiner: ["cap_examiner_1", "cap_examiner_2", "cap_examiner_3", "cap_examiner_4"],
+  candidate: ["cap_candidate_1", "cap_candidate_2", "cap_candidate_3", "cap_candidate_4"],
 };
 
 export function AwaitingApproval({
@@ -38,18 +29,14 @@ export function AwaitingApproval({
   note: string | null;
 }) {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
   const revoked = status === "revoked";
-  const noun = role === "examiner" ? "examiner" : "candidate";
 
   return (
     <div className="space-y-6">
       <Hero
-        title={revoked ? "Your access has been revoked" : "Waiting on an administrator"}
-        body={
-          revoked
-            ? `An administrator has withdrawn your access to the platform.`
-            : `Your ${noun} account exists, but an administrator has to approve it before you can use the platform.`
-        }
+        title={revoked ? ta("awaiting_revoked_title") : ta("awaiting_title")}
+        body={revoked ? ta("awaiting_revoked_body") : ta(`awaiting_body_${role}`)}
       />
 
       <Card className="max-w-2xl">
@@ -59,12 +46,10 @@ export function AwaitingApproval({
           </div>
           <div>
             <p className="text-[14px] font-semibold text-ink">
-              {revoked ? "What this means" : "What happens next"}
+              {revoked ? ta("what_this_means") : ta("what_happens_next")}
             </p>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-soft">
-              {revoked
-                ? "You can still sign in, but the platform will refuse every action. Contact your administrator if you believe this is a mistake."
-                : `An administrator sees your request on their dashboard. Approval is theirs alone to give — no other ${noun} can grant it. Once they do, sign out and back in to pick up the change immediately.`}
+              {revoked ? ta("awaiting_revoked_detail") : ta(`awaiting_next_${role}`)}
             </p>
             {note && (
               <div className="mt-4">
@@ -80,13 +65,13 @@ export function AwaitingApproval({
       <Card className="max-w-2xl">
         <SectionTitle
           title={t("awaiting_approval_heading")}
-          hint={`Once an administrator approves your ${noun} account.`}
+          hint={ta(`awaiting_hint_${role}`)}
         />
         <ul className="space-y-2.5">
           {CAPABILITIES[role].map((item) => (
             <li key={item} className="flex gap-2.5 text-[13.5px] text-ink-soft">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rotate-45 bg-line-strong" />
-              {item}
+              {ta(item)}
             </li>
           ))}
         </ul>

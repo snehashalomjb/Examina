@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { cx } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -41,6 +42,7 @@ export function SubjectCombobox({
   onChange: (subjectId: string) => void;
   onCreated: (subject: Subject) => void;
 }) {
+  const t = useTranslations("questionBank");
   const selected = subjects.find((s) => s.id === value) ?? null;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -92,7 +94,7 @@ export function SubjectCombobox({
       onCreated(created);
       pick(created);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not create that subject.");
+      setError(err instanceof ApiError ? err.message : t("combo_error_create"));
     } finally {
       setCreating(false);
     }
@@ -109,7 +111,7 @@ export function SubjectCombobox({
         )}
       >
         <span className={selected ? "text-ink" : "text-ink-muted"}>
-          {selected ? `${selected.code} — ${selected.name}` : "Search or enter subject…"}
+          {selected ? `${selected.code} — ${selected.name}` : t("combo_placeholder")}
         </span>
         <span className="text-ink-muted">▾</span>
       </button>
@@ -124,7 +126,7 @@ export function SubjectCombobox({
               if (e.key === "Enter" && canCreate) void createAndSelect();
               if (e.key === "Escape") setOpen(false);
             }}
-            placeholder="Search or type a new subject…"
+            placeholder={t("combo_search_placeholder")}
             className="w-full border-b border-line px-3 py-2 text-[13.5px] text-ink outline-none"
           />
           <ul className="max-h-56 overflow-y-auto py-1">
@@ -143,7 +145,7 @@ export function SubjectCombobox({
               </li>
             ))}
             {!filtered.length && !canCreate && (
-              <li className="px-3 py-2 text-[12.5px] text-ink-muted">No subjects match.</li>
+              <li className="px-3 py-2 text-[12.5px] text-ink-muted">{t("combo_no_match")}</li>
             )}
             {canCreate && (
               <li>
@@ -153,7 +155,7 @@ export function SubjectCombobox({
                   onClick={() => void createAndSelect()}
                   className="block w-full px-3 py-2 text-left text-[13px] font-medium text-accent transition hover:bg-accent-soft disabled:opacity-60"
                 >
-                  {creating ? "Adding…" : `+ Add "${query.trim()}"`}
+                  {creating ? t("combo_adding") : `+ ${t("combo_add", { name: query.trim() })}`}
                 </button>
               </li>
             )}

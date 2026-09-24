@@ -22,6 +22,7 @@ import type { Activity } from "@/lib/types";
 
 export default function AuditLogsPage() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth(["admin"]);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,7 @@ export default function AuditLogsPage() {
       setActivity(await api.get<Activity[]>("/admin/activity?limit=50"));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load the audit log.");
+      setError(err instanceof ApiError ? err.message : ta("error_load_audit"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -50,11 +51,11 @@ export default function AuditLogsPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Audit Logs"
-        body="Registrations, sittings and published results, newest first - the same feed the dashboard's activity panel reads from."
+        title={ta("nav_audit_logs")}
+        body={ta("audit_body")}
         action={
           <Button variant="secondary" size="sm" loading={refreshing} onClick={() => void load()}>
-            Refresh
+            {ta("refresh")}
           </Button>
         }
       />
@@ -69,7 +70,7 @@ export default function AuditLogsPage() {
             ))}
           </div>
         ) : activity.length === 0 ? (
-          <EmptyState title="Nothing recorded yet" body="Platform events will appear here as the system is used." />
+          <EmptyState title={ta("audit_empty_title")} body={ta("audit_empty_body")} />
         ) : (
           <div className="-mx-5 overflow-x-auto px-5">
             <table className="w-full min-w-[640px] border-collapse text-left">
@@ -97,7 +98,7 @@ export default function AuditLogsPage() {
                               : "neutral"
                         }
                       >
-                        {item.severity}
+                        {ta.has(`severity_${item.severity}`) ? ta(`severity_${item.severity}`) : item.severity}
                       </Badge>
                     </td>
                   </tr>

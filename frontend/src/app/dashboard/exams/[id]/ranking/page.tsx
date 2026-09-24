@@ -34,12 +34,6 @@ function canPublish(row: RankingRow): boolean {
   );
 }
 
-const SHORTLIST_LABEL: Record<ShortlistStatus, string> = {
-  shortlisted: "Shortlisted",
-  rejected: "Rejected",
-  on_hold: "On Hold",
-};
-
 const SHORTLIST_TONE: Record<ShortlistStatus, "mint" | "rose" | "amber"> = {
   shortlisted: "mint",
   rejected: "rose",
@@ -48,6 +42,7 @@ const SHORTLIST_TONE: Record<ShortlistStatus, "mint" | "rose" | "amber"> = {
 
 export default function RankingPage() {
   const t = useTranslations("results");
+  const tx = useTranslations("examsOps");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const params = useParams<{ id: string }>();
   const examId = params.id;
@@ -75,13 +70,13 @@ export default function RankingPage() {
           setRows(rankingData);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load ranking.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : tx("ranking_error_load"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [user, examId]);
+  }, [user, examId, tx]);
 
   async function setShortlist(candidateId: string, status: ShortlistStatus) {
     setSaving(candidateId);
@@ -92,11 +87,11 @@ export default function RankingPage() {
       setRows((prev) =>
         prev.map((r) => r.candidate_id === candidateId ? { ...r, shortlist_status: status } : r)
       );
-      toast(`${status === "shortlisted" ? "Shortlisted" : status === "rejected" ? "Rejected" : "Placed on hold"}`, 
+      toast(status === "shortlisted" ? tx("shortlist_shortlisted") : status === "rejected" ? tx("shortlist_rejected") : tx("ranking_placed_on_hold"),
         status === "shortlisted" ? "mint" : status === "rejected" ? "rose" : "amber"
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not update shortlist", "rose");
+      toast(err instanceof ApiError ? err.message : tx("ranking_error_shortlist"), "rose");
     } finally {
       setSaving(null);
     }
@@ -114,7 +109,7 @@ export default function RankingPage() {
         prev.map((r) => (r.session_id === row.session_id ? { ...r, published: true } : r)),
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not publish the result", "rose");
+      toast(err instanceof ApiError ? err.message : tx("ranking_error_publish"), "rose");
     } finally {
       setPublishing(null);
     }
@@ -130,7 +125,7 @@ export default function RankingPage() {
         `report_${safeName}.pdf`,
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not download the report", "rose");
+      toast(err instanceof ApiError ? err.message : tx("ranking_error_download"), "rose");
     } finally {
       setDownloading(null);
     }
@@ -152,15 +147,15 @@ export default function RankingPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title={exam ? `Results — ${exam.title}` : "Candidate Results"}
+        title={exam ? tx("ranking_title_exam", { title: exam.title }) : tx("ranking_title")}
         body={
           exam?.company_name
-            ? `${exam.company_name}${exam.job_role ? ` · ${exam.job_role}` : ""} — Corporate Assessment`
-            : "Every candidate who sat this exam: score, questions attempted, and proctoring flags."
+            ? tx("ranking_body_corporate", { company: exam.job_role ? `${exam.company_name} · ${exam.job_role}` : exam.company_name })
+            : tx("ranking_body")
         }
         action={
           <Link href="/dashboard/exams">
-            <Button variant="secondary" size="sm">← Back to Exams</Button>
+            <Button variant="secondary" size="sm">{tx("back_to_exams")}</Button>
           </Link>
         }
       />
@@ -172,25 +167,25 @@ export default function RankingPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {(isCorporate
             ? [
-                { label: "Total Appeared", value: rows.length, tone: "neutral" as const },
-                { label: "Shortlisted", value: shortlisted, tone: "mint" as const },
-                { label: "Rejected", value: rejected, tone: "rose" as const },
-                { label: "Pending Decision", value: pending, tone: "amber" as const },
+                { label: tx("ranking_total_appeared"), value: rows.length, tone: "neutral" as const },
+                { label: tx("shortlist_shortlisted"), value: shortlisted, tone: "mint" as const },
+                { label: tx("shortlist_rejected"), value: rejected, tone: "rose" as const },
+                { label: tx("ranking_pending_decision"), value: pending, tone: "amber" as const },
               ]
             : [
-                { label: "Total Appeared", value: rows.length, tone: "neutral" as const },
+                { label: tx("ranking_total_appeared"), value: rows.length, tone: "neutral" as const },
                 {
-                  label: "Passed",
+                  label: tx("ranking_passed"),
                   value: rows.filter((r) => r.overall_percentage >= 50).length,
                   tone: "mint" as const,
                 },
                 {
-                  label: "Flagged",
+                  label: tx("ranking_flagged"),
                   value: rows.filter((r) => r.is_flagged).length,
                   tone: "rose" as const,
                 },
                 {
-                  label: "Average Score",
+                  label: tx("analytics_average_score"),
                   value: rows.length
                     ? `${(rows.reduce((s, r) => s + r.overall_percentage, 0) / rows.length).toFixed(1)}%`
                     : "0%",
@@ -319,7 +314,7 @@ export default function RankingPage() {
                           {row.unanswered_count > 0 && (
                             <>
                               {" · "}
-                              <span>{row.unanswered_count} blank</span>
+                              <span>{tx("ranking_blank_count", { count: row.unanswered_count })}</span>
                             </>
                           )}
                         </p>
@@ -329,12 +324,12 @@ export default function RankingPage() {
                       </td>
                       <td className="px-5 py-3 text-right text-ink-soft">
                         {row.time_taken_seconds != null
-                          ? `${Math.floor(row.time_taken_seconds / 60)}m ${row.time_taken_seconds % 60}s`
+                          ? tx("ranking_time_taken", { m: Math.floor(row.time_taken_seconds / 60), s: row.time_taken_seconds % 60 })
                           : "—"}
                       </td>
                       <td className="px-5 py-3 text-center">
                         {row.is_flagged ? (
-                          <Badge tone="rose">Flagged {row.suspicion_score.toFixed(0)}</Badge>
+                          <Badge tone="rose">{tx("ranking_flagged_score", { score: row.suspicion_score.toFixed(0) })}</Badge>
                         ) : (
                           <Badge tone="mint">{t("clear")}</Badge>
                         )}
@@ -343,7 +338,7 @@ export default function RankingPage() {
                         <td className="px-5 py-3 text-center">
                           {row.shortlist_status ? (
                             <Badge tone={SHORTLIST_TONE[row.shortlist_status]}>
-                              {SHORTLIST_LABEL[row.shortlist_status]}
+                              {tx(`shortlist_${row.shortlist_status}`)}
                             </Badge>
                           ) : (
                             <span className="text-ink-muted">{t("pending")}</span>
@@ -359,6 +354,9 @@ export default function RankingPage() {
                               loading={saving === row.candidate_id}
                               onClick={() => setShortlist(row.candidate_id, "shortlisted")}
                               className="!text-mint hover:!bg-mint/10"
+                            
+                              title={tx("ranking_action_shortlist")}
+                              aria-label={tx("ranking_action_shortlist")}
                             >
                               ✓
                             </Button>
@@ -368,6 +366,9 @@ export default function RankingPage() {
                               loading={saving === row.candidate_id}
                               onClick={() => setShortlist(row.candidate_id, "on_hold")}
                               className="!text-amber hover:!bg-amber/10"
+                            
+                              title={tx("ranking_action_hold")}
+                              aria-label={tx("ranking_action_hold")}
                             >
                               ⏸
                             </Button>
@@ -377,6 +378,9 @@ export default function RankingPage() {
                               loading={saving === row.candidate_id}
                               onClick={() => setShortlist(row.candidate_id, "rejected")}
                               className="!text-rose hover:!bg-rose/10"
+                            
+                              title={tx("ranking_action_reject")}
+                              aria-label={tx("ranking_action_reject")}
                             >
                               ✗
                             </Button>
@@ -393,7 +397,7 @@ export default function RankingPage() {
                               disabled={!row.result_id}
                               onClick={() => downloadReport(row)}
                             >
-                              Download Report
+                              {tx("ranking_download_report")}
                             </Button>
                           ) : canPublish(row) ? (
                             <Button
@@ -402,7 +406,7 @@ export default function RankingPage() {
                               disabled={publishing !== null}
                               onClick={() => publishOne(row)}
                             >
-                              Publish Result
+                              {tx("ranking_publish_result")}
                             </Button>
                           ) : row.needs_integrity_review ? (
                             <Link href={`/dashboard/proctoring/${row.session_id}`}>
@@ -411,9 +415,9 @@ export default function RankingPage() {
                           ) : (
                             <span className="text-[12px] text-ink-muted">
                               {row.integrity_verdict === "malpractice"
-                                ? "Withheld"
+                                ? tx("ranking_withheld")
                                 : row.pending_review_count > 0
-                                  ? "Grading pending"
+                                  ? tx("ranking_grading_pending")
                                   : "—"}
                             </span>
                           )}
@@ -471,13 +475,11 @@ export default function RankingPage() {
           <p className="text-[12px] text-ink-muted">
             {isCorporate ? (
               <>
-                <strong>Actions:</strong> ✓ = Shortlist · ⏸ = On Hold · ✗ = Reject.
-                Decisions are recorded with your identity and timestamp and can be updated at any time.
-                The platform assists your decision — it does not shortlist automatically.
+                <strong>{tx("ranking_legend_actions")}</strong> {tx("ranking_legend_body")}
               </>
             ) : (
               <>
-                <strong>Proctor</strong> {t("proctorExplanation")}
+                <strong>{t("proctor")}</strong> {t("proctorExplanation")}
               </>
             )}
           </p>

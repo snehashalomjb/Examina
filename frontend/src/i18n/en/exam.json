@@ -145,5 +145,6 @@
   "button_view_result": "View result",
   "heading_ready_to_sit": "Ready to Sit",
   "heading_your_attempts": "Your Attempts",
-  "heading_scheduled": "Scheduled"
+  "heading_scheduled": "Scheduled",
+  "face_check_failed": "The camera works, but the face check could not run. Reload the page and re-run the checks; if it keeps failing, contact your examiner."
 }

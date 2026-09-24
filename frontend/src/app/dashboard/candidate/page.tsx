@@ -31,15 +31,24 @@ const STATUS_TONE: Record<SessionStatus, "accent" | "green" | "amber" | "rose"> 
   terminated: "rose",
 };
 
-const STATUS_LABEL: Record<SessionStatus, string> = {
-  in_progress: "In progress",
-  submitted: "Submitted",
-  auto_submitted: "Auto-submitted",
-  terminated: "Terminated",
-};
+/** Server `reason` strings (exam_sessions.py) are English; map the known ones to keys. */
+function translateReason(
+  reason: string | null | undefined,
+  startsAt: string | null | undefined,
+  tc: ReturnType<typeof useTranslations>,
+): string | null {
+  if (!reason) return null;
+  if (reason === "Attempt in progress") return tc("reason_attempt_in_progress");
+  if (reason === "Already attempted") return tc("reason_already_attempted");
+  if (reason === "This exam is closed") return tc("reason_exam_closed");
+  if (reason === "The exam window has closed") return tc("reason_window_closed");
+  if (reason.startsWith("Opens ")) return tc("reason_opens", { date: formatDate(startsAt) });
+  return reason;
+}
 
 export default function CandidateDashboard() {
   const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   const { user } = useRequireAuth(["candidate"]);
   const router = useRouter();
 
@@ -63,7 +72,7 @@ export default function CandidateDashboard() {
         setExams(examData);
         setStats(statsData);
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load your exams.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : tc("error_load_exams"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -84,19 +93,29 @@ export default function CandidateDashboard() {
   const history = exams.filter((e) => !e.can_start && e.session_status);
   const upcoming = exams.filter((e) => !e.can_start && !e.session_status);
 
-  /* Sparkline data from history scores */
+  /* Sparkline data: published scores, oldest -> newest, last 7. `/my/exams` arrives
+   * newest-first by exam start, so it has to be re-sorted by submission time - otherwise
+   * the line reads backwards and the highlighted end dot sits on the oldest result. */
   const scoreHistory = history
     .filter((e) => e.percentage !== null && e.percentage !== undefined)
+    .sort(
+      (a, b) =>
+        new Date(a.submitted_at ?? a.starts_at).getTime() -
+        new Date(b.submitted_at ?? b.starts_at).getTime(),
+    )
     .slice(-7)
     .map((e) => Math.round(e.percentage as number));
+  const latestScore = scoreHistory.length ? scoreHistory[scoreHistory.length - 1] : null;
+  const scoreDelta =
+    scoreHistory.length >= 2 ? latestScore! - scoreHistory[scoreHistory.length - 2] : null;
 
   /* Motivational message */
   const motivational =
     available.length > 0
-      ? `You have ${available.length} exam${available.length > 1 ? "s" : ""} open right now. Good luck! 🍀`
+      ? tc("motivational_open", { count: available.length })
       : upcoming.length > 0
-        ? `${upcoming.length} exam${upcoming.length > 1 ? "s" : ""} coming up. Stay prepared! 📚`
-        : "You're all caught up! Check back for new assignments. 🎉";
+        ? tc("motivational_upcoming", { count: upcoming.length })
+        : tc("motivational_caught_up");
 
   return (
     <div className="space-y-6">
@@ -120,21 +139,48 @@ export default function CandidateDashboard() {
           <div className="flex-1">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-green-soft border border-green-border px-3 py-1">
               <span className="h-2 w-2 rounded-full bg-green animate-pulse" />
-              <span className="text-[11px] font-bold text-green-ink tracking-wide uppercase">Candidate Portal</span>
+              <span className="text-[11px] font-bold text-green-ink tracking-wide uppercase">{tc("candidate_portal")}</span>
             </div>
             <h1 className="text-[22px] font-extrabold tracking-tight text-ink sm:text-[26px]">
-              Welcome back, {user.full_name.split(" ")[0]} 👋
+              {tc("welcome_back", { name: user.full_name.split(" ")[0] })}
             </h1>
             <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-lg">{motivational}</p>
           </div>
 
-          {/* Sparkline performance card */}
-          {scoreHistory.length >= 2 && (
-            <div className="shrink-0 rounded-[14px] border border-line bg-surface/80 p-3.5 backdrop-blur-sm">
-              <p className="mb-1 text-[10.5px] font-bold uppercase tracking-widest text-ink-muted">Score Trend</p>
-              <Sparkline data={scoreHistory} width={96} height={36} tone="green" />
-              <p className="mt-1 text-[11px] text-ink-muted">
-                Last {scoreHistory.length} results
+          {/* Score trend card - latest published score, change since the previous one,
+              and the trend line once there are two points to draw. */}
+          {latestScore !== null && (
+            <div className="w-full shrink-0 rounded-[14px] border border-line bg-surface/80 p-3.5 backdrop-blur-sm sm:w-auto sm:min-w-[168px]">
+              <p className="text-[10.5px] font-bold uppercase tracking-widest text-ink-muted">{tc("score_trend")}</p>
+              <div className="mt-1 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[22px] font-extrabold leading-none tracking-tight text-ink">
+                    {latestScore}%
+                  </p>
+                  {scoreDelta !== null && (
+                    <p
+                      className={cx(
+                        "mt-1 text-[11px] font-semibold",
+                        scoreDelta > 0 ? "text-green-ink" : scoreDelta < 0 ? "text-rose-ink" : "text-ink-muted",
+                      )}
+                    >
+                      {scoreDelta > 0 ? "▲" : scoreDelta < 0 ? "▼" : "•"} {tc("pts_vs_previous", { count: Math.abs(scoreDelta) })}
+                    </p>
+                  )}
+                </div>
+                {scoreHistory.length >= 2 && (
+                  <Sparkline
+                    data={scoreHistory}
+                    width={96}
+                    height={36}
+                    tone={scoreDelta !== null && scoreDelta < 0 ? "rose" : "green"}
+                  />
+                )}
+              </div>
+              <p className="mt-1.5 text-[11px] text-ink-muted">
+                {scoreHistory.length === 1
+                  ? tc("first_published_result")
+                  : tc("last_n_results", { count: scoreHistory.length })}
               </p>
             </div>
           )}
@@ -155,32 +201,32 @@ export default function CandidateDashboard() {
         ) : (
           <>
             <StatCard
-              label="Open to Sit"
+              label={tc("stat_open_to_sit")}
               value={stats.available_exams}
               tone={stats.available_exams ? "green" : "neutral"}
-              trend={stats.available_exams > 0 ? { value: "Available now", up: true } : undefined}
-              hint="Not yet attempted"
+              trend={stats.available_exams > 0 ? { value: tc("stat_available_now"), up: true } : undefined}
+              hint={tc("stat_not_yet_attempted")}
               icon={<ExamIcon />}
             />
             <StatCard
-              label="Completed"
+              label={tc("stat_completed")}
               value={stats.completed_exams}
               tone="neutral"
-              hint="Papers submitted"
+              hint={tc("stat_papers_submitted")}
               icon={<CheckIcon />}
             />
             <StatCard
-              label="Average Score"
+              label={tc("stat_average_score")}
               value={stats.average_percentage !== null ? `${stats.average_percentage}%` : "—"}
               tone="accent"
-              hint="Across published results"
+              hint={tc("stat_across_published")}
               icon={<TrendIcon />}
             />
             <StatCard
-              label="Best Result"
+              label={tc("stat_best_result")}
               value={stats.best_percentage !== null ? `${stats.best_percentage}%` : "—"}
               tone={stats.best_percentage !== null && stats.best_percentage >= 80 ? "mint" : "amber"}
-              hint={`${stats.published_results} published`}
+              hint={tc("stat_published_count", { count: stats.published_results })}
               icon={<StarIcon />}
             />
           </>
@@ -192,10 +238,10 @@ export default function CandidateDashboard() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-[16px] font-bold text-ink">{t("heading_ready_to_sit")}</h2>
-            <p className="mt-0.5 text-[12.5px] text-ink-muted">Ensure your camera is working before you begin.</p>
+            <p className="mt-0.5 text-[12.5px] text-ink-muted">{tc("camera_check_hint")}</p>
           </div>
           <Link href="/dashboard/candidate/exams">
-            <Button variant="secondary" size="sm">View all →</Button>
+            <Button variant="secondary" size="sm">{tc("view_all")}</Button>
           </Link>
         </div>
 
@@ -212,8 +258,8 @@ export default function CandidateDashboard() {
           </div>
         ) : available.length === 0 ? (
           <EmptyState
-            title="No exams open right now"
-            body="When an examiner publishes an exam and its window opens, it will appear here."
+            title={tc("no_exams_open_title")}
+            body={tc("no_exams_open_body")}
             icon={<ExamIcon />}
           />
         ) : (
@@ -233,7 +279,7 @@ export default function CandidateDashboard() {
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-[15px] font-bold text-ink">{t("heading_your_attempts")}</h2>
             <Link href="/dashboard/results" className="text-[12.5px] font-semibold text-accent hover:underline">
-              Results →
+              {tc("results_link")}
             </Link>
           </div>
           {loading ? (
@@ -243,8 +289,8 @@ export default function CandidateDashboard() {
           ) : history.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-3xl">📝</p>
-              <p className="mt-2 text-[13px] font-semibold text-ink">No attempts yet</p>
-              <p className="mt-0.5 text-[12px] text-ink-muted">Papers you have sat will appear here.</p>
+              <p className="mt-2 text-[13px] font-semibold text-ink">{tc("no_attempts_title")}</p>
+              <p className="mt-0.5 text-[12px] text-ink-muted">{tc("no_attempts_body")}</p>
             </div>
           ) : (
             <ul className="divide-y divide-line">
@@ -274,7 +320,7 @@ export default function CandidateDashboard() {
                       <p className="truncate text-[11.5px] text-ink-muted">
                         {card.subject_name}
                         {card.session_status && (
-                          <> · <Badge tone={STATUS_TONE[card.session_status]} size="xs">{STATUS_LABEL[card.session_status]}</Badge></>
+                          <> · <Badge tone={STATUS_TONE[card.session_status]} size="xs">{tc(`status_${card.session_status}`)}</Badge></>
                         )}
                       </p>
                     </div>
@@ -282,7 +328,7 @@ export default function CandidateDashboard() {
                       <div className="shrink-0">
                         {card.passed !== null && card.passed !== undefined && (
                           <Badge tone={card.passed ? "mint" : "rose"} size="xs" className="mr-1">
-                            {card.passed ? "Pass" : "Fail"}
+                            {card.passed ? tc("pass") : tc("fail")}
                           </Badge>
                         )}
                         <Link href={`/results/${card.result_id}`}>
@@ -291,7 +337,7 @@ export default function CandidateDashboard() {
                       </div>
                     ) : (
                       <span className="shrink-0 whitespace-nowrap text-[11px] text-ink-muted">
-                        Under review
+                        {tc("under_review")}
                       </span>
                     )}
                   </li>
@@ -311,8 +357,8 @@ export default function CandidateDashboard() {
           ) : upcoming.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-3xl">📅</p>
-              <p className="mt-2 text-[13px] font-semibold text-ink">Nothing scheduled</p>
-              <p className="mt-0.5 text-[12px] text-ink-muted">Future exam windows will show up here.</p>
+              <p className="mt-2 text-[13px] font-semibold text-ink">{tc("nothing_scheduled_title")}</p>
+              <p className="mt-0.5 text-[12px] text-ink-muted">{tc("nothing_scheduled_body")}</p>
             </div>
           ) : (
             <ul className="space-y-2.5">
@@ -327,18 +373,19 @@ export default function CandidateDashboard() {
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-semibold text-ink">{card.title}</p>
                         <p className="mt-0.5 text-[11.5px] text-ink-muted">
-                          {card.subject_name} · {card.duration_minutes} min · {card.total_questions}Q
+                          {card.subject_name} ·{" "}
+                          {tc("minutes_questions_short", { minutes: card.duration_minutes, count: card.total_questions })}
                         </p>
                       </div>
-                      <Badge tone="accent" size="xs">Upcoming</Badge>
+                      <Badge tone="accent" size="xs">{tc("badge_upcoming")}</Badge>
                     </div>
                     {opensAt ? (
                       <div className="mt-2 flex items-center gap-1.5 text-[11.5px] font-semibold text-accent">
                         <span>⏳</span>
-                        Opens in <Countdown target={opensAt} />
+                        <span>{tc.rich("opens_in", { countdown: () => <Countdown target={opensAt} /> })}</span>
                       </div>
                     ) : (
-                      <p className="mt-1.5 text-[11.5px] text-ink-muted">{card.reason}</p>
+                      <p className="mt-1.5 text-[11.5px] text-ink-muted">{translateReason(card.reason, card.starts_at, tc)}</p>
                     )}
                   </li>
                 );
@@ -353,6 +400,8 @@ export default function CandidateDashboard() {
 
 /* ─── Available Exam Card ────────────────────────────────────────── */
 function ExamAvailableCard({ card, onEnter }: { card: CandidateExamCard; onEnter: () => void }) {
+  const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   const isResume = card.session_status === "in_progress";
   const diff = card.ends_at ? new Date(card.ends_at).getTime() - Date.now() : null;
   const closingSoon = diff !== null && diff < 3_600_000 && diff > 0;
@@ -372,16 +421,16 @@ function ExamAvailableCard({ card, onEnter }: { card: CandidateExamCard; onEnter
           <p className="mt-0.5 text-[12.5px] text-ink-muted">{card.subject_name}</p>
         </div>
         <Badge tone={isResume ? "accent" : closingSoon ? "amber" : "green"} size="xs">
-          {isResume ? "In Progress" : closingSoon ? "Closing Soon" : "Open"}
+          {isResume ? tc("status_in_progress") : closingSoon ? tc("badge_closing_soon") : tc("badge_open")}
         </Badge>
       </div>
 
       {/* Metadata grid */}
       <div className="grid grid-cols-3 gap-2 rounded-[11px] bg-sunken px-3 py-2.5">
         {[
-          ["Duration", `${card.duration_minutes} min`],
-          ["Questions", String(card.total_questions)],
-          ["Closes", formatDate(card.ends_at, false)],
+          [t("duration_label"), tc("minutes_short", { count: card.duration_minutes })],
+          [t("questions_label"), String(card.total_questions)],
+          [t("closes_label"), formatDate(card.ends_at, false)],
         ].map(([label, value]) => (
           <div key={label}>
             <dt className="text-[10px] font-bold uppercase tracking-[0.08em] text-ink-muted">{label}</dt>
@@ -394,14 +443,14 @@ function ExamAvailableCard({ card, onEnter }: { card: CandidateExamCard; onEnter
       {closingSoon && (
         <div className="flex items-center gap-2 rounded-[9px] bg-amber-soft border border-amber/20 px-3 py-2 text-[12px] font-semibold text-amber-ink">
           <span>⏱</span>
-          <span>Closes in <Countdown target={card.ends_at} /></span>
+          <span>{tc.rich("closes_in", { countdown: () => <Countdown target={card.ends_at} /> })}</span>
         </div>
       )}
 
       {/* Proctoring notice */}
       <div className="flex items-center gap-2 rounded-[9px] bg-sunken px-3 py-2 text-[11.5px] text-ink-muted">
         <span>🔒</span>
-        <span>Webcam proctored · auto-submits at time</span>
+        <span>{tc("proctoring_notice")}</span>
       </div>
 
       {/* CTA */}
@@ -411,7 +460,7 @@ function ExamAvailableCard({ card, onEnter }: { card: CandidateExamCard; onEnter
         size="lg"
         variant={isResume ? "primary" : "primary"}
       >
-        {isResume ? "▶ Resume Assessment" : "Start Assessment →"}
+        {isResume ? tc("resume_assessment") : tc("start_assessment")}
       </Button>
     </Card>
   );

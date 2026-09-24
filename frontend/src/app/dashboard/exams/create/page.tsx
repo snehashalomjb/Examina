@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { AIGenerator } from "@/components/AIGenerator";
@@ -47,11 +48,15 @@ import type {
 } from "@/lib/types";
 import { CATEGORY_LABEL, QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
 
+/**
+ * A preset exam pattern. Its name, description and section names/descriptions are
+ * translated: they live in the `createExamPage` namespace under
+ * `pattern_<id>_name`, `pattern_<id>_desc`, `pattern_<id>_s<n>_name` and
+ * `pattern_<id>_s<n>_desc` (id with dashes as underscores, n 1-based).
+ */
 interface ExamPattern {
   id: string;
-  name: string;
   category: ExamCategoryType;
-  description: string;
   duration_minutes: number;
   passing_percentage: number;
   declared_total_marks: number;
@@ -62,8 +67,6 @@ interface ExamPattern {
   default_company?: string;
   default_role?: string;
   sections: Array<{
-    name: string;
-    description: string;
     duration_minutes: number | null;
     marks_per_question: number;
     rules: SelectionRule[];
@@ -73,9 +76,7 @@ interface ExamPattern {
 const ACADEMIC_PATTERNS: ExamPattern[] = [
   {
     id: "acad-final",
-    name: "Semester Final Examination (Comprehensive)",
     category: "academic",
-    description: "Comprehensive end-term exam with mixed objective MCQs, short explanations, deep essays, and handwritten diagram uploads.",
     duration_minutes: 90,
     passing_percentage: 40,
     declared_total_marks: 100,
@@ -85,8 +86,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "Semester IV",
     sections: [
       {
-        name: "Section A: Objective & Conceptual",
-        description: "MCQs and multi-select questions",
         duration_minutes: 30,
         marks_per_question: 2,
         rules: [
@@ -96,8 +95,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
         ],
       },
       {
-        name: "Section B: Analytical & Descriptive",
-        description: "Short and long answers with handwritten diagrams",
         duration_minutes: 60,
         marks_per_question: 5,
         rules: [
@@ -110,9 +107,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
   },
   {
     id: "acad-midterm",
-    name: "Mid-Term / Unit Topic Assessment",
     category: "academic",
-    description: "Focused periodic unit test evaluating core theoretical concepts and basic problem solving.",
     duration_minutes: 45,
     passing_percentage: 50,
     declared_total_marks: 50,
@@ -122,8 +117,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "Semester III",
     sections: [
       {
-        name: "Unit Evaluation",
-        description: "Objective questions and short explanations",
         duration_minutes: 45,
         marks_per_question: 2,
         rules: [
@@ -136,9 +129,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
   },
   {
     id: "acad-speedquiz",
-    name: "Objective / Speed Quiz Assessment",
     category: "academic",
-    description: "Rapid-fire purely objective test (MCQ, True/False, Fill in blanks) with instant results auto-publishing.",
     duration_minutes: 20,
     passing_percentage: 60,
     declared_total_marks: 30,
@@ -148,8 +139,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "Semester II",
     sections: [
       {
-        name: "Speed Quiz",
-        description: "Fast-paced objective questions",
         duration_minutes: 20,
         marks_per_question: 2,
         rules: [
@@ -162,9 +151,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
   },
   {
     id: "acad-labviva",
-    name: "Practical / Lab Viva & Submission Exam",
     category: "academic",
-    description: "Laboratory evaluation testing practical code implementations, architecture diagrams, and viva questions.",
     duration_minutes: 60,
     passing_percentage: 50,
     declared_total_marks: 60,
@@ -174,8 +161,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "Semester VI",
     sections: [
       {
-        name: "Practical & Viva",
-        description: "Architecture diagrams, code analysis, and viva short answers",
         duration_minutes: 60,
         marks_per_question: 5,
         rules: [
@@ -188,9 +173,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
   },
   {
     id: "acad-essay",
-    name: "Theoretical & Descriptive Essay Examination",
     category: "academic",
-    description: "Deep descriptive examination requiring long structured essays, evaluated via rubric scoring.",
     duration_minutes: 75,
     passing_percentage: 45,
     declared_total_marks: 80,
@@ -200,8 +183,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "Semester I",
     sections: [
       {
-        name: "Descriptive Papers",
-        description: "In-depth theoretical analyses and essays",
         duration_minutes: 75,
         marks_per_question: 10,
         rules: [
@@ -213,9 +194,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
   },
   {
     id: "acad-scholarship",
-    name: "Merit Scholarship & National Entrance Test",
     category: "academic",
-    description: "High-stakes competitive exam with strict proctoring, negative marking, and high difficulty threshold.",
     duration_minutes: 60,
     passing_percentage: 70,
     declared_total_marks: 100,
@@ -225,8 +204,6 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
     default_sem: "2026 Batch",
     sections: [
       {
-        name: "Competitive Screening",
-        description: "High difficulty problems with negative marking",
         duration_minutes: 60,
         marks_per_question: 3,
         rules: [
@@ -242,9 +219,7 @@ const ACADEMIC_PATTERNS: ExamPattern[] = [
 const CORPORATE_PATTERNS: ExamPattern[] = [
   {
     id: "corp-sde",
-    name: "Full-Stack Software Engineer (SDE-1) Assessment",
     category: "corporate",
-    description: "4-stage evaluation: Quantitative Aptitude, Core CS & Web Tech, System Design, and Hands-on Coding.",
     duration_minutes: 90,
     passing_percentage: 70,
     declared_total_marks: 100,
@@ -253,22 +228,16 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Full-Stack Software Engineer (SDE-1)",
     sections: [
       {
-        name: "Section 1: Quantitative & Analytical Aptitude",
-        description: "Problem solving and quantitative skills",
         duration_minutes: 20,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 4, category: "aptitude" }],
       },
       {
-        name: "Section 2: Core CS & Web Technologies",
-        description: "React, TypeScript, databases, and APIs",
         duration_minutes: 30,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 5, category: "technical" }],
       },
       {
-        name: "Section 3: Hands-on Coding Challenge",
-        description: "Algorithmic programming implementation",
         duration_minutes: 40,
         marks_per_question: 20,
         rules: [{ question_type: "coding", difficulty: "easy", count: 1, category: "coding" }],
@@ -277,9 +246,7 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
   },
   {
     id: "corp-aptitude",
-    name: "Quantitative & Logical Aptitude Screening",
     category: "corporate",
-    description: "First-round screening test evaluating mathematical acumen, data interpretation, and deductive logic.",
     duration_minutes: 45,
     passing_percentage: 65,
     declared_total_marks: 60,
@@ -288,15 +255,11 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Associate Consultant / Analyst",
     sections: [
       {
-        name: "Section A: Quantitative Ability",
-        description: "Arithmetic, algebra, and data interpretation",
         duration_minutes: 25,
         marks_per_question: 2.5,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 5, category: "aptitude" }],
       },
       {
-        name: "Section B: Logical & Critical Reasoning",
-        description: "Puzzles, syllogisms, and series",
         duration_minutes: 20,
         marks_per_question: 2.5,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 5, category: "logical_reasoning" }],
@@ -305,9 +268,7 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
   },
   {
     id: "corp-data-analyst",
-    name: "Data Analyst & BI Specialist Assessment",
     category: "corporate",
-    description: "Evaluates SQL database querying, statistical modeling, data interpretation, and business insights.",
     duration_minutes: 60,
     passing_percentage: 60,
     declared_total_marks: 75,
@@ -316,15 +277,11 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Data Analyst & BI Specialist",
     sections: [
       {
-        name: "SQL & Relational Databases",
-        description: "Joins, aggregations, window functions",
         duration_minutes: 30,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 4, category: "technical" }],
       },
       {
-        name: "Quantitative & Business Analytics",
-        description: "Statistics and business data interpretation",
         duration_minutes: 30,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 4, category: "aptitude" }],
@@ -333,9 +290,7 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
   },
   {
     id: "corp-frontend",
-    name: "Senior Frontend Engineer Assessment",
     category: "corporate",
-    description: "Specialized assessment for Frontend Developers: React 19, TypeScript, Web Performance, and UI coding.",
     duration_minutes: 75,
     passing_percentage: 70,
     declared_total_marks: 80,
@@ -344,22 +299,16 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Senior Frontend Engineer (React / Next.js)",
     sections: [
       {
-        name: "HTML5, CSS & Web Architecture",
-        description: "DOM, Layouts, Box Model, Performance",
         duration_minutes: 25,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 4, category: "technical" }],
       },
       {
-        name: "React, State & TypeScript",
-        description: "Hooks, reconciliation, typing",
         duration_minutes: 25,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "medium", count: 4, category: "technical" }],
       },
       {
-        name: "Frontend Coding Challenge",
-        description: "Component logic and algorithmic transformation",
         duration_minutes: 25,
         marks_per_question: 20,
         rules: [{ question_type: "coding", difficulty: "easy", count: 1, category: "coding" }],
@@ -368,9 +317,7 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
   },
   {
     id: "corp-backend",
-    name: "Backend & Distributed Systems Assessment",
     category: "corporate",
-    description: "Advanced backend engineering: OS concurrency, database transaction engines, Raft/WAL, and coding.",
     duration_minutes: 90,
     passing_percentage: 65,
     declared_total_marks: 100,
@@ -379,22 +326,16 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Backend / Distributed Systems Engineer",
     sections: [
       {
-        name: "Operating Systems & Networking",
-        description: "Threads, sockets, TCP, race conditions",
         duration_minutes: 25,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "hard", count: 4, category: "technical" }],
       },
       {
-        name: "Databases, WAL & Distributed Systems",
-        description: "Raft, 2PC, MVCC, Indexing",
         duration_minutes: 25,
         marks_per_question: 3,
         rules: [{ question_type: "mcq", difficulty: "hard", count: 4, category: "technical" }],
       },
       {
-        name: "Backend Coding Challenge",
-        description: "Algorithmic and concurrency problem solving",
         duration_minutes: 40,
         marks_per_question: 25,
         rules: [{ question_type: "coding", difficulty: "medium", count: 1, category: "coding" }],
@@ -403,9 +344,7 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
   },
   {
     id: "corp-freshers",
-    name: "Freshers Campus Graduate Hiring Drive",
     category: "corporate",
-    description: "Standardized 4-section campus test: Quantitative, Logical Reasoning, Verbal Communication, and Programming.",
     duration_minutes: 60,
     passing_percentage: 60,
     declared_total_marks: 75,
@@ -414,29 +353,21 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
     default_role: "Graduate Trainee Engineer (GET)",
     sections: [
       {
-        name: "Quantitative Aptitude",
-        description: "Numerical problem solving",
         duration_minutes: 15,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "easy", count: 3, category: "aptitude" }],
       },
       {
-        name: "Logical & Deductive Reasoning",
-        description: "Puzzles and series",
         duration_minutes: 15,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "easy", count: 3, category: "logical_reasoning" }],
       },
       {
-        name: "Verbal Ability & English",
-        description: "Grammar and comprehension",
         duration_minutes: 15,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "easy", count: 2, category: "verbal_ability" }],
       },
       {
-        name: "Basic Computer Science Foundations",
-        description: "Syntax and core concepts",
         duration_minutes: 15,
         marks_per_question: 2,
         rules: [{ question_type: "mcq", difficulty: "easy", count: 2, category: "technical" }],
@@ -447,6 +378,14 @@ const CORPORATE_PATTERNS: ExamPattern[] = [
 
 export default function CreateExamWizard() {
   const { user } = useRequireAuth(["examiner", "admin"]);
+  const t = useTranslations("createExam");
+  const tp = useTranslations("createExamPage");
+  const typeLabel = (type: QuestionType) => tp(`qtype_${type}`);
+  const categoryLabel = (c: QuestionCategory) => tp(`qcat_${c}`);
+  const difficultyLabel = (d: Difficulty) => t(`difficulty_${d}`);
+  const patternKey = (p: ExamPattern) => `pattern_${p.id.replace(/-/g, "_")}`;
+  const patternName = (p: ExamPattern) => tp(`${patternKey(p)}_name`);
+  const patternDescription = (p: ExamPattern) => tp(`${patternKey(p)}_desc`);
   // ?exam=<id> reopens a draft. Saving a draft you cannot come back to is a trap, and
   // the pool step deliberately leaves drafts behind.
   const resumeId = useSearchParams().get("exam");
@@ -595,7 +534,7 @@ export default function CreateExamWizard() {
         setSubjects(subjectList);
         if (subjectList.length > 0) setSubjectId(subjectList[0].id);
       } catch {
-        toast("Failed to load subjects", "rose");
+        toast(t("toast_failed_load_subjects"), "rose");
       }
     }
     void loadData();
@@ -676,7 +615,7 @@ export default function CreateExamWizard() {
         setStep(5); // straight to the pool, which is why anyone reopens a draft
       } catch (err) {
         toast(
-          err instanceof ApiError ? err.message : "Could not open that draft.",
+          err instanceof ApiError ? err.message : tp("toast_could_not_open_draft"),
           "rose",
         );
       }
@@ -690,8 +629,8 @@ export default function CreateExamWizard() {
   // When pattern is selected, pre-fill fields
   function applyPattern(p: ExamPattern) {
     setSelectedPatternId(p.id);
-    setTitle(p.name);
-    setDescription(p.description);
+    setTitle(patternName(p));
+    setDescription(patternDescription(p));
     setDurationMinutes(p.duration_minutes);
     setPassingPercentage(p.passing_percentage);
     setDeclaredTotalMarks(p.declared_total_marks);
@@ -707,8 +646,10 @@ export default function CreateExamWizard() {
     }
 
     setSections(
-      p.sections.map((section) => ({
+      p.sections.map((section, index) => ({
         ...section,
+        name: tp(`${patternKey(p)}_s${index + 1}_name`),
+        description: tp(`${patternKey(p)}_s${index + 1}_desc`),
         marks_per_question: section.marks_per_question,
         negative_marks: null,
       })),
@@ -788,27 +729,29 @@ export default function CreateExamWizard() {
   }
 
   /** What stops this exam being publishable, in the examiner's words. */
+  /** What is wrong with the exam window, or null when it is valid and fits the duration. */
+  function windowProblem(): string | null {
+    if (!startsAt || !endsAt) return tp("problem_set_window");
+    if (new Date(endsAt) <= new Date(startsAt)) return tp("problem_window_order");
+    const windowMinutes =
+      (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000;
+    if (durationMinutes > windowMinutes) {
+      return tp("problem_duration_exceeds_window", { minutes: durationMinutes });
+    }
+    return null;
+  }
+
   function configurationProblems(): string[] {
     const found: string[] = [];
-    if (!title.trim()) found.push("The exam needs a title.");
-    if (!subjectId) found.push("Pick the subject this exam belongs to.");
-    if (!startsAt || !endsAt) found.push("Set when the exam opens and closes.");
-    else if (new Date(endsAt) <= new Date(startsAt)) {
-      found.push("The exam window must end after it starts.");
-    } else {
-      const windowMinutes =
-        (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60000;
-      if (durationMinutes > windowMinutes) {
-        found.push(
-          `The ${durationMinutes}-minute duration is longer than the exam window.`,
-        );
-      }
-    }
-    if (sections.length === 0) found.push("Add at least one section with selection rules.");
+    if (!title.trim()) found.push(tp("problem_needs_title"));
+    if (!subjectId) found.push(tp("problem_pick_subject"));
+    const windowIssue = windowProblem();
+    if (windowIssue) found.push(windowIssue);
+    if (sections.length === 0) found.push(tp("problem_add_section"));
     if (sections.some((sec) => sec.rules.length === 0)) {
-      found.push("Every section needs at least one selection rule.");
+      found.push(tp("problem_section_needs_rule"));
     }
-    if (!sections.some((sec) => sec.name.trim())) found.push("Sections need names.");
+    if (!sections.some((sec) => sec.name.trim())) found.push(tp("problem_sections_need_names"));
     return found;
   }
 
@@ -857,7 +800,7 @@ export default function CreateExamWizard() {
         if (examId) {
           const updated = await api.patch<Exam>(`/exams/${examId}`, payload);
           absorbSectionIds(updated);
-          if (!options?.quiet) toast("Draft saved", "mint");
+          if (!options?.quiet) toast(t("toast_draft_saved"), "mint");
           return examId;
         }
         const created = await api.post<Exam>("/exams", {
@@ -866,7 +809,7 @@ export default function CreateExamWizard() {
         });
         absorbSectionIds(created);
         setExamId(created.id);
-        if (!options?.quiet) toast("Draft saved — now build the question pool", "mint");
+        if (!options?.quiet) toast(t("toast_draft_saved_with_pool"), "mint");
         return created.id;
       } catch (err) {
         toast(
@@ -874,7 +817,7 @@ export default function CreateExamWizard() {
             ? err.problems?.length
               ? `${err.message}: ${err.problems.join(", ")}`
               : err.message
-            : "Could not save the draft.",
+            : t("toast_could_not_save_draft"),
           "rose",
         );
         return null;
@@ -892,7 +835,7 @@ export default function CreateExamWizard() {
     try {
       setPool(await api.get<ExamPool>(`/exams/${id}/pool`));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not load the pool.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_load_pool"), "rose");
     }
   }, []);
 
@@ -912,7 +855,7 @@ export default function CreateExamWizard() {
     try {
       setPool(await api.put<ExamPool>(`/exams/${examId}/questions/order`, { question_ids: ids }));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not shuffle the pool.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_shuffle"), "rose");
     } finally {
       setShufflingPool(false);
     }
@@ -952,12 +895,12 @@ export default function CreateExamWizard() {
       const ordered = [...(exam.sections ?? [])].sort((a, b) => a.order_index - b.order_index);
       const section = ordered[sIdx]?.id;
       if (!section) {
-        toast("Save the draft before picking questions for this section.", "amber");
+        toast(t("toast_save_before_picking"), "amber");
         return null;
       }
       return { exam: id, section };
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not read the exam.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_load_exam"), "rose");
       return null;
     }
   }
@@ -975,11 +918,14 @@ export default function CreateExamWizard() {
         }),
       );
       toast(
-        `${questionIds.length} question(s) added to ${sections[sIdx]?.name ?? "the section"}`,
+        tp("toast_questions_added_to_section", {
+          count: questionIds.length,
+          section: sections[sIdx]?.name || tp("the_section"),
+        }),
         "mint",
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not add those questions.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_add"), "rose");
     } finally {
       setPinning(false);
     }
@@ -996,7 +942,7 @@ export default function CreateExamWizard() {
         }),
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not move that question.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_move"), "rose");
     }
   }
 
@@ -1009,9 +955,9 @@ export default function CreateExamWizard() {
           section_id: null,
         }),
       );
-      toast("Returned to the shared pool", "mint");
+      toast(t("toast_returned_to_pool"), "mint");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not move that question.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_move"), "rose");
     }
   }
 
@@ -1022,7 +968,7 @@ export default function CreateExamWizard() {
     try {
       setPool(await api.delete<ExamPool>(`/exams/${examId}/questions/${questionId}`));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not remove that question.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_remove"), "rose");
     }
   }
 
@@ -1042,17 +988,17 @@ export default function CreateExamWizard() {
           await api.post<ExamPool>(`/exams/${id}/questions`, {
             question_ids: matching.map((q) => q.id),
           });
-          toast(`${matching.length} question(s) you wrote earlier added to the pool`, "mint");
+          toast(t("toast_early_questions_added", { count: matching.length }), "mint");
         } catch (err) {
           toast(
-            err instanceof ApiError ? err.message : "Could not add your earlier questions.",
+            err instanceof ApiError ? err.message : t("toast_could_not_add_early"),
             "rose",
           );
         }
       }
       if (strays) {
         toast(
-          `${strays} question(s) are for another subject — they stayed in the bank.`,
+          t("toast_stray_questions", { count: strays }),
           "amber",
         );
       }
@@ -1069,9 +1015,9 @@ export default function CreateExamWizard() {
       setPool(
         await api.post<ExamPool>(`/exams/${examId}/questions`, { question_ids: questionIds }),
       );
-      toast(`${questionIds.length} question(s) added`, "mint");
+      toast(t("toast_questions_added", { count: questionIds.length }), "mint");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not add those questions.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_add"), "rose");
     }
   }
 
@@ -1080,9 +1026,9 @@ export default function CreateExamWizard() {
     try {
       await api.post(`/questions/${question.id}/duplicate`, { exam_id: examId });
       await refreshPool(examId);
-      toast("Copied into this exam", "mint");
+      toast(t("toast_copied_into_exam"), "mint");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not duplicate that.", "rose");
+      toast(err instanceof ApiError ? err.message : t("toast_could_not_duplicate"), "rose");
     }
   }
 
@@ -1118,13 +1064,16 @@ export default function CreateExamWizard() {
       const shortfalls = result.rows.filter((r) => r.added < r.requested);
       toast(
         shortfalls.length
-          ? `${result.rows.length - shortfalls.length}/${result.rows.length} rows fully filled - some rows need more bank questions`
-          : `${result.rows.length} section(s) filled from the bank`,
+          ? tp("toast_blueprint_partial", {
+              filled: result.rows.length - shortfalls.length,
+              total: result.rows.length,
+            })
+          : tp("toast_blueprint_filled", { count: result.rows.length }),
         shortfalls.length ? "amber" : "mint",
       );
       return result.rows;
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not apply the blueprint.", "rose");
+      toast(err instanceof ApiError ? err.message : tp("toast_could_not_apply_blueprint"), "rose");
       return null;
     }
   }
@@ -1136,7 +1085,7 @@ export default function CreateExamWizard() {
     setSubmitting(true);
     try {
       await api.post(`/exams/${id}/publish`);
-      toast(`"${title}" is published`, "mint");
+      toast(tp("toast_exam_is_published", { title }), "mint");
       setPublished({ id, questions: pool?.required_count ?? 0 });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -1147,7 +1096,7 @@ export default function CreateExamWizard() {
         await refreshPool(id);
         setStep(5);
       } else {
-        toast("Could not publish the exam.", "rose");
+        toast(t("toast_could_not_publish"), "rose");
       }
     } finally {
       setSubmitting(false);
@@ -1173,18 +1122,18 @@ export default function CreateExamWizard() {
           <div>
             <Link href="/dashboard/exams"
               className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-muted hover:text-accent transition-colors mb-2">
-              ← Back to Exams
+              {t("backToExams")}
             </Link>
             <h1 className="text-[22px] font-bold tracking-tight"
               style={{ background: category === "academic" ? "linear-gradient(135deg, #1e1b4b, #4f46e5)" : "linear-gradient(135deg, #3b0764, #7c3aed)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Create Examination
+              {t("title")}
             </h1>
             <p className="mt-1 text-[13px] text-ink-muted">
-              Configure examination mode, choose blueprint patterns, bind question pools, and set AI proctoring.
+              {t("description")}
             </p>
           </div>
           <Badge tone={category === "academic" ? "accent" : "purple"} className="mt-1 shrink-0">
-            {category === "academic" ? "🎓 Academic Mode" : "💼 Corporate Mode"}
+            {category === "academic" ? t("badge_academic_mode") : t("badge_corporate_mode")}
           </Badge>
         </div>
       </div>
@@ -1202,40 +1151,36 @@ export default function CreateExamWizard() {
               ✓
             </span>
             <div>
-              <h2 className="text-lg font-bold text-ink">Exam published</h2>
+              <h2 className="text-lg font-bold text-ink">{t("exam_published")}</h2>
               <p className="text-[13px] text-ink-muted">
-                {title} is live for its window. Only assigned candidates can see it.
+                {t("exam_published_body", { title })}
               </p>
             </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-            <Summary label="Exam ID" value={published.id.slice(0, 8)} />
-            <Summary label="Questions per candidate" value={String(published.questions)} />
+            <Summary label={t("label_exam_id")} value={published.id.slice(0, 8)} />
+            <Summary label={t("label_questions_per_candidate")} value={String(published.questions)} />
             <Summary
-              label="Candidates assigned"
-              value={assignedCount ? String(assignedCount) : "None yet"}
+              label={t("label_candidates_assigned")}
+              value={assignedCount ? String(assignedCount) : t("value_none_yet")}
             />
             <Summary
-              label="Window"
+              label={t("label_window")}
               value={`${new Date(startsAt).toLocaleDateString()} → ${new Date(endsAt).toLocaleDateString()}`}
             />
           </dl>
 
           <div className="rounded-[10px] border border-line bg-surface p-3">
             <p className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
-              How candidates reach it
+              {t("how_candidates_reach_it")}
             </p>
-            <p className="mt-1 text-[13px] text-ink-soft">
-              There is no shareable link, by design. An assigned candidate signs in and
-              finds the exam under <span className="font-medium text-ink">My Exams</span>,
-              which is what keeps a paper from being opened by whoever has the URL.
-            </p>
+            <p className="mt-1 text-[13px] text-ink-soft">{t("no_shareable_link")}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/exams">
-              <Button size="sm">Back to exams</Button>
+              <Button size="sm">{t("back_to_exams")}</Button>
             </Link>
             <Button
               size="sm"
@@ -1245,11 +1190,11 @@ export default function CreateExamWizard() {
                 setStep(6);
               }}
             >
-              Assign more candidates
+              {t("assign_more_candidates")}
             </Button>
             <Link href="/dashboard/exams/create">
               <Button size="sm" variant="ghost">
-                Create another
+                {t("create_another")}
               </Button>
             </Link>
           </div>
@@ -1268,13 +1213,13 @@ export default function CreateExamWizard() {
         </div>
         <div className="flex items-stretch divide-x divide-line">
           {[
-            { num: 1, label: "Category", short: "Cat" },
-            { num: 2, label: "Pattern", short: "Pat" },
-            { num: 3, label: "Details", short: "Det" },
-            { num: 4, label: "Sections", short: "Sec" },
-            { num: 5, label: "Pool", short: "Pool" },
-            { num: 6, label: "Candidates", short: "Cand" },
-            { num: 7, label: "Review & Publish", short: "Pub" },
+            { num: 1, label: t("step_category"), short: t("step_short_cat") },
+            { num: 2, label: t("step_pattern"), short: t("step_short_pat") },
+            { num: 3, label: t("step_details"), short: t("step_short_det") },
+            { num: 4, label: t("step_sections"), short: t("step_short_sec") },
+            { num: 5, label: t("step_pool"), short: t("step_short_pool") },
+            { num: 6, label: t("step_candidates"), short: t("step_short_cand") },
+            { num: 7, label: t("step_review"), short: t("step_short_pub") },
           ].map((s) => {
             const isDone = step > s.num;
             const isActive = step === s.num;
@@ -1321,10 +1266,8 @@ export default function CreateExamWizard() {
       {step === 1 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div className="text-center max-w-xl mx-auto mb-6">
-            <h2 className="text-xl font-bold text-ink">Select Examination Category</h2>
-            <p className="text-sm text-ink-muted mt-1">
-              Choose the operating mode for this examination. Both modes draw directly from your unified question bank.
-            </p>
+            <h2 className="text-xl font-bold text-ink">{tp("step1_title")}</h2>
+            <p className="text-sm text-ink-muted mt-1">{tp("step1_desc")}</p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
@@ -1357,9 +1300,9 @@ export default function CreateExamWizard() {
                 setStep(3);
               }}
             >
-              Skip templates — Create from scratch
+              {t("skip_templates")}
             </Button>
-            <Button onClick={() => setStep(2)}>Next: Select Exam Pattern →</Button>
+            <Button onClick={() => setStep(2)}>{t("next_select_pattern")}</Button>
           </div>
         </div>
       )}
@@ -1370,14 +1313,16 @@ export default function CreateExamWizard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-ink">
-                Choose a {category === "academic" ? "Academic" : "Corporate Hiring"} Exam Pattern
+                {category === "academic"
+                  ? t("choose_pattern_title_academic")
+                  : t("choose_pattern_title_corporate")}
               </h2>
-              <p className="text-sm text-ink-muted mt-1">
-                Select a structured blueprint to pre-configure sections, rules, timers, and question pool filters.
-              </p>
+              <p className="text-sm text-ink-muted mt-1">{t("choose_pattern_desc")}</p>
             </div>
             <Badge tone={category === "academic" ? "accent" : "purple"}>
-              6 {category === "academic" ? "Academic" : "Corporate"} Patterns Available
+              {category === "academic"
+                ? t("patterns_available_academic")
+                : t("patterns_available_corporate")}
             </Badge>
           </div>
 
@@ -1397,30 +1342,36 @@ export default function CreateExamWizard() {
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <h3 className="text-sm font-bold text-ink leading-snug">{p.name}</h3>
+                      <h3 className="text-sm font-bold text-ink leading-snug">{patternName(p)}</h3>
                       {isSelected && (
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-white text-[10px] font-bold">
                           ✓
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-ink-muted leading-relaxed mb-4">{p.description}</p>
+                    <p className="text-xs text-ink-muted leading-relaxed mb-4">
+                      {patternDescription(p)}
+                    </p>
 
                     <div className="space-y-1.5 border-t border-line/60 pt-3 text-[11px] text-ink-muted">
                       <div className="flex justify-between">
-                        <span>Duration:</span>
-                        <span className="font-semibold text-ink">{p.duration_minutes} mins</span>
+                        <span>{t("pattern_duration")}</span>
+                        <span className="font-semibold text-ink">
+                          {tp("n_mins", { count: p.duration_minutes })}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Total Marks:</span>
+                        <span>{t("pattern_total_marks")}</span>
                         <span className="font-semibold text-ink">{p.declared_total_marks}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Sections:</span>
-                        <span className="font-semibold text-ink">{p.sections.length} section(s)</span>
+                        <span>{t("pattern_sections")}</span>
+                        <span className="font-semibold text-ink">
+                          {tp("n_sections", { count: p.sections.length })}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Passing Threshold:</span>
+                        <span>{t("pattern_passing")}</span>
                         <span className="font-semibold text-ink">{p.passing_percentage}%</span>
                       </div>
                     </div>
@@ -1440,7 +1391,7 @@ export default function CreateExamWizard() {
                           : "bg-surface-soft text-ink hover:bg-surface-elevated border border-line"
                       )}
                     >
-                      {isSelected ? "Selected Pattern" : "Use This Pattern"}
+                      {isSelected ? t("pattern_selected") : t("pattern_use")}
                     </button>
                   </div>
                 </div>
@@ -1452,27 +1403,22 @@ export default function CreateExamWizard() {
           <Card className="space-y-4 border-line">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-ink">
-                  Already know the questions? Write them now
-                </h3>
-                <p className="mt-0.5 text-xs text-ink-muted">
-                  Type the question, its options, and tick the correct answer. Saved to
-                  your Question Bank and added to this exam&apos;s pool at step 5.
-                </p>
+                <h3 className="text-sm font-bold text-ink">{t("early_questions_title")}</h3>
+                <p className="mt-0.5 text-xs text-ink-muted">{t("early_questions_desc")}</p>
               </div>
               <Button
                 size="sm"
                 variant={authoringEarly ? "secondary" : "primary"}
                 onClick={() => setAuthoringEarly((open) => !open)}
               >
-                {authoringEarly ? "Close editor" : "+ Add a question"}
+                {authoringEarly ? t("close_editor") : t("add_a_question")}
               </Button>
             </div>
 
             {earlyQuestions.length > 0 && (
               <ul className="space-y-2 rounded-lg border border-line bg-sunken/40 p-3">
                 {earlyQuestions.map((q, idx) => {
-                  const answer = answerKeySummary(q);
+                  const answer = answerKeySummary(q, tp);
                   return (
                     <li key={q.id} className="flex items-start gap-2 text-xs">
                       <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded bg-accent-soft text-[10px] font-bold text-accent">
@@ -1481,8 +1427,8 @@ export default function CreateExamWizard() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-ink">{q.body}</p>
                         <p className="mt-0.5 text-ink-muted">
-                          {TYPE_LABEL[q.question_type]} · {q.marks} mark
-                          {q.marks === 1 ? "" : "s"} · Answer:{" "}
+                          {typeLabel(q.question_type)} · {tp("n_marks", { count: q.marks })} ·{" "}
+                          {tp("answer_label")}{" "}
                           <span className="font-semibold text-ink">{answer}</span>
                         </p>
                       </div>
@@ -1492,17 +1438,14 @@ export default function CreateExamWizard() {
                           setEarlyQuestions((prev) => prev.filter((p) => p.id !== q.id))
                         }
                         className="shrink-0 text-[11px] font-semibold text-rose-500 hover:text-rose-700"
-                        title="Leave it in the bank, but do not put it in this exam"
+                        title={tp("not_in_exam_hint")}
                       >
-                        Not in this exam
+                        {t("not_in_this_exam")}
                       </button>
                     </li>
                   );
                 })}
-                <li className="pt-1 text-[11px] text-ink-muted">
-                  Correct answers stay on the server. Nothing here is ever sent to a
-                  candidate&apos;s browser.
-                </li>
+                <li className="pt-1 text-[11px] text-ink-muted">{t("answers_note")}</li>
               </ul>
             )}
 
@@ -1519,7 +1462,7 @@ export default function CreateExamWizard() {
 
           <div className="flex justify-between pt-4">
             <Button variant="secondary" onClick={() => setStep(1)}>
-              ← Back to Category
+              {t("back_to_category")}
             </Button>
             <div className="flex gap-2">
               <Button
@@ -1530,9 +1473,9 @@ export default function CreateExamWizard() {
                   setStep(3);
                 }}
               >
-                Start from scratch instead
+                {t("start_from_scratch")}
               </Button>
-              <Button onClick={() => setStep(3)}>Next: Basic Details →</Button>
+              <Button onClick={() => setStep(3)}>{t("next_basic_details")}</Button>
             </div>
           </div>
         </div>
@@ -1542,22 +1485,20 @@ export default function CreateExamWizard() {
       {step === 3 && !published && (
         <Card className="space-y-5 animate-fade-in">
           <div>
-            <h2 className="text-lg font-bold text-ink">Exam Details & Target Configuration</h2>
-            <p className="text-xs text-ink-muted">
-              Configure titles, window duration, subject binding, and mode-specific parameters.
-            </p>
+            <h2 className="text-lg font-bold text-ink">{t("step3_title")}</h2>
+            <p className="text-xs text-ink-muted">{t("step3_desc")}</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Exam Title" required>
+            <Field label={t("field_exam_title")} required>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. CS101 Semester Final Examination"
+                placeholder={t("placeholder_title")}
               />
             </Field>
 
-            <Field label="Primary Subject" required>
+            <Field label={t("field_primary_subject")} required>
               <SubjectCombobox
                 subjects={subjects}
                 value={subjectId}
@@ -1567,21 +1508,21 @@ export default function CreateExamWizard() {
             </Field>
           </div>
 
-          <Field label="Description">
+          <Field label={t("field_description")}>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="Short overview of syllabus, topics covered, and evaluation structure..."
+              placeholder={t("placeholder_description")}
             />
           </Field>
 
-          <Field label="Instructions" hint="Shown to the candidate before they start.">
+          <Field label={t("field_instructions")} hint={t("field_instructions_hint")}>
             <Textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               rows={3}
-              placeholder="e.g. No calculators. Answer all questions. Read each question carefully..."
+              placeholder={t("placeholder_instructions")}
             />
           </Field>
 
@@ -1589,28 +1530,28 @@ export default function CreateExamWizard() {
           {category === "academic" ? (
             <div className="rounded-xl border border-accent/20 bg-accent-soft/10 p-4 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-wider">
-                🎓 Academic Metadata
+                {t("academic_metadata")}
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Course / Degree">
+                <Field label={t("field_course")}>
                   <Input
                     value={course}
                     onChange={(e) => setCourse(e.target.value)}
-                    placeholder="e.g. B.Tech Computer Science"
+                    placeholder={t("placeholder_course")}
                   />
                 </Field>
-                <Field label="Department">
+                <Field label={t("field_department")}>
                   <Input
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. Computer Science & Eng"
+                    placeholder={t("placeholder_department")}
                   />
                 </Field>
-                <Field label="Semester / Batch">
+                <Field label={t("field_semester")}>
                   <Input
                     value={semester}
                     onChange={(e) => setSemester(e.target.value)}
-                    placeholder="e.g. Semester IV"
+                    placeholder={t("placeholder_semester")}
                   />
                 </Field>
               </div>
@@ -1618,21 +1559,21 @@ export default function CreateExamWizard() {
           ) : (
             <div className="rounded-xl border border-purple-500/20 bg-purple-50/20 dark:bg-purple-950/20 p-4 space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
-                💼 Corporate Hiring Metadata
+                {t("corporate_metadata")}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Company / Organization Name">
+                <Field label={t("field_company")}>
                   <Input
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="e.g. TechCorp Global"
+                    placeholder={t("placeholder_company")}
                   />
                 </Field>
-                <Field label="Target Job Role">
+                <Field label={t("field_job_role")}>
                   <Input
                     value={jobRole}
                     onChange={(e) => setJobRole(e.target.value)}
-                    placeholder="e.g. Full-Stack Software Engineer (SDE-1)"
+                    placeholder={t("placeholder_job_role")}
                   />
                 </Field>
               </div>
@@ -1641,7 +1582,7 @@ export default function CreateExamWizard() {
 
           {/* Timing & Scoring */}
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Duration (minutes)" required>
+            <Field label={t("field_duration")} required>
               <Input
                 type="number"
                 min={5}
@@ -1651,7 +1592,7 @@ export default function CreateExamWizard() {
               />
             </Field>
 
-            <Field label="Declared Total Marks">
+            <Field label={t("field_total_marks")}>
               <Input
                 type="number"
                 min={1}
@@ -1660,7 +1601,7 @@ export default function CreateExamWizard() {
               />
             </Field>
 
-            <Field label="Passing Percentage (%)">
+            <Field label={t("field_passing_pct")}>
               <Input
                 type="number"
                 min={0}
@@ -1672,19 +1613,19 @@ export default function CreateExamWizard() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Difficulty Level" hint="A descriptive tag shown to candidates.">
+            <Field label={t("field_difficulty")} hint={t("field_difficulty_hint")}>
               <Select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as Difficulty | "")}
               >
-                <option value="">Mixed</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+                <option value="">{t("difficulty_mixed")}</option>
+                <option value="easy">{t("difficulty_easy")}</option>
+                <option value="medium">{t("difficulty_medium")}</option>
+                <option value="hard">{t("difficulty_hard")}</option>
               </Select>
             </Field>
 
-            <Field label="Maximum Attempts">
+            <Field label={t("field_max_attempts")}>
               <Input
                 type="number"
                 min={1}
@@ -1695,24 +1636,24 @@ export default function CreateExamWizard() {
             </Field>
 
             <Field
-              label="Questions per candidate"
-              hint="Calculated from the section rules — never typed, so it cannot contradict them."
+              label={t("field_questions_per_candidate")}
+              hint={t("field_questions_per_candidate_hint")}
             >
               <div className="flex h-[38px] items-center rounded-[10px] border border-line bg-sunken px-3 text-[13px] font-semibold text-ink">
-                {totalQuestionsNeeded || "Set by your sections"}
+                {totalQuestionsNeeded || t("set_by_sections")}
               </div>
             </Field>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Opens At (Window Start)" required>
+            <Field label={t("field_opens_at")} required>
               <Input
                 type="datetime-local"
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
               />
             </Field>
-            <Field label="Closes At (Window End)" required>
+            <Field label={t("field_closes_at")} required>
               <Input
                 type="datetime-local"
                 value={endsAt}
@@ -1729,15 +1670,15 @@ export default function CreateExamWizard() {
                 onChange={(e) => setNegativeMarking(e.target.checked)}
                 className="h-4 w-4 rounded border-line text-accent focus:ring-accent"
               />
-              Enable Negative Marking
+              {t("enable_negative_marking")}
             </label>
           </div>
 
           <div className="flex justify-between pt-4 border-t border-line">
             <Button variant="secondary" onClick={() => setStep(2)}>
-              ← Back to Patterns
+              {t("back_to_patterns")}
             </Button>
-            <Button onClick={() => setStep(4)}>Next: Configure Sections →</Button>
+            <Button onClick={() => setStep(4)}>{t("next_configure_sections")}</Button>
           </div>
         </Card>
       )}
@@ -1747,10 +1688,8 @@ export default function CreateExamWizard() {
         <div className="space-y-6 animate-fade-in">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-ink">Exam Sections & Selection Rules</h2>
-              <p className="text-sm text-ink-muted mt-0.5">
-                Define the sections and algorithmic rules to draw random questions from your pool.
-              </p>
+              <h2 className="text-xl font-bold text-ink">{t("step4_title")}</h2>
+              <p className="text-sm text-ink-muted mt-0.5">{t("step4_desc")}</p>
             </div>
             <Button
               size="sm"
@@ -1758,7 +1697,7 @@ export default function CreateExamWizard() {
                 setSections((prev) => [
                   ...prev,
                   {
-                    name: `Section ${prev.length + 1}`,
+                    name: tp("default_section_name", { n: prev.length + 1 }),
                     description: "",
                     duration_minutes: null,
                     marks_per_question: 2,
@@ -1768,20 +1707,20 @@ export default function CreateExamWizard() {
                 ]);
               }}
             >
-              + Add Section
+              {t("add_section")}
             </Button>
           </div>
 
           {sections.length === 0 ? (
             <Card className="text-center py-8">
-              <p className="text-sm text-ink-muted mb-3">No sections defined yet.</p>
+              <p className="text-sm text-ink-muted mb-3">{t("no_sections_yet")}</p>
               <Button
                 size="sm"
                 onClick={() => {
                   setSections([
                     {
-                      name: "General Section",
-                      description: "Main exam questions",
+                      name: tp("general_section_name"),
+                      description: tp("general_section_desc"),
                       duration_minutes: null,
                       marks_per_question: 2,
                       negative_marks: null,
@@ -1790,7 +1729,7 @@ export default function CreateExamWizard() {
                   ]);
                 }}
               >
-                Add Default Section
+                {t("add_default_section")}
               </Button>
             </Card>
           ) : (
@@ -1811,7 +1750,7 @@ export default function CreateExamWizard() {
                           );
                         }}
                         className="font-bold text-sm h-8"
-                        placeholder="Section Name"
+                        placeholder={tp("placeholder_section_name")}
                       />
                     </div>
                     <button
@@ -1819,12 +1758,12 @@ export default function CreateExamWizard() {
                       onClick={() => setSections((prev) => prev.filter((_, idx) => idx !== sIdx))}
                       className="text-xs text-rose-500 hover:text-rose-700 font-semibold"
                     >
-                      Remove Section
+                      {t("remove_section")}
                     </button>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2 text-xs">
-                    <Field label="Section Description">
+                    <Field label={t("field_section_desc")}>
                       <Input
                         value={sec.description}
                         onChange={(e) => {
@@ -1833,10 +1772,10 @@ export default function CreateExamWizard() {
                             prev.map((s, idx) => (idx === sIdx ? { ...s, description: val } : s))
                           );
                         }}
-                        placeholder="Optional description"
+                        placeholder={t("placeholder_section_desc")}
                       />
                     </Field>
-                    <Field label="Section Duration (mins, null = shared)">
+                    <Field label={t("field_section_duration")}>
                       <Input
                         type="number"
                         value={sec.duration_minutes || ""}
@@ -1846,7 +1785,7 @@ export default function CreateExamWizard() {
                             prev.map((s, idx) => (idx === sIdx ? { ...s, duration_minutes: val } : s))
                           );
                         }}
-                        placeholder="Leave blank for shared exam timer"
+                        placeholder={t("placeholder_section_duration")}
                       />
                     </Field>
                   </div>
@@ -1854,7 +1793,7 @@ export default function CreateExamWizard() {
                   {/* Rules list */}
                   <div className="space-y-2 border-t border-line/60 pt-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-ink">Question Selection Rules</span>
+                      <span className="text-xs font-bold text-ink">{t("question_selection_rules")}</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -1874,7 +1813,7 @@ export default function CreateExamWizard() {
                         }}
                         className="text-xs text-accent hover:underline font-semibold"
                       >
-                        + Add Rule
+                        {t("add_rule")}
                       </button>
                     </div>
 
@@ -1883,7 +1822,7 @@ export default function CreateExamWizard() {
                         key={rIdx}
                         className="flex flex-wrap items-center gap-2 rounded-lg bg-sunken/40 p-2 text-xs"
                       >
-                        <span className="text-ink-muted">Draw</span>
+                        <span className="text-ink-muted">{t("rule_draw")}</span>
                         <input
                           type="number"
                           min={1}
@@ -1906,7 +1845,7 @@ export default function CreateExamWizard() {
                           }}
                           className="w-16 rounded border border-line bg-surface px-2 py-1 text-center font-bold"
                         />
-                        <span className="text-ink-muted">questions of type</span>
+                        <span className="text-ink-muted">{t("rule_questions_of_type")}</span>
                         <select
                           value={rule.question_type}
                           onChange={(e) => {
@@ -1926,14 +1865,14 @@ export default function CreateExamWizard() {
                           }}
                           className="rounded border border-line bg-surface px-2 py-1 text-xs"
                         >
-                          {Object.entries(TYPE_LABEL).map(([t, label]) => (
-                            <option key={t} value={t}>
-                              {label}
+                          {(Object.keys(TYPE_LABEL) as QuestionType[]).map((type) => (
+                            <option key={type} value={type}>
+                              {typeLabel(type)}
                             </option>
                           ))}
                         </select>
 
-                        <span className="text-ink-muted">difficulty</span>
+                        <span className="text-ink-muted">{t("rule_difficulty")}</span>
                         <select
                           value={rule.difficulty || "any"}
                           onChange={(e) => {
@@ -1953,13 +1892,13 @@ export default function CreateExamWizard() {
                           }}
                           className="rounded border border-line bg-surface px-2 py-1 text-xs"
                         >
-                          <option value="any">Any difficulty</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
+                          <option value="any">{t("rule_any_difficulty")}</option>
+                          <option value="easy">{t("difficulty_easy")}</option>
+                          <option value="medium">{t("difficulty_medium")}</option>
+                          <option value="hard">{t("difficulty_hard")}</option>
                         </select>
 
-                        <span className="text-ink-muted">category</span>
+                        <span className="text-ink-muted">{t("rule_category")}</span>
                         <select
                           value={rule.category ?? ""}
                           onChange={(e) => {
@@ -1979,15 +1918,15 @@ export default function CreateExamWizard() {
                           }}
                           className="rounded border border-line bg-surface px-2 py-1 text-xs"
                         >
-                          <option value="">Any category</option>
+                          <option value="">{t("rule_any_category")}</option>
                           {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((c) => (
                             <option key={c} value={c}>
-                              {CATEGORY_LABEL[c]}
+                              {categoryLabel(c)}
                             </option>
                           ))}
                         </select>
 
-                        <span className="text-ink-muted">subject</span>
+                        <span className="text-ink-muted">{t("rule_subject")}</span>
                         <select
                           value={rule.topic ?? ""}
                           onChange={(e) => {
@@ -2007,7 +1946,7 @@ export default function CreateExamWizard() {
                           }}
                           className="max-w-[160px] rounded border border-line bg-surface px-2 py-1 text-xs"
                         >
-                          <option value="">Any subject</option>
+                          <option value="">{t("rule_any_subject")}</option>
                           {subjects.map((sub) => (
                             <option key={sub.id} value={sub.name}>
                               {sub.name}
@@ -2028,8 +1967,8 @@ export default function CreateExamWizard() {
                           className="rounded border border-accent/40 bg-accent-soft/30 px-2 py-1 text-[11px] font-semibold text-accent hover:bg-accent-soft/60"
                         >
                           {ruleAuthor?.s === sIdx && ruleAuthor?.r === rIdx
-                            ? "Close editor"
-                            : "+ Write one"}
+                            ? t("close_editor")
+                            : t("write_one")}
                         </button>
 
                         <button
@@ -2040,7 +1979,7 @@ export default function CreateExamWizard() {
                           }}
                           className="rounded border border-line bg-surface px-2 py-1 text-[11px] font-semibold text-ink-muted hover:text-ink"
                         >
-                          {exampleOpen === `${sIdx}:${rIdx}` ? "Hide example" : "See example"}
+                          {exampleOpen === `${sIdx}:${rIdx}` ? t("hide_example") : t("see_example")}
                         </button>
 
                         {sec.rules.length > 1 && (
@@ -2089,15 +2028,17 @@ export default function CreateExamWizard() {
                         return (
                           <div className="rounded-lg border border-accent/30 bg-accent-soft/10 p-3">
                             <p className="mb-3 text-[11.5px] text-ink-muted">
-                              Writing for{" "}
-                              <span className="font-semibold text-ink">{sec.name}</span> ·{" "}
-                              rule {ruleAuthor.r + 1}. Type and difficulty are pre-set to{" "}
-                              <span className="font-semibold text-ink">
-                                {TYPE_LABEL[rule.question_type]}
-                              </span>
-                              {rule.difficulty ? ` / ${rule.difficulty}` : ""} so this rule
-                              can draw it. Change either and the rule will skip it.
-                              {ruleSeeded && " Started from the worked example — rewrite it."}
+                              {tp.rich("writing_for_rule", {
+                                section: sec.name,
+                                rule: ruleAuthor.r + 1,
+                                type:
+                                  typeLabel(rule.question_type) +
+                                  (rule.difficulty ? ` / ${difficultyLabel(rule.difficulty)}` : ""),
+                                b: (chunks) => (
+                                  <span className="font-semibold text-ink">{chunks}</span>
+                                ),
+                              })}
+                              {ruleSeeded && ` ${tp("started_from_example")}`}
                             </p>
                             <QuestionEditor
                               key={`${sIdx}:${ruleAuthor.r}:${ruleSeeded}`}
@@ -2135,11 +2076,10 @@ export default function CreateExamWizard() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <span className="text-xs font-bold text-ink">
-                              Questions chosen for this section
+                              {t("section_chosen_title")}
                             </span>
                             <p className="mt-0.5 text-[11px] text-ink-muted">
-                              {mine.length} chosen of {needed} this section draws. The rest
-                              are drawn at random from the shared pool.
+                              {t("section_chosen_desc", { chosen: mine.length, needed })}
                             </p>
                           </div>
                           <Button
@@ -2152,7 +2092,7 @@ export default function CreateExamWizard() {
                               setBankForSection((cur) => (cur === sIdx ? null : sIdx));
                             }}
                           >
-                            {bankForSection === sIdx ? "Close bank" : "Pick from Question Bank"}
+                            {bankForSection === sIdx ? t("close_bank") : t("pick_from_bank")}
                           </Button>
                         </div>
 
@@ -2169,12 +2109,12 @@ export default function CreateExamWizard() {
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate font-medium text-ink">{entry.body}</p>
                                   <p className="mt-0.5 text-ink-muted">
-                                    {TYPE_LABEL[entry.question_type]} · {entry.difficulty} ·{" "}
-                                    {entry.effective_marks} mark
-                                    {entry.effective_marks === 1 ? "" : "s"}
+                                    {typeLabel(entry.question_type)} ·{" "}
+                                    {entry.difficulty ? difficultyLabel(entry.difficulty) : ""} ·{" "}
+                                    {tp("n_marks", { count: entry.effective_marks })}
                                     {!entry.has_answer_key && (
                                       <span className="ml-1 font-semibold text-amber">
-                                        · no answer key
+                                        · {tp("no_answer_key")}
                                       </span>
                                     )}
                                   </p>
@@ -2183,9 +2123,9 @@ export default function CreateExamWizard() {
                                   type="button"
                                   onClick={() => void unpinFromSection(entry.question_id)}
                                   className="shrink-0 text-[11px] font-semibold text-ink-muted hover:text-ink"
-                                  title="Keep it in the exam, but let any section draw it"
+                                  title={tp("unpin_hint")}
                                 >
-                                  Unpin
+                                  {t("unpin")}
                                 </button>
                               </li>
                             ))}
@@ -2195,11 +2135,10 @@ export default function CreateExamWizard() {
                         {bankForSection === sIdx && (
                           <div className="rounded-lg border border-line bg-surface p-3">
                             <Alert tone="accent">
-                              Anything you add here is chosen <strong>for {sec.name}</strong>:
-                              this section draws it first, and no other section can. It still
-                              has to match one of this section&apos;s rules — the Question Bank
-                              is your reusable library, the pool is what this exam may draw
-                              from.
+                              {tp.rich("bank_for_section_note", {
+                                section: sec.name,
+                                strong: (chunks) => <strong>{chunks}</strong>,
+                              })}
                             </Alert>
                             <div className="mt-3">
                               <QuestionBankSelector
@@ -2223,10 +2162,10 @@ export default function CreateExamWizard() {
 
           <div className="flex justify-between pt-4">
             <Button variant="secondary" onClick={() => setStep(3)}>
-              ← Back to Details
+              {t("back_to_details")}
             </Button>
             <Button loading={savingDraft} onClick={() => void goToPool()}>
-              {examId ? "Next: Build Question Pool →" : "Save draft & build the pool →"}
+              {examId ? t("next_build_pool") : t("save_and_build_pool")}
             </Button>
           </div>
         </div>
@@ -2238,16 +2177,15 @@ export default function CreateExamWizard() {
         <div className="space-y-6 animate-fade-in">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold text-ink">Build Question Pool</h2>
-              <p className="text-sm text-ink-muted mt-0.5">
-                Write questions yourself, reuse the bank, generate a set with AI, or
-                import a file. Use as many of the four as you like.
-              </p>
+              <h2 className="text-xl font-bold text-ink">{t("step5_title")}</h2>
+              <p className="text-sm text-ink-muted mt-0.5">{t("step5_desc")}</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge tone={pool?.can_publish ? "mint" : "amber"}>
-                {pool?.stats.total_questions ?? 0} in the pool ·{" "}
-                {pool?.required_count ?? totalQuestionsNeeded} per paper
+                {tp("pool_badge", {
+                  total: pool?.stats.total_questions ?? 0,
+                  per_paper: pool?.required_count ?? totalQuestionsNeeded,
+                })}
               </Badge>
               <Button
                 size="sm"
@@ -2255,27 +2193,24 @@ export default function CreateExamWizard() {
                 loading={savingDraft}
                 onClick={() => void saveDraft()}
               >
-                Save draft
+                {t("save_draft")}
               </Button>
             </div>
           </div>
 
           {!examId ? (
-            <Alert tone="amber" title="Save the draft first">
-              The pool belongs to an exam, so the exam has to exist before questions can
-              join it. Go back a step and save the draft.
+            <Alert tone="amber" title={t("pool_save_draft_first_title")}>
+              {t("pool_save_draft_first")}
             </Alert>
           ) : (
             <>
               {/* guided vs advanced */}
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-line bg-sunken/40 px-3 py-2">
                 <p className="text-[12.5px] text-ink-muted">
-                  {guidedMode
-                    ? "Guided: one section at a time, filtered to exactly its subject, type and difficulty."
-                    : "Advanced: write, browse, AI-generate or import freely into the shared pool."}
+                  {guidedMode ? t("guided_mode_label") : t("advanced_mode_label")}
                 </p>
                 <Button size="sm" variant="secondary" onClick={() => setGuidedMode((v) => !v)}>
-                  {guidedMode ? "Switch to Advanced editor" : "Switch to Guided Selection"}
+                  {guidedMode ? t("switch_to_advanced") : t("switch_to_guided")}
                 </Button>
               </div>
 
@@ -2294,16 +2229,19 @@ export default function CreateExamWizard() {
               )}
 
               {ruleAuthor && guidedMode && (
-                <Modal open onClose={() => setRuleAuthor(null)} title="Write a matching question" size="lg">
+                <Modal open onClose={() => setRuleAuthor(null)} title={t("write_matching_question")} size="lg">
                   {(() => {
                     const rule = sections[ruleAuthor.s]?.rules[ruleAuthor.r];
                     if (!rule) return null;
                     return (
                       <div className="space-y-3">
                         <p className="text-[12px] text-ink-muted">
-                          Type and difficulty are pre-set to{" "}
-                          <span className="font-semibold text-ink">{TYPE_LABEL[rule.question_type]}</span>
-                          {rule.difficulty ? ` / ${rule.difficulty}` : ""} so this section can use it.
+                          {tp.rich("preset_for_section", {
+                            type:
+                              typeLabel(rule.question_type) +
+                              (rule.difficulty ? ` / ${difficultyLabel(rule.difficulty)}` : ""),
+                            b: (chunks) => <span className="font-semibold text-ink">{chunks}</span>,
+                          })}
                         </p>
                         <QuestionEditor
                           subjects={subjects}
@@ -2315,7 +2253,7 @@ export default function CreateExamWizard() {
                           onSaved={async (q) => {
                             if (examId && sections[ruleAuthor.s]?.id) await pinToSection(ruleAuthor.s, q.id);
                             else if (examId) await refreshPool(examId);
-                            setGuidedReloadToken((t) => t + 1);
+                            setGuidedReloadToken((token) => token + 1);
                             setRuleAuthor(null);
                           }}
                           onCancel={() => setRuleAuthor(null)}
@@ -2332,11 +2270,11 @@ export default function CreateExamWizard() {
               <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
                 {(
                   [
-                    { key: "create", label: "+ Create Question" },
-                    { key: "bank", label: "Question Bank" },
-                    { key: "ai", label: "AI Generate" },
-                    { key: "import", label: "Import Questions" },
-                    { key: "blueprint", label: "Blueprint" },
+                    { key: "create", label: t("tab_create") },
+                    { key: "bank", label: t("tab_bank") },
+                    { key: "ai", label: t("tab_ai") },
+                    { key: "import", label: t("tab_import") },
+                    { key: "blueprint", label: t("tab_blueprint") },
                   ] as { key: typeof poolTab; label: string }[]
                 ).map((tab) => (
                   <button
@@ -2407,9 +2345,12 @@ export default function CreateExamWizard() {
               {/* the pool itself */}
               <div>
                 <div className="mb-3 flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-ink">Exam Question Pool</h3>
+                  <h3 className="text-lg font-bold text-ink">{t("pool_title")}</h3>
                   <Badge tone="neutral">
-                    {pool?.stats.total_questions ?? 0} / {pool?.required_count ?? 0} needed
+                    {tp("pool_needed_badge", {
+                      total: pool?.stats.total_questions ?? 0,
+                      needed: pool?.required_count ?? 0,
+                    })}
                   </Badge>
                   {!randomize && (pool?.entries.length ?? 0) > 1 && (
                     <Button
@@ -2418,7 +2359,7 @@ export default function CreateExamWizard() {
                       loading={shufflingPool}
                       onClick={() => void shufflePool()}
                     >
-                      🔀 Shuffle order
+                      {t("shuffle_order")}
                     </Button>
                   )}
                 </div>
@@ -2453,7 +2394,7 @@ export default function CreateExamWizard() {
                       setPoolTab("bank");
                     } catch (err) {
                       toast(
-                        err instanceof ApiError ? err.message : "Could not open that question.",
+                        err instanceof ApiError ? err.message : tp("toast_could_not_open_question"),
                         "rose"
                       );
                     }
@@ -2464,21 +2405,18 @@ export default function CreateExamWizard() {
           )}
 
           {guidedMode && !guidedComplete && (
-            <Alert tone="amber">
-              Every section still needs its exact question count selected before you can
-              continue.
-            </Alert>
+            <Alert tone="amber">{t("guided_incomplete")}</Alert>
           )}
 
           <div className="flex justify-between pt-4 border-t border-line">
             <Button variant="secondary" onClick={() => setStep(4)}>
-              ← Back to Sections
+              {t("back_to_sections")}
             </Button>
             <Button
               onClick={() => setStep(6)}
               disabled={guidedMode ? !guidedComplete : !pool?.can_publish}
             >
-              Next: Assign Candidates →
+              {t("next_assign_candidates")}
             </Button>
           </div>
         </div>
@@ -2488,20 +2426,17 @@ export default function CreateExamWizard() {
       {step === 6 && !published && (
         <div className="space-y-6 animate-fade-in">
           <div>
-            <h2 className="text-xl font-bold text-ink">Assign Candidates</h2>
-            <p className="text-sm text-ink-muted mt-0.5">
-              Only assigned candidates ever see this exam. Assigning somebody whose login
-              access is still pending is allowed — the exam waits for them.
-            </p>
+            <h2 className="text-xl font-bold text-ink">{t("step6_title")}</h2>
+            <p className="text-sm text-ink-muted mt-0.5">{t("step6_desc")}</p>
           </div>
 
           <CandidateSelector examId={examId} onChange={setAssignedCount} />
 
           <div className="flex justify-between pt-4 border-t border-line">
             <Button variant="secondary" onClick={() => setStep(5)}>
-              ← Back to the Question Pool
+              {t("back_to_pool")}
             </Button>
-            <Button onClick={() => setStep(7)}>Next: Review &amp; Publish →</Button>
+            <Button onClick={() => setStep(7)}>{t("next_review_publish")}</Button>
           </div>
         </div>
       )}
@@ -2512,11 +2447,12 @@ export default function CreateExamWizard() {
           {/* ------------------------------------------------------ randomisation */}
           <Card className="space-y-4">
             <div>
-              <h2 className="text-lg font-bold text-ink">Randomisation</h2>
+              <h2 className="text-lg font-bold text-ink">{t("step7_randomisation")}</h2>
               <p className="text-xs text-ink-muted">
-                The pool holds {pool?.stats.total_questions ?? 0} questions. Each
-                candidate sits {pool?.required_count ?? totalQuestionsNeeded} of them,
-                drawn by the section rules.
+                {t("step7_randomisation_desc", {
+                  total: pool?.stats.total_questions ?? 0,
+                  per_candidate: pool?.required_count ?? totalQuestionsNeeded,
+                })}
               </p>
             </div>
 
@@ -2524,78 +2460,72 @@ export default function CreateExamWizard() {
               <Toggle
                 checked={randomize}
                 onChange={setRandomize}
-                title="Randomize question order"
-                body="Every candidate gets the same questions in a different order — the count never changes, and a question never leaves its section."
+                title={t("toggle_randomize_title")}
+                body={t("toggle_randomize_body")}
               />
               <Toggle
                 checked={shuffleOptions}
                 onChange={setShuffleOptions}
-                title="Randomize answer options"
-                body="A separate setting. Shuffles A/B/C/D within each choice question, so &quot;the answer is C&quot; is not shareable. Off by default."
+                title={t("toggle_shuffle_options_title")}
+                body={t("toggle_shuffle_options_body")}
               />
             </div>
 
             {!randomize && (
-              <Alert tone="amber">
-                With randomisation off, every candidate sits the pool in the order you
-                arranged it — so the pool must hold exactly what you want asked.
-              </Alert>
+              <Alert tone="amber">{t("randomise_off_warning")}</Alert>
             )}
           </Card>
 
           {/* --------------------------------------------------------- proctoring */}
           <Card className="space-y-4">
             <div>
-              <h2 className="text-lg font-bold text-ink">Proctoring &amp; Integrity</h2>
-              <p className="text-xs text-ink-muted">
-                These settings decide what gets detected and flagged. They never decide
-                whether a candidate cheated — you rule on the evidence afterwards.
-              </p>
+              <h2 className="text-lg font-bold text-ink">{t("step7_proctoring")}</h2>
+              <p className="text-xs text-ink-muted">{t("step7_proctoring_desc")}</p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <Toggle
                 checked={proctorWebcam}
                 onChange={setProctorWebcam}
-                title="Webcam face verification"
-                body="Continuous facial presence, plus multiple-face detection."
+                title={t("toggle_webcam_title")}
+                body={t("toggle_webcam_body")}
               />
               <Toggle
                 checked={proctorGaze}
                 onChange={setProctorGaze}
-                title="Gaze tracking"
-                body="Raises a signal on prolonged off-screen looking."
+                title={t("toggle_gaze_title")}
+                body={t("toggle_gaze_body")}
               />
               <Toggle
                 checked={proctorFullscreen}
                 onChange={setProctorFullscreen}
-                title="Fullscreen enforcement"
-                body="Tab switches and window blur are recorded with timestamps."
+                title={t("toggle_fullscreen_title")}
+                body={t("toggle_fullscreen_body")}
               />
               <Toggle
                 checked={proctorBlockCopyPaste}
                 onChange={setProctorBlockCopyPaste}
-                title="Block copy / paste"
-                body="Clipboard actions inside the runner are refused."
+                title={t("toggle_copy_paste_title")}
+                body={t("toggle_copy_paste_body")}
               />
               <Toggle
                 checked={proctorMicrophone}
                 onChange={setProctorMicrophone}
-                title="Require a microphone"
-                body="Checked during the pre-flight test, before the timer starts."
+                title={t("toggle_microphone_title")}
+                body={t("toggle_microphone_body")}
               />
               <Toggle
                 checked={proctorSingleDisplay}
                 onChange={setProctorSingleDisplay}
-                title="Single display only"
-                body="A second monitor is refused at pre-flight."
+                title={t("toggle_single_display_title")}
+                body={t("toggle_single_display_body")}
               />
             </div>
 
             <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-3">
               <Field
-                label="Times a candidate may leave the exam"
-                hint="Tab switch, minimise, or leaving fullscreen. On the last one their answers are submitted and the exam closes. 0 turns this off."
+                label={t("field_max_focus_violations")}
+                hint={t("field_max_focus_violations_hint")}
               >
                 <Input
                   type="number"
@@ -2606,8 +2536,8 @@ export default function CreateExamWizard() {
                 />
               </Field>
               <Field
-                label="Tab switches before flagging"
-                hint="Earlier switches warn the candidate; this many flags the sitting."
+                label={t("field_max_tab_switches")}
+                hint={t("field_max_tab_switches_hint")}
               >
                 <Input
                   type="number"
@@ -2617,7 +2547,7 @@ export default function CreateExamWizard() {
                   onChange={(e) => setMaxTabSwitches(Number(e.target.value))}
                 />
               </Field>
-              <Field label="Gaze sensitivity" hint="0 is lenient, 1 is strict.">
+              <Field label={t("field_gaze_sensitivity")} hint={t("field_gaze_sensitivity_hint")}>
                 <Input
                   type="number"
                   min="0"
@@ -2627,7 +2557,7 @@ export default function CreateExamWizard() {
                   onChange={(e) => setGazeSensitivity(Number(e.target.value))}
                 />
               </Field>
-              <Field label="Snapshot interval (seconds)">
+              <Field label={t("field_snapshot_interval")}>
                 <Input
                   type="number"
                   min="10"
@@ -2638,8 +2568,8 @@ export default function CreateExamWizard() {
                 />
               </Field>
               <Field
-                label="Suspicion score that flags"
-                hint="The sitting is marked for your review at this score."
+                label={t("field_flag_score")}
+                hint={t("field_flag_score_hint")}
               >
                 <Input
                   type="number"
@@ -2649,8 +2579,8 @@ export default function CreateExamWizard() {
                 />
               </Field>
               <Field
-                label="Suspicion score that ends the sitting"
-                hint="Must be above the flag score. Ending a sitting is not a verdict."
+                label={t("field_terminate_score")}
+                hint={t("field_terminate_score_hint")}
               >
                 <Input
                   type="number"
@@ -2662,22 +2592,12 @@ export default function CreateExamWizard() {
             </div>
 
             <Alert tone="accent">
-              {maxFocusViolations > 0 ? (
-                <>
-                  Leaving the exam escalates: warning, final warning, then the answers are
-                  submitted and the exam closes at{" "}
-                  <span className="font-semibold">{maxFocusViolations}</span>. That is a
-                  submitted paper, not a void one — it is marked and published through the
-                  normal workflow. You review the evidence afterwards and rule the sitting
-                  a genuine attempt or malpractice.
-                </>
-              ) : (
-                <>
-                  Leaving the exam is recorded but will not close it. Flagged sittings are
-                  still marked — you review the evidence and rule each one a genuine
-                  attempt or malpractice.
-                </>
-              )}
+              {maxFocusViolations > 0
+                ? tp.rich("focus_escalation_note", {
+                    count: maxFocusViolations,
+                    b: (chunks) => <span className="font-semibold">{chunks}</span>,
+                  })
+                : tp("focus_recorded_only_note")}
             </Alert>
           </Card>
 
@@ -2685,9 +2605,9 @@ export default function CreateExamWizard() {
           <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-surface p-1">
             {(
               [
-                { key: "summary", label: "Summary & validation" },
-                { key: "full", label: "📋 Question Paper Preview" },
-                { key: "paper", label: "Preview the candidate's paper" },
+                { key: "summary", label: t("tab_summary") },
+                { key: "full", label: t("tab_full_preview") },
+                { key: "paper", label: t("tab_candidate_paper") },
               ] as { key: typeof reviewTab; label: string }[]
             ).map((tab) => (
               <button
@@ -2741,44 +2661,70 @@ export default function CreateExamWizard() {
               reviewTab !== "summary" && "hidden"
             )}
           >
-            <h2 className="text-base font-bold text-ink">Review before publishing</h2>
+            <h2 className="text-base font-bold text-ink">{t("review_title")}</h2>
             <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-              <Summary label="Mode" value={category === "academic" ? "Academic" : "Corporate"} />
-              <Summary label="Duration" value={`${durationMinutes} minutes`} />
-              <Summary label="Declared marks" value={String(declaredTotalMarks || "Auto")} />
               <Summary
-                label="Pass mark"
-                value={passingPercentage ? `${passingPercentage}%` : "None declared"}
+                label={t("label_mode")}
+                value={category === "academic" ? t("mode_academic") : t("mode_corporate")}
               />
-              <Summary label="Sections" value={`${sections.length}`} />
+              <Summary label={t("label_duration")} value={t("value_minutes", { count: durationMinutes })} />
               <Summary
-                label="Pool"
-                value={`${pool?.stats.total_questions ?? 0} questions · ${pool?.stats.total_marks ?? 0} marks`}
+                label={t("label_declared_marks")}
+                value={declaredTotalMarks ? String(declaredTotalMarks) : t("value_auto")}
               />
               <Summary
-                label="Per candidate"
-                value={`${pool?.required_count ?? totalQuestionsNeeded} questions`}
+                label={t("label_pass_mark")}
+                value={passingPercentage ? `${passingPercentage}%` : t("value_none_declared")}
               />
-              <Summary label="Negative marking" value={negativeMarking ? "On" : "Off"} />
-              <Summary label="Attempts allowed" value={String(maxAttempts)} />
-              <Summary label="Randomised" value={randomize ? "Per candidate" : "Fixed order"} />
+              <Summary label={t("label_sections")} value={`${sections.length}`} />
               <Summary
-                label="Leaving the exam"
+                label={t("label_pool")}
+                value={t("value_pool_summary", {
+                  questions: pool?.stats.total_questions ?? 0,
+                  marks: pool?.stats.total_marks ?? 0,
+                })}
+              />
+              <Summary
+                label={t("label_per_candidate")}
+                value={t("value_questions", { count: pool?.required_count ?? totalQuestionsNeeded })}
+              />
+              <Summary
+                label={t("label_negative_marking")}
+                value={negativeMarking ? t("value_on") : t("value_off")}
+              />
+              <Summary label={t("label_attempts_allowed")} value={String(maxAttempts)} />
+              <Summary
+                label={t("label_randomised")}
+                value={randomize ? t("value_per_candidate") : t("value_fixed_order")}
+              />
+              <Summary
+                label={t("label_leaving_exam")}
                 value={
                   maxFocusViolations > 0
-                    ? `Auto-submits at ${maxFocusViolations}`
-                    : "Recorded only"
+                    ? t("value_auto_submits_at", { count: maxFocusViolations })
+                    : t("value_recorded_only")
                 }
               />
               <Summary
-                label="Target"
-                value={category === "academic" ? course || "Not set" : companyName || "Not set"}
+                label={t("label_target")}
+                value={
+                  category === "academic"
+                    ? course || t("value_not_set")
+                    : companyName || t("value_not_set")
+                }
               />
               <Summary
-                label="Candidates"
-                value={assignedCount ? `${assignedCount} assigned` : "None assigned"}
+                label={t("label_candidates")}
+                value={
+                  assignedCount
+                    ? t("value_assigned", { count: assignedCount })
+                    : t("value_none_assigned")
+                }
               />
-              <Summary label="Status" value={examId ? "Draft saved" : "Not saved yet"} />
+              <Summary
+                label={t("label_status")}
+                value={examId ? t("value_draft_saved") : t("value_not_saved")}
+              />
             </dl>
 
             {(() => {
@@ -2801,52 +2747,54 @@ export default function CreateExamWizard() {
               return (
                 <ValidationChecklist
                   items={[
-                    { label: "Required details completed", ok: Boolean(title.trim() && subjectId) },
                     {
-                      label: "Exam window is valid and fits the duration",
-                      ok: configurationProblems().every((problem) => !problem.includes("window")),
+                      label: t("checklist_details_complete"),
+                      ok: Boolean(title.trim() && subjectId),
                     },
-                    { label: "At least one section with rules", ok: sections.length > 0 },
                     {
-                      label: "Enough questions in the pool for every rule",
+                      label: t("checklist_window_valid"),
+                      ok: windowProblem() === null,
+                    },
+                    { label: t("checklist_one_section"), ok: sections.length > 0 },
+                    {
+                      label: t("checklist_enough_questions"),
                       ok: Boolean(pool?.can_publish),
                       detail: pool?.problems.join(" "),
                     },
                     {
-                      label: "Every pooled question has an answer key or model answer",
+                      label: t("checklist_answer_keys"),
                       ok: (pool?.entries ?? []).every((entry) => entry.has_answer_key),
                       detail: (pool?.entries ?? []).some((entry) => !entry.has_answer_key)
-                        ? "Some pooled questions have nothing to grade against."
+                        ? t("checklist_no_answer_key_detail")
                         : undefined,
                     },
                     {
-                      label: "No duplicate questions in the pool",
+                      label: t("checklist_no_duplicates"),
                       ok: duplicateIds.size === 0,
-                      detail: duplicateIds.size ? `${duplicateIds.size} question(s) appear more than once.` : undefined,
+                      detail: duplicateIds.size
+                        ? t("checklist_duplicates_detail", { count: duplicateIds.size })
+                        : undefined,
                     },
                     {
-                      label: "Every selected question matches its section's subject, type and difficulty",
+                      label: t("checklist_section_match"),
                       ok: !sectionMismatch,
                     },
                     {
-                      label: "Question Paper Preview reviewed",
+                      label: t("checklist_paper_reviewed"),
                       ok: paperPreviewed,
-                      detail: paperPreviewed
-                        ? undefined
-                        : 'Open the "Question Paper Preview" tab above before publishing.',
+                      detail: paperPreviewed ? undefined : t("checklist_paper_reviewed_detail"),
                     },
                     {
-                      label: "Proctoring thresholds are consistent",
+                      label: t("checklist_proctor_consistent"),
                       ok: terminateOnScore > flagOnScore,
-                      detail: "The score that ends a sitting must be above the one that flags it.",
+                      detail: t("checklist_proctor_detail"),
                     },
                     {
                       // A warning, not a blocker: an exam can legitimately be published
                       // before its cohort is known, and candidates can be added later.
-                      label: "Candidates assigned",
+                      label: t("checklist_candidates"),
                       ok: assignedCount > 0,
-                      detail:
-                        "Nobody is assigned yet, so nobody will see this exam. You can assign them after publishing.",
+                      detail: t("none_candidates_note"),
                     },
                   ]}
                 />
@@ -2856,54 +2804,54 @@ export default function CreateExamWizard() {
 
           <div className="flex flex-wrap justify-between gap-3 pt-4">
             <Button variant="secondary" onClick={() => setStep(6)}>
-              ← Back to Candidates
+              {t("back_to_candidates")}
             </Button>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" loading={savingDraft} onClick={() => void saveDraft()}>
-                Save draft
+                {t("save_draft")}
               </Button>
               <Button
                 onClick={() => setShowPublishConfirm(true)}
                 disabled={submitting || !canPublish()}
                 loading={submitting}
               >
-                Publish exam
+                {t("publish_exam")}
               </Button>
             </div>
           </div>
 
           {!pool?.can_publish && (
-            <Alert tone="amber" title="Publishing is blocked">
-              {pool?.problems.length
-                ? pool.problems.join(" ")
-                : "Build the question pool first — an exam with no questions cannot be sat."}
+            <Alert tone="amber" title={t("publishing_blocked_title")}>
+              {pool?.problems.length ? pool.problems.join(" ") : t("publishing_blocked_no_pool")}
             </Alert>
           )}
           {pool?.can_publish && !paperPreviewed && (
-            <Alert tone="amber" title="Review the paper first">
-              Open the &quot;Question Paper Preview&quot; tab above and check the exam
-              exactly as it will appear to candidates before publishing.
+            <Alert tone="amber" title={t("review_paper_first_title")}>
+              {t("review_paper_first")}
             </Alert>
           )}
 
           {showPublishConfirm && (
-            <Modal open onClose={() => setShowPublishConfirm(false)} title="Publish this exam?">
+            <Modal open onClose={() => setShowPublishConfirm(false)} title={t("publish_confirm_title")}>
               <div className="space-y-4">
                 <dl className="grid grid-cols-2 gap-3 text-[13px]">
-                  <Summary label="Exam name" value={title || "Untitled"} />
-                  <Summary label="Total questions" value={String(pool?.stats.total_questions ?? 0)} />
-                  <Summary label="Total marks" value={String(pool?.stats.total_marks ?? 0)} />
-                  <Summary label="Duration" value={`${durationMinutes} minutes`} />
-                  <Summary label="Sections" value={String(sections.length)} />
-                  <Summary label="Candidates assigned" value={String(assignedCount)} />
+                  <Summary label={t("label_exam_name")} value={title || tp("untitled")} />
+                  <Summary
+                    label={t("label_total_questions")}
+                    value={String(pool?.stats.total_questions ?? 0)}
+                  />
+                  <Summary label={t("label_total_marks")} value={String(pool?.stats.total_marks ?? 0)} />
+                  <Summary
+                    label={t("label_duration")}
+                    value={t("value_minutes", { count: durationMinutes })}
+                  />
+                  <Summary label={t("label_sections")} value={String(sections.length)} />
+                  <Summary label={t("label_candidates_assigned")} value={String(assignedCount)} />
                 </dl>
-                <Alert tone="accent">
-                  Once published and a candidate has started, the question assignment can
-                  no longer change.
-                </Alert>
+                <Alert tone="accent">{t("publish_once_published")}</Alert>
                 <div className="flex justify-end gap-2">
                   <Button variant="secondary" onClick={() => setShowPublishConfirm(false)}>
-                    Cancel
+                    {t("cancel")}
                   </Button>
                   <Button
                     loading={submitting}
@@ -2912,7 +2860,7 @@ export default function CreateExamWizard() {
                       await publishExam();
                     }}
                   >
-                    Publish Exam
+                    {t("publish_exam_confirm")}
                   </Button>
                 </div>
               </div>
@@ -2923,7 +2871,7 @@ export default function CreateExamWizard() {
 
       {/* Editing a question, from the bank browser or the pool - same editor either way. */}
       {editingQuestion && (
-        <Modal open onClose={() => setEditingQuestion(null)} title="Edit question" size="xl">
+        <Modal open onClose={() => setEditingQuestion(null)} title={t("edit_question_title")} size="xl">
           <QuestionEditor
             subjects={subjects}
             question={editingQuestion}
@@ -2981,15 +2929,16 @@ function Toggle({
  * questions is worse than an empty one.
  */
 function ExampleCard({ type, onUse }: { type: QuestionType; onUse: () => void }) {
+  const tp = useTranslations("createExamPage");
   const ex = exampleFor(type);
-  const key = answerKeySummary({ ...ex, options: ex.options ?? [] } as Question);
+  const key = answerKeySummary({ ...ex, options: ex.options ?? [] } as Question, tp);
 
   return (
     <div className="rounded-lg border border-line bg-surface p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <Badge tone="neutral">Example · {TYPE_LABEL[type]}</Badge>
+        <Badge tone="neutral">{tp("example_badge", { type: tp(`qtype_${type}`) })}</Badge>
         <Button size="sm" variant="secondary" onClick={onUse}>
-          Use this as a starting point
+          {tp("use_as_starting_point")}
         </Button>
       </div>
 
@@ -3009,16 +2958,18 @@ function ExampleCard({ type, onUse }: { type: QuestionType; onUse: () => void })
             >
               <span className="text-ink-muted">{String.fromCharCode(65 + i)}.</span>
               <span>{o.text}</span>
-              {o.is_correct && <span className="ml-auto text-[10px] text-mint">correct</span>}
+              {o.is_correct && (
+                <span className="ml-auto text-[10px] text-mint">{tp("correct_badge")}</span>
+              )}
             </li>
           ))}
         </ul>
       )}
 
       <p className="mt-2 text-[11.5px] text-ink-muted">
-        Answer key: <span className="font-semibold text-ink">{key}</span> · {ex.marks ?? 0} mark
-        {ex.marks === 1 ? "" : "s"}
-        <span className="ml-1">— examiner only, never sent to a candidate.</span>
+        {tp("answer_key_label")} <span className="font-semibold text-ink">{key}</span> ·{" "}
+        {tp("n_marks", { count: ex.marks ?? 0 })}
+        <span className="ml-1">{tp("examiner_only_note")}</span>
       </p>
     </div>
   );
@@ -3030,7 +2981,7 @@ function ExampleCard({ type, onUse }: { type: QuestionType; onUse: () => void })
  * Examiner-side only, and deliberately so: this reads the answer key the examiner just
  * typed back to them for confirmation. The candidate's paper API strips all of it.
  */
-function answerKeySummary(q: Question): string {
+function answerKeySummary(q: Question, tp: (key: string) => string): string {
   const ticked = q.options.filter((o) => o.is_correct).map((o) => o.text);
   if (ticked.length) return ticked.join(", ");
 
@@ -3041,8 +2992,8 @@ function answerKeySummary(q: Question): string {
   if (q.question_type === "fill_blank" && spec && "accepted_answers" in spec) {
     return spec.accepted_answers.join(" / ");
   }
-  if (q.model_answer) return "Model answer set";
-  return "Marked by an examiner";
+  if (q.model_answer) return tp("model_answer_set");
+  return tp("marked_by_examiner");
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

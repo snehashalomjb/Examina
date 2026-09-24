@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Mark } from "@/components/LowPoly";
 import { Splash } from "@/components/Splash";
@@ -26,24 +27,28 @@ import type {
   SectionScoreResult,
 } from "@/lib/types";
 
-const GRADE_LABEL: Record<GradeStatus, string> = {
-  unanswered: "Not answered",
-  auto_scored: "Auto-scored",
-  pending_ai: "Awaiting review",
-  ai_scored: "Provisional",
-  examiner_reviewed: "Examiner reviewed",
+/** Translation keys for each grade status, resolved at render time. */
+const GRADE_LABEL_KEY: Record<GradeStatus, string> = {
+  unanswered: "state_not_answered",
+  auto_scored: "grade_auto_scored",
+  pending_ai: "grade_pending_ai",
+  ai_scored: "grade_ai_scored",
+  examiner_reviewed: "grade_examiner_reviewed",
 };
 
-function formatTime(seconds: number): string {
+type Translate = ReturnType<typeof useTranslations<"examRunner">>;
+
+function formatTime(seconds: number, t: Translate): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (h > 0) return t("time_hm", { h, m });
+  if (m > 0) return t("time_ms", { m, s });
+  return t("time_s", { s });
 }
 
 export default function ResultDetailPage() {
+  const t = useTranslations("examRunner");
   const { user, booting } = useRequireAuth();
   const params = useParams<{ resultId: string }>();
   const [detail, setDetail] = useState<ResultDetail | null>(null);
@@ -55,9 +60,10 @@ export default function ResultDetailPage() {
       try {
         setDetail(await api.get<ResultDetail>(`/results/${params.resultId}`));
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Could not load this result.");
+        setError(err instanceof ApiError ? err.message : t("load_result_failed"));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, params.resultId]);
 
   const [downloading, setDownloading] = useState(false);
@@ -82,7 +88,7 @@ export default function ResultDetailPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch {
-      setError("Could not generate PDF scorecard. Please try again.");
+      setError(t("pdf_failed"));
     } finally {
       setDownloading(false);
     }
@@ -101,14 +107,14 @@ export default function ResultDetailPage() {
   const statusLabel =
     detail?.exam_type === "corporate"
       ? isPass === true
-        ? "QUALIFIED"
+        ? t("result_qualified")
         : isPass === false
-          ? "NOT QUALIFIED"
+          ? t("result_not_qualified")
           : null
       : isPass === true
-        ? "PASS"
+        ? t("result_pass")
         : isPass === false
-          ? "FAIL"
+          ? t("result_fail")
           : null;
 
   return (
@@ -131,11 +137,11 @@ export default function ResultDetailPage() {
               disabled={downloading}
             >
               <span>📄</span>
-              {downloading ? "Generating PDF..." : "Download PDF Scorecard"}
+              {downloading ? t("generating_pdf") : t("download_pdf_scorecard")}
             </Button>
           )}
           <Link href={backHref}>
-            <Button variant="secondary" size="sm">← Back</Button>
+            <Button variant="secondary" size="sm">← {t("back")}</Button>
           </Link>
         </div>
       </div>
@@ -188,7 +194,7 @@ export default function ResultDetailPage() {
                 </h1>
                 <p className="mt-1 text-[13.5px] text-ink-muted">
                   {detail.subject_name} · {detail.candidate_name}
-                  {detail.submitted_at ? ` · submitted ${formatDate(detail.submitted_at)}` : ""}
+                  {detail.submitted_at ? ` · ${t("submitted_on", { date: formatDate(detail.submitted_at) })}` : ""}
                 </p>
 
                 {statusLabel && (
@@ -212,26 +218,26 @@ export default function ResultDetailPage() {
 
                 {/* Stats row */}
                 <div className="mt-5 flex flex-wrap justify-center gap-5 sm:justify-start">
-                  <StatItem label="Score" value={`${detail.result.obtained_marks} / ${detail.result.total_marks}`} />
+                  <StatItem label={t("stat_score")} value={`${detail.result.obtained_marks} / ${detail.result.total_marks}`} />
                   <StatItem
-                    label="Accuracy"
+                    label={t("stat_accuracy")}
                     value={`${detail.result.total_marks > 0 ? Math.round((detail.result.obtained_marks / detail.result.total_marks) * 100) : 0}%`}
                   />
                   {detail.time_taken_seconds != null && (
-                    <StatItem label="Time taken" value={formatTime(detail.time_taken_seconds)} />
+                    <StatItem label={t("stat_time_taken")} value={formatTime(detail.time_taken_seconds, t)} />
                   )}
                   <StatItem
-                    label="Correct"
+                    label={t("stat_correct")}
                     value={`${detail.result.correct_count}`}
                     accent="mint"
                   />
                   <StatItem
-                    label="Wrong"
+                    label={t("stat_wrong")}
                     value={`${detail.result.incorrect_count}`}
                     accent="rose"
                   />
                   <StatItem
-                    label="Blank"
+                    label={t("blank_label")}
                     value={`${detail.result.unanswered_count}`}
                   />
                 </div>
@@ -241,9 +247,11 @@ export default function ResultDetailPage() {
                   <div className="mt-4 inline-flex items-center gap-2 rounded-[10px] border border-accent/20 bg-accent-soft/40 px-4 py-2 text-[13px]">
                     <span className="text-[15px]">📊</span>
                     <span className="text-ink">
-                      You scored higher than{" "}
-                      <strong className="text-accent-ink">{detail.percentile}%</strong> of{" "}
-                      {detail.cohort_size} candidates.
+                      {t.rich("percentile_text", {
+                        percentile: detail.percentile,
+                        cohort: detail.cohort_size,
+                        b: (chunks) => <strong className="text-accent-ink">{chunks}</strong>,
+                      })}
                     </span>
                   </div>
                 )}
@@ -253,9 +261,7 @@ export default function ResultDetailPage() {
             {detail.result.pending_review_count > 0 && (
               <div className="border-t border-amber/20 bg-amber-soft/60 px-8 py-3">
                 <p className="text-[12.5px] font-medium text-amber-ink">
-                  ⚠ {detail.result.pending_review_count} answer
-                  {detail.result.pending_review_count === 1 ? " is" : "s are"} still awaiting
-                  examiner review — your score may change.
+                  ⚠ {t("pending_review_notice", { count: detail.result.pending_review_count })}
                 </p>
               </div>
             )}
@@ -264,7 +270,7 @@ export default function ResultDetailPage() {
           {/* ─────────────────── section scores (corporate / multi-section) ─────── */}
           {detail.section_scores.length > 0 && (
             <div>
-              <SectionTitle title="Section breakdown" />
+              <SectionTitle title={t("section_breakdown")} />
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {detail.section_scores.map((sec) => (
                   <SectionScoreCard key={sec.section_id} sec={sec} />
@@ -275,7 +281,7 @@ export default function ResultDetailPage() {
 
           {/* ─────────────────── question breakdown ────────────────────────── */}
           <div>
-            <SectionTitle title="Question by question" />
+            <SectionTitle title={t("question_by_question")} />
             <div className="mt-3 space-y-3">
               {detail.questions.map((question, index) => (
                 <QuestionCard key={question.question_id} index={index} question={question} />
@@ -341,6 +347,7 @@ function StatItem({
 }
 
 function SectionScoreCard({ sec }: { sec: SectionScoreResult }) {
+  const t = useTranslations("examRunner");
   const tone =
     sec.percentage >= 70 ? "mint" : sec.percentage >= 40 ? "amber" : "rose";
   return (
@@ -353,15 +360,16 @@ function SectionScoreCard({ sec }: { sec: SectionScoreResult }) {
       </div>
       <ProgressBar value={sec.percentage} tone={tone} />
       <div className="mt-2.5 flex gap-3 text-[11.5px] text-ink-muted">
-        <span className="text-mint">{sec.correct} correct</span>
-        <span className="text-rose">{sec.incorrect} wrong</span>
-        <span>{sec.unanswered} blank</span>
+        <span className="text-mint">{t("section_correct", { count: sec.correct })}</span>
+        <span className="text-rose">{t("section_wrong", { count: sec.incorrect })}</span>
+        <span>{t("section_blank", { count: sec.unanswered })}</span>
       </div>
     </Card>
   );
 }
 
 function QuestionCard({ index, question }: { index: number; question: QuestionResult }) {
+  const t = useTranslations("examRunner");
   const scored = question.awarded_marks !== null;
   const full = scored && question.awarded_marks! >= question.marks;
   const zero = scored && question.awarded_marks! <= 0;
@@ -370,9 +378,9 @@ function QuestionCard({ index, question }: { index: number; question: QuestionRe
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge tone="accent">Q{index + 1}</Badge>
+        <Badge tone="accent">{t("question_short", { number: index + 1 })}</Badge>
         {question.section_name && <Badge>{question.section_name}</Badge>}
-        <Badge>{GRADE_LABEL[question.grade_status]}</Badge>
+        <Badge>{GRADE_LABEL_KEY[question.grade_status] ? t(GRADE_LABEL_KEY[question.grade_status]) : question.grade_status}</Badge>
         <span className="ml-auto text-[13px] font-semibold text-ink">
           <span className={cx(full ? "text-mint" : zero ? "text-rose" : "text-amber")}>
             {scored ? question.awarded_marks : "—"}
@@ -386,14 +394,14 @@ function QuestionCard({ index, question }: { index: number; question: QuestionRe
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-[10px] border border-line bg-sunken/50 p-3">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
-            Your answer
+            {t("your_answer")}
           </p>
           {question.your_answer ? (
             isImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={question.your_answer}
-                alt="Your uploaded answer"
+                alt={t("uploaded_answer_alt")}
                 className="max-h-64 w-full rounded-[8px] object-contain"
               />
             ) : (
@@ -402,15 +410,15 @@ function QuestionCard({ index, question }: { index: number; question: QuestionRe
               </p>
             )
           ) : (
-            <p className="text-[13.5px] italic text-ink-muted">Left blank</p>
+            <p className="text-[13.5px] italic text-ink-muted">{t("left_blank")}</p>
           )}
         </div>
 
         <div className="rounded-[10px] border border-line bg-surface p-3">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-muted">
             {question.question_type === "mcq" || question.question_type === "multi_select"
-              ? "Correct answer"
-              : "Model answer"}
+              ? t("correct_answer")
+              : t("model_answer")}
           </p>
           <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink-soft">
             {question.correct_answer ?? "—"}
@@ -420,7 +428,7 @@ function QuestionCard({ index, question }: { index: number; question: QuestionRe
 
       {question.examiner_comment && (
         <div className="mt-3">
-          <Alert tone="accent" title="Examiner comment">
+          <Alert tone="accent" title={t("examiner_comment")}>
             {question.examiner_comment}
           </Alert>
         </div>
@@ -428,7 +436,7 @@ function QuestionCard({ index, question }: { index: number; question: QuestionRe
 
       {question.ai_justification && (
         <div className="mt-3">
-          <Alert tone="neutral" title="Automated first-pass note">
+          <Alert tone="neutral" title={t("automated_note")}>
             {question.ai_justification}
           </Alert>
         </div>

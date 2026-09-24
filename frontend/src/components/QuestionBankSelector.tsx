@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -24,7 +25,6 @@ import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { ApiError, api } from "@/lib/api";
 import {
   CATEGORY_LABEL,
-  QUESTION_SOURCE_LABEL,
   QUESTION_TYPE_LABEL,
   type Difficulty,
   type Question,
@@ -77,6 +77,7 @@ export function QuestionBankSelector({
   currentUserId,
   isAdmin = false,
 }: QuestionBankSelectorProps) {
+  const t = useTranslations("questionBank");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,11 +130,11 @@ export function QuestionBankSelector({
           : data,
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load the question bank.");
+      setError(err instanceof ApiError ? err.message : t("selector_error_load"));
     } finally {
       setLoading(false);
     }
-  }, [effectiveSubject, type, category, difficulty, topic, marks, search, shelf, currentUserId]);
+  }, [effectiveSubject, type, category, difficulty, topic, marks, search, shelf, currentUserId, t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), search ? 300 : 0);
@@ -194,7 +195,7 @@ export function QuestionBankSelector({
                 : "text-ink-muted hover:bg-sunken hover:text-ink",
             )}
           >
-            {tab.label}
+            {t(`shelf_${tab.key}`)}
           </button>
         ))}
       </div>
@@ -202,9 +203,9 @@ export function QuestionBankSelector({
       {/* filters */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {!subjectId && (
-          <Field label="Subject">
+          <Field label={t("subject")}>
             <Select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)}>
-              <option value="">All subjects</option>
+              <option value="">{t("all_subjects")}</option>
               {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code}
@@ -213,66 +214,66 @@ export function QuestionBankSelector({
             </Select>
           </Field>
         )}
-        <Field label="Type">
+        <Field label={t("type")}>
           <Select value={type} onChange={(e) => setType(e.target.value as QuestionType | "")}>
-            <option value="">Any type</option>
+            <option value="">{t("any_type")}</option>
             {(Object.keys(QUESTION_TYPE_LABEL) as QuestionType[]).map((value) => (
               <option key={value} value={value}>
-                {QUESTION_TYPE_LABEL[value]}
+                {t(`type_${value}`)}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Category">
+        <Field label={t("category")}>
           <Select
             value={category}
             onChange={(e) => setCategory(e.target.value as QuestionCategory | "")}
           >
-            <option value="">Any category</option>
+            <option value="">{t("any_category")}</option>
             {(Object.keys(CATEGORY_LABEL) as QuestionCategory[]).map((value) => (
               <option key={value} value={value}>
-                {CATEGORY_LABEL[value]}
+                {t(`category_${value}`)}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Difficulty">
+        <Field label={t("difficulty")}>
           <Select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as Difficulty | "")}
           >
-            <option value="">Any difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
+            <option value="">{t("any_difficulty")}</option>
+            <option value="easy">{t("difficulty_easy")}</option>
+            <option value="medium">{t("difficulty_medium")}</option>
+            <option value="hard">{t("difficulty_hard")}</option>
           </Select>
         </Field>
-        <Field label="Topic">
+        <Field label={t("topic")}>
           <Select value={topic} onChange={(e) => setTopic(e.target.value)}>
-            <option value="">Any topic</option>
-            {topics.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            <option value="">{t("any_topic")}</option>
+            {topics.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Marks">
+        <Field label={t("marks")}>
           <Input
             type="number"
             min="0"
             step="0.5"
             value={marks}
             onChange={(e) => setMarks(e.target.value)}
-            placeholder="Any"
+            placeholder={t("any")}
           />
         </Field>
         <div className="sm:col-span-2">
-          <Field label="Search">
+          <Field label={t("search")}>
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search question text and topics"
+              placeholder={t("selector_search_placeholder")}
             />
           </Field>
         </div>
@@ -290,7 +291,9 @@ export function QuestionBankSelector({
             className="h-4 w-4 rounded border-line-strong"
             disabled={selectable.length === 0}
           />
-          {selected.length ? `${selected.length} selected` : `${questions.length} shown`}
+          {selected.length
+            ? t("selector_selected", { count: selected.length })
+            : t("selector_shown", { count: questions.length })}
         </label>
         <Button
           size="sm"
@@ -298,7 +301,7 @@ export function QuestionBankSelector({
           loading={adding}
           onClick={() => void addSelected()}
         >
-          Add {selected.length || ""} to exam
+          {t("selector_add_to_exam", { count: selected.length })}
         </Button>
       </div>
 
@@ -311,8 +314,8 @@ export function QuestionBankSelector({
         </div>
       ) : questions.length === 0 ? (
         <EmptyState
-          title="Nothing matches those filters"
-          body="Loosen a filter, or write the question yourself from the Create tab."
+          title={t("selector_empty_title")}
+          body={t("selector_empty_body")}
         />
       ) : (
         <ul className="space-y-2">
@@ -343,24 +346,24 @@ export function QuestionBankSelector({
                     <p className="line-clamp-2 text-[13.5px] text-ink">{question.body}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <Badge tone="neutral">
-                        {QUESTION_TYPE_LABEL[question.question_type]}
+                        {t(`type_${question.question_type}`)}
                       </Badge>
                       <Badge tone={DIFFICULTY_TONE[question.difficulty]}>
-                        {question.difficulty}
+                        {t(`difficulty_${question.difficulty}`)}
                       </Badge>
-                      <Badge tone="accent">{question.marks} marks</Badge>
+                      <Badge tone="accent">{t("marks_count", { count: question.marks })}</Badge>
                       {question.topic && <Badge tone="neutral">{question.topic}</Badge>}
                       {question.source !== "manual" && (
                         <Badge tone={question.source === "ai_generated" ? "purple" : "amber"}>
-                          {QUESTION_SOURCE_LABEL[question.source as QuestionSource]}
+                          {t(`source_${question.source as QuestionSource}`)}
                         </Badge>
                       )}
                       {question.created_by_name && (
                         <span className="text-[11.5px] text-ink-muted">
-                          by {question.created_by_name}
+                          {t("by_author", { name: question.created_by_name })}
                         </span>
                       )}
-                      {added && <Badge tone="mint">already in this exam</Badge>}
+                      {added && <Badge tone="mint">{t("selector_already_in_exam")}</Badge>}
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1">
@@ -370,7 +373,7 @@ export function QuestionBankSelector({
                       variant="ghost"
                       onClick={() => setPreview(question)}
                     >
-                      Preview
+                      {t("btn_preview")}
                     </Button>
                     {onEdit && mayEdit(question) && (
                       <Button
@@ -379,7 +382,7 @@ export function QuestionBankSelector({
                         variant="ghost"
                         onClick={() => onEdit(question)}
                       >
-                        Edit
+                        {t("btn_edit")}
                       </Button>
                     )}
                     {onDuplicate && (
@@ -389,7 +392,7 @@ export function QuestionBankSelector({
                         variant="ghost"
                         onClick={() => void onDuplicate(question)}
                       >
-                        Duplicate
+                        {t("btn_duplicate")}
                       </Button>
                     )}
                   </div>

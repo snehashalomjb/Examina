@@ -35,6 +35,12 @@ const NAMESPACES = [
   "dashboard-detail",
   "createExam",
   "examCategory",
+  "createExamPage",
+  "examRunner",
+  "candidatePages",
+  "questionBank",
+  "examsOps",
+  "adminShell",
 ] as const;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

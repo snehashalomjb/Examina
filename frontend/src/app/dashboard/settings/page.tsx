@@ -20,6 +20,7 @@ import { useAuth, useRequireAuth } from "@/lib/auth";
 
 export default function SettingsPage() {
   const t = useTranslations("profile");
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth();
   const { signOut } = useAuth();
 
@@ -30,13 +31,12 @@ export default function SettingsPage() {
       <Hero title={t("settings_title")} body={t("settings_subtitle")} />
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <ChangePasswordCard email={user.email} t={t} />
+        <ChangePasswordCard email={user.email} />
 
         <Card>
           <SectionTitle title={t("session_title")} hint={t("session_hint")} />
           <p className="text-[13.5px] leading-relaxed text-ink-soft">
-            You stay signed in on this device until you sign out or your refresh token
-            expires. Sign out on any shared or public machine when you finish.
+            {ta("session_body")}
           </p>
           <div className="mt-5">
             <Button variant="secondary" onClick={signOut}>
@@ -57,7 +57,9 @@ export default function SettingsPage() {
  * token inline in development. Reusing that flow means there is exactly one code path
  * that can change a password, rather than a second one to keep secure.
  */
-function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => string }) {
+function ChangePasswordCard({ email }: { email: string }) {
+  const t = useTranslations("profile");
+  const ta = useTranslations("adminShell");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,7 +70,7 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
     setError(null);
 
     if (newPassword !== confirm) {
-      setError("The two passwords do not match.");
+      setError(ta("error_passwords_no_match"));
       return;
     }
 
@@ -81,9 +83,7 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
       );
       const token = issued.detail.split("reset_token=")[1];
       if (!token) {
-        setError(
-          "A reset link was issued to your email address. Follow it to finish changing your password.",
-        );
+        setError(ta("reset_link_issued"));
         return;
       }
       await api.post(
@@ -91,11 +91,11 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
         { token: token.trim(), new_password: newPassword },
         { auth: false },
       );
-      toast("Password updated", "mint");
+      toast(ta("password_updated"), "mint");
       setNewPassword("");
       setConfirm("");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not change the password.");
+      setError(err instanceof ApiError ? err.message : ta("error_change_the_password"));
     } finally {
       setBusy(false);
     }
@@ -105,7 +105,7 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
     <Card>
       <SectionTitle title={t("change_password_title")} hint={t("settingsChangePasswordHint")} />
       <form onSubmit={submit} className="space-y-4">
-        <Field label="New password">
+        <Field label={ta("new_password")}>
           <Input
             type="password"
             value={newPassword}
@@ -115,7 +115,7 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
             autoComplete="new-password"
           />
         </Field>
-        <Field label="Confirm new password">
+        <Field label={ta("confirm_new_password")}>
           <Input
             type="password"
             value={confirm}
@@ -127,7 +127,7 @@ function ChangePasswordCard({ email, t }: { email: string; t: (key: string) => s
         </Field>
         {error && <Alert tone="rose">{error}</Alert>}
         <Button type="submit" loading={busy}>
-          Update password
+          {ta("update_password")}
         </Button>
       </form>
     </Card>

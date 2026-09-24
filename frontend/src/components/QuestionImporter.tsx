@@ -60,7 +60,12 @@ export function QuestionImporter({
   subjectId,
   onImported,
 }: QuestionImporterProps) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
+  const typeLabel = (value: string) =>
+    value in QUESTION_TYPE_LABEL ? t(`type_${value}`) : value;
+  const difficultyLabel = (value: string) =>
+    t.has(`difficulty_${value}`) ? t(`difficulty_${value}`) : value;
   const [chosenSubject, setChosenSubject] = useState(subjectId ?? "");
   const subject = subjectId ?? chosenSubject;
 
@@ -106,7 +111,7 @@ export function QuestionImporter({
 
   async function parse(candidate: File, sheet?: string) {
     if (candidate.size > MAX_MB * 1024 * 1024) {
-      setError(`That file is larger than ${MAX_MB} MB.`);
+      setError(t("importer_error_too_large", { limit: MAX_MB }));
       return;
     }
     setParsing(true);
@@ -127,7 +132,7 @@ export function QuestionImporter({
           .map((row) => row.row_number),
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That file could not be read.");
+      setError(err instanceof ApiError ? err.message : t("importer_error_unreadable"));
       setParsed(null);
       setRows([]);
     } finally {
@@ -146,7 +151,7 @@ export function QuestionImporter({
 
   async function fetchUrl() {
     const trimmed = url.trim();
-    if (!trimmed) { setError("Paste a Google Forms or web URL first."); return; }
+    if (!trimmed) { setError(t("importer_error_paste_url")); return; }
     setUrlFetching(true);
     setError(null);
     setResult(null);
@@ -166,7 +171,7 @@ export function QuestionImporter({
           .map((row) => row.row_number),
       );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not fetch questions from that URL.");
+      setError(err instanceof ApiError ? err.message : t("importer_error_fetch_url"));
     } finally {
       setUrlFetching(false);
     }
@@ -186,7 +191,7 @@ export function QuestionImporter({
 
   async function commit() {
     if (!subject) {
-      setError("Pick the subject these questions belong to.");
+      setError(t("importer_error_pick_subject"));
       return;
     }
     if (!selectedRows.length) return;
@@ -222,8 +227,8 @@ export function QuestionImporter({
       setResult(outcome);
       toast(
         outcome.failed
-          ? `${outcome.created} imported, ${outcome.failed} refused`
-          : `${outcome.created} question(s) imported`,
+          ? t("importer_toast_partial", { created: outcome.created, failed: outcome.failed })
+          : t("importer_toast_done", { count: outcome.created }),
         outcome.failed ? "amber" : "mint",
       );
       onImported?.(outcome);
@@ -232,7 +237,7 @@ export function QuestionImporter({
       setRows((current) => current.filter((row) => !done.has(row.row_number)));
       setChosen([]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "The import failed.");
+      setError(err instanceof ApiError ? err.message : t("importer_error_failed"));
     } finally {
       setImporting(false);
     }
@@ -243,26 +248,26 @@ export function QuestionImporter({
       <Card>
         {/* ── Header ─────────────────────────────────────────── */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[15px] font-bold tracking-tight text-ink">{t("importer_heading")}</h3>
+          <h3 className="text-[15px] font-bold tracking-tight text-ink">{tq("importer_heading")}</h3>
           <button
             type="button"
             className="text-[12.5px] font-semibold text-accent hover:underline"
             onClick={() =>
               void api
                 .download("/questions/import/template", "examina-question-template.csv")
-                .catch(() => setError("Could not download the template."))
+                .catch(() => setError(t("importer_error_template")))
             }
           >
-            ↓ Download CSV template
+            ↓ {t("importer_download_template")}
           </button>
         </div>
 
         {/* ── Subject picker ──────────────────────────────────── */}
         {!subjectId && (
           <div className="mb-4">
-            <Field label="Subject" required hint="Every imported question needs one.">
+            <Field label={t("subject")} required hint={t("importer_subject_hint")}>
               <Select value={chosenSubject} onChange={(e) => setChosenSubject(e.target.value)}>
-                <option value="">{t("importer_subject_option")}</option>
+                <option value="">{tq("importer_subject_option")}</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.code} — {s.name}
@@ -276,8 +281,8 @@ export function QuestionImporter({
         {/* ── Mode tabs ───────────────────────────────────────── */}
         <div className="mb-5 flex rounded-[11px] border border-line bg-sunken p-1">
           {([
-            { id: "file", label: "📁 Upload File" },
-            { id: "url",  label: "🔗 Import from URL" },
+            { id: "file", label: `📁 ${t("importer_tab_file")}` },
+            { id: "url",  label: `🔗 ${t("importer_tab_url")}` },
           ] as const).map((tab) => (
             <button
               key={tab.id}
@@ -350,17 +355,17 @@ export function QuestionImporter({
               ) : (
                 <>
                   <p className="text-[14px] font-semibold text-ink">
-                    {dragging ? "Drop it!" : "Drag & drop a file here"}
+                    {dragging ? t("importer_drop_it") : t("importer_drag_drop")}
                   </p>
                   <p className="mt-1 text-[12px] text-ink-muted">
-                    PDF, Word (.doc/.docx), Excel (.xlsx), CSV, or JSON — up to {MAX_MB} MB
+                    {t("importer_formats_hint", { limit: MAX_MB })}
                   </p>
                 </>
               )}
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <label className="cursor-pointer rounded-[10px] border border-line-strong bg-surface px-4 py-2 text-[13px] font-semibold text-ink shadow-[var(--shadow-xs)] hover:bg-sunken hover:-translate-y-[1px] transition-all">
-                  {file ? "Choose different file" : "Browse files"}
+                  {file ? t("importer_choose_different") : t("importer_browse")}
                   <input
                     type="file"
                     accept={ACCEPT}
@@ -370,7 +375,7 @@ export function QuestionImporter({
                 </label>
                 {file && (
                   <Button variant="ghost" size="sm" onClick={() => pick(null)}>
-                    ✕ Clear
+                    ✕ {t("importer_clear")}
                   </Button>
                 )}
               </div>
@@ -379,7 +384,7 @@ export function QuestionImporter({
             {parsing && (
               <div className="mt-4 flex items-center gap-3 rounded-[10px] bg-accent-soft/30 px-4 py-3">
                 <span className="animate-spin text-lg">⚙️</span>
-                <p className="text-[13px] font-medium text-accent">Reading {file?.name}…</p>
+                <p className="text-[13px] font-medium text-accent">{t("importer_reading_file", { name: file?.name ?? "" })}</p>
               </div>
             )}
           </>
@@ -395,7 +400,7 @@ export function QuestionImporter({
                 <div>
                   <p className="text-[13px] font-bold text-ink">Google Forms</p>
                   <p className="mt-0.5 text-[11.5px] text-ink-muted">
-                    Paste a public Google Forms link — questions are extracted automatically.
+                    {t("importer_gforms_hint")}
                   </p>
                   <p className="mt-1 text-[10.5px] font-mono text-ink-muted">
                     docs.google.com/forms/d/…
@@ -405,9 +410,9 @@ export function QuestionImporter({
               <div className="flex items-start gap-3 rounded-[12px] border border-line bg-gradient-to-br from-purple-50/50 to-transparent p-3.5">
                 <span className="text-2xl">🌐</span>
                 <div>
-                  <p className="text-[13px] font-bold text-ink">Any Website / Quiz URL</p>
+                  <p className="text-[13px] font-bold text-ink">{t("importer_website_title")}</p>
                   <p className="mt-0.5 text-[11.5px] text-ink-muted">
-                    Publicly accessible quiz pages, question-bank sites, or LMS exports.
+                    {t("importer_website_hint")}
                   </p>
                 </div>
               </div>
@@ -426,14 +431,14 @@ export function QuestionImporter({
                           ? "bg-purple-100 text-purple-600"
                           : "bg-sunken text-ink-muted",
                     )}>
-                      {detectUrlType(url) === "google_forms" ? "🔵 Google Forms" : detectUrlType(url) === "website" ? "🌐 Web" : ""}
+                      {detectUrlType(url) === "google_forms" ? "🔵 Google Forms" : detectUrlType(url) === "website" ? `🌐 ${t("importer_badge_web")}` : ""}
                     </span>
                   )}
                   <Input
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void fetchUrl(); }}
-                    placeholder="Paste Google Forms link or website URL…"
+                    placeholder={t("importer_url_placeholder")}
                     className={cx(
                       "w-full pr-4",
                       url && detectUrlType(url) === "google_forms" ? "pl-36" : url ? "pl-20" : "",
@@ -445,21 +450,21 @@ export function QuestionImporter({
                   loading={urlFetching}
                   disabled={!url.trim()}
                 >
-                  {urlFetching ? "Fetching…" : "Import"}
+                  {urlFetching ? t("importer_fetching") : t("importer_import")}
                 </Button>
               </div>
 
               {/* Hint rows */}
               <div className="space-y-1 text-[11.5px] text-ink-muted">
-                <p>💡 The form or page must be <strong>publicly accessible</strong> (no login required).</p>
-                <p>💡 Google Forms: open your form → click ⋮ → <em>Get pre-filled link</em> → copy the URL.</p>
+                <p>💡 {t.rich("importer_tip_public", { strong: (chunks) => <strong>{chunks}</strong> })}</p>
+                <p>💡 {t.rich("importer_tip_gforms", { em: (chunks) => <em>{chunks}</em> })}</p>
               </div>
             </div>
 
             {urlFetching && (
               <div className="flex items-center gap-3 rounded-[10px] bg-accent-soft/30 px-4 py-3">
                 <span className="animate-spin text-lg">⚙️</span>
-                <p className="text-[13px] font-medium text-accent">Fetching questions from URL…</p>
+                <p className="text-[13px] font-medium text-accent">{t("importer_fetching_url")}</p>
               </div>
             )}
           </div>
@@ -473,14 +478,15 @@ export function QuestionImporter({
       </Card>
 
       {result && (
-        <Alert tone={result.failed ? "amber" : "mint"} title={t("importer_alert_finished")}>
-          {result.created} question{result.created === 1 ? "" : "s"} imported
-          {examId ? " and added to this exam" : " into your bank"}.
+        <Alert tone={result.failed ? "amber" : "mint"} title={tq("importer_alert_finished")}>
+          {examId
+            ? t("importer_result_exam", { count: result.created })
+            : t("importer_result_bank", { count: result.created })}
           {result.failed > 0 && (
             <ul className="mt-1 list-inside list-disc">
               {result.errors.map((e, i) => (
                 <li key={i}>
-                  {e.row_number ? `Row ${e.row_number}: ` : ""}
+                  {e.row_number ? t("importer_row_prefix", { n: e.row_number }) + " " : ""}
                   {e.error}
                 </li>
               ))}
@@ -493,8 +499,11 @@ export function QuestionImporter({
         <Alert tone="accent">
           <div className="flex flex-wrap items-center gap-3">
             <span>
-              This workbook has {parsed.sheet_names.length} sheets. Reading{" "}
-              <strong>{parsed.sheet_name}</strong>.
+              {t.rich("importer_workbook_sheets", {
+                count: parsed.sheet_names.length,
+                name: parsed.sheet_name ?? "",
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </span>
             <Select
               value={parsed.sheet_name ?? ""}
@@ -516,24 +525,24 @@ export function QuestionImporter({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-[15px] font-semibold tracking-tight text-ink">
-                Review before importing
+                {t("importer_review_title")}
               </h3>
-              <Badge tone="neutral">{rows.length} detected</Badge>
-              <Badge tone="mint">{rows.filter((r) => !r.problems.length).length} ready</Badge>
+              <Badge tone="neutral">{t("importer_detected", { count: rows.length })}</Badge>
+              <Badge tone="mint">{t("importer_ready", { count: rows.filter((r) => !r.problems.length).length })}</Badge>
               {rows.some((r) => r.problems.length > 0) && (
                 <Badge tone="rose">
-                  {rows.filter((r) => r.problems.length > 0).length} need fixing
+                  {t("importer_need_fixing", { count: rows.filter((r) => r.problems.length > 0).length })}
                 </Badge>
               )}
               {parsed.duplicates > 0 && (
-                <Badge tone="amber">{parsed.duplicates} duplicate</Badge>
+                <Badge tone="amber">{t("importer_duplicates", { count: parsed.duplicates })}</Badge>
               )}
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
               {typeCounts.map(([type, count]) => (
                 <Badge key={type} tone="neutral">
-                  {count} {QUESTION_TYPE_LABEL[type as QuestionType] ?? type}
+                  {count} {typeLabel(type)}
                 </Badge>
               ))}
             </div>
@@ -544,7 +553,7 @@ export function QuestionImporter({
                 onChange={(e) => setSkipDuplicates(e.target.checked)}
                 className="h-4 w-4 rounded border-line-strong"
               />
-              Skip duplicates
+              {t("importer_skip_duplicates")}
             </label>
           </div>
 
@@ -565,15 +574,16 @@ export function QuestionImporter({
                 }
                 className="h-4 w-4 rounded border-line-strong"
               />
-              {selectedRows.length} of {importable.length} selected
+              {t("importer_selected_of", { selected: selectedRows.length, total: importable.length })}
             </label>
             <Button
               loading={importing}
               disabled={!selectedRows.length || !subject}
               onClick={() => void commit()}
             >
-              Import {selectedRows.length || ""}
-              {examId ? " into this exam" : " into bank"}
+              {examId
+                ? t("importer_import_into_exam", { count: selectedRows.length })
+                : t("importer_import_into_bank", { count: selectedRows.length })}
             </Button>
           </div>
 
@@ -613,9 +623,9 @@ export function QuestionImporter({
                     <div className="min-w-0 flex-1">
                       <p className="text-[13.5px] text-ink">
                         <span className="mr-2 font-mono text-[11.5px] text-ink-muted">
-                          row {row.row_number}
+                          {t("importer_row", { n: row.row_number })}
                         </span>
-                        {row.body || <span className="italic text-ink-muted">(no text)</span>}
+                        {row.body || <span className="italic text-ink-muted">{t("importer_no_text")}</span>}
                       </p>
 
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -623,21 +633,21 @@ export function QuestionImporter({
                           <Badge tone="purple">{row.subject_name}</Badge>
                         )}
                         <Badge tone="neutral">
-                          {QUESTION_TYPE_LABEL[row.question_type] ?? row.question_type}
+                          {typeLabel(row.question_type)}
                         </Badge>
-                        <Badge tone="neutral">{row.difficulty}</Badge>
-                        <Badge tone="accent">{row.marks} marks</Badge>
+                        <Badge tone="neutral">{difficultyLabel(row.difficulty)}</Badge>
+                        <Badge tone="accent">{t("marks_count", { count: row.marks })}</Badge>
                         {row.options.length > 0 && (
                           <Badge tone="neutral">
-                            {row.options.length} options ·{" "}
+                            {t("importer_options_count", { count: row.options.length })} ·{" "}
                             {row.options
                               .map((o, i) => (o.is_correct ? String.fromCharCode(65 + i) : null))
                               .filter(Boolean)
-                              .join(",") || "no key"}
+                              .join(",") || t("importer_no_key")}
                           </Badge>
                         )}
                         {row.duplicate_of && (
-                          <Badge tone="amber">duplicate of {row.duplicate_of}</Badge>
+                          <Badge tone="amber">{t("importer_duplicate_of", { id: String(row.duplicate_of) })}</Badge>
                         )}
                       </div>
 
@@ -656,7 +666,7 @@ export function QuestionImporter({
                         setExpanded(expanded === row.row_number ? null : row.row_number)
                       }
                     >
-                      {expanded === row.row_number ? "Close" : broken ? "Fix" : "Edit"}
+                      {expanded === row.row_number ? t("btn_close") : broken ? t("importer_fix") : t("btn_edit")}
                     </Button>
                   </div>
 
@@ -672,8 +682,7 @@ export function QuestionImporter({
           </ul>
 
           <p className="mt-3 text-[12px] text-ink-muted">
-            Fixes made here are re-checked on the server when you import. Rows that
-            still fail are reported back, never quietly dropped.
+            {t("importer_footer_note")}
           </p>
         </Card>
       )}
@@ -695,14 +704,15 @@ function RowFixer({
   row: ImportedRow;
   onChange: (patch: Partial<ImportedRow>) => void;
 }) {
-  const t = useTranslations("question");
+  const tq = useTranslations("question");
+  const t = useTranslations("questionBank");
   const optionBearing = ["mcq", "multi_select", "true_false"].includes(row.question_type);
   const single = row.question_type === "mcq" || row.question_type === "true_false";
   const written = row.question_type === "short_answer" || row.question_type === "long_answer";
 
   return (
     <div className="mt-3 space-y-3 rounded-[10px] border border-line bg-surface p-3">
-      <Field label="Question">
+      <Field label={t("question")}>
         <Textarea
           value={row.body}
           onChange={(e) => onChange({ body: e.target.value, problems: [] })}
@@ -711,7 +721,7 @@ function RowFixer({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <Field label="Type">
+        <Field label={t("type")}>
           <Select
             value={row.question_type}
             onChange={(e) =>
@@ -720,22 +730,22 @@ function RowFixer({
           >
             {(Object.keys(QUESTION_TYPE_LABEL) as QuestionType[]).map((value) => (
               <option key={value} value={value}>
-                {QUESTION_TYPE_LABEL[value]}
+                {t(`type_${value}`)}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Difficulty">
+        <Field label={t("difficulty")}>
           <Select
             value={row.difficulty}
             onChange={(e) => onChange({ difficulty: e.target.value as Difficulty })}
           >
-            <option value="easy">{t("difficulty_easy")}</option>
-            <option value="medium">{t("difficulty_medium")}</option>
-            <option value="hard">{t("difficulty_hard")}</option>
+            <option value="easy">{tq("difficulty_easy")}</option>
+            <option value="medium">{tq("difficulty_medium")}</option>
+            <option value="hard">{tq("difficulty_hard")}</option>
           </Select>
         </Field>
-        <Field label="Marks">
+        <Field label={t("marks")}>
           <Input
             type="number"
             min="0"
@@ -744,7 +754,7 @@ function RowFixer({
             onChange={(e) => onChange({ marks: Number(e.target.value), problems: [] })}
           />
         </Field>
-        <Field label="Negative">
+        <Field label={t("negative")}>
           <Input
             type="number"
             min="0"
@@ -758,7 +768,7 @@ function RowFixer({
       {optionBearing && row.options.length > 0 && (
         <div>
           <p className="mb-1.5 text-[13px] font-medium text-ink-soft">
-            Correct answer — tap a letter
+            {t("importer_correct_tap_letter")}
           </p>
           <div className="space-y-1.5">
             {row.options.map((option, index) => (
@@ -805,7 +815,7 @@ function RowFixer({
       )}
 
       {written && (
-        <Field label="Model answer" required>
+        <Field label={t("model_answer")} required>
           <Textarea
             value={row.model_answer ?? ""}
             onChange={(e) => onChange({ model_answer: e.target.value, problems: [] })}
@@ -821,7 +831,7 @@ function RowFixer({
           onChange={(e) => onChange({ save_to_bank: e.target.checked })}
           className="h-4 w-4 rounded border-line-strong"
         />
-        Save this one to my Question Bank
+        {t("importer_save_this_to_bank")}
       </label>
     </div>
   );

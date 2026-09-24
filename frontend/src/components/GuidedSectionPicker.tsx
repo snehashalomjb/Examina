@@ -16,12 +16,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Alert, Badge, Button, Card, EmptyState, Skeleton, cx, toast } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import {
-  CATEGORY_LABEL,
-  QUESTION_TYPE_LABEL,
   type Difficulty,
   type ExamPool,
   type PoolEntry,
@@ -50,6 +49,10 @@ interface Task {
   sectionName: string;
   sectionId: string | undefined;
   rule: SelectionRule;
+  /** How the subject is chosen: a named subject (topic), any subject within a category,
+   * or the exam's own subject. The UI turns this into translated text. */
+  subjectKind: "topic" | "category" | "exam";
+  /** The subject's name (user data) for "topic" and "exam"; empty when unknown. */
   subjectLabel: string;
   subjectId: string | undefined;
 }
@@ -80,18 +83,31 @@ function buildTasks(sections: SectionDraft[], subjects: Subject[], examSubjectId
     sec.rules.forEach((rule, rIdx) => {
       let subjectId: string | undefined;
       let subjectLabel: string;
+      let subjectKind: Task["subjectKind"];
       if (rule.topic) {
         const match = bySubjectName.get(rule.topic);
         subjectId = match?.id;
         subjectLabel = rule.topic;
+        subjectKind = "topic";
       } else if (rule.category) {
         subjectId = undefined;
-        subjectLabel = `Any subject — ${CATEGORY_LABEL[rule.category]}`;
+        subjectLabel = "";
+        subjectKind = "category";
       } else {
         subjectId = examSubjectId || undefined;
-        subjectLabel = subjects.find((s) => s.id === examSubjectId)?.name ?? "Exam subject";
+        subjectLabel = subjects.find((s) => s.id === examSubjectId)?.name ?? "";
+        subjectKind = "exam";
       }
-      out.push({ sIdx, rIdx, sectionName: sec.name, sectionId: sec.id, rule, subjectId, subjectLabel });
+      out.push({
+        sIdx,
+        rIdx,
+        sectionName: sec.name,
+        sectionId: sec.id,
+        rule,
+        subjectId,
+        subjectKind,
+        subjectLabel,
+      });
     });
   });
   return out;
@@ -128,6 +144,14 @@ export function GuidedSectionPicker({
   onAllComplete,
   reloadToken = 0,
 }: GuidedSectionPickerProps) {
+  const t = useTranslations("createExam");
+  const tp = useTranslations("createExamPage");
+  const typeLabel = (type: QuestionType) => tp(`qtype_${type}`);
+  const difficultyLabel = (d: Difficulty) => t(`difficulty_${d}`);
+  const subjectText = (task: Task) =>
+    task.subjectKind === "category" && task.rule.category
+      ? tp("guided_any_subject_category", { category: tp(`qcat_${task.rule.category}`) })
+      : task.subjectLabel || tp("guided_exam_subject");
   const tasks = useMemo(() => buildTasks(sections, subjects, examSubjectId), [sections, subjects, examSubjectId]);
   const [taskIndex, setTaskIndex] = useState(0);
   const [available, setAvailable] = useState<Question[]>([]);
@@ -159,7 +183,7 @@ export function GuidedSectionPicker({
       setAvailable(data);
       setSelected(existingForTask(pool, task));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load matching questions.");
+      setError(err instanceof ApiError ? err.message : tp("guided_could_not_load"));
       setAvailable([]);
     } finally {
       setLoading(false);
@@ -175,10 +199,7 @@ export function GuidedSectionPicker({
 
   if (tasks.length === 0) {
     return (
-      <EmptyState
-        title="No sections yet"
-        body="Go back and add at least one section with a selection rule before picking questions."
-      />
+      <EmptyState title={tp("guided_no_sections_title")} body={tp("guided_no_sections_body")} />
     );
   }
 
@@ -199,7 +220,7 @@ export function GuidedSectionPicker({
     setSelected((cur) => {
       if (cur.includes(id)) return cur.filter((x) => x !== id);
       if (cur.length >= requiredCount) {
-        toast(`Already selected ${requiredCount} of ${requiredCount} - deselect one first`, "amber");
+        toast(tp("guided_already_selected", { count: requiredCount }), "amber");
         return cur;
       }
       return [...cur, id];
@@ -215,10 +236,17 @@ export function GuidedSectionPicker({
       const toRemove = [...before].filter((id) => !selected.includes(id));
       if (toAdd.length) await onAdd(task.sIdx, toAdd);
       for (const id of toRemove) await onRemove(id);
-      toast(`${task.sectionName}: ${selectedCount}/${requiredCount} selected`, "mint");
+      toast(
+        tp("guided_section_selected", {
+          section: task.sectionName,
+          selected: selectedCount,
+          required: requiredCount,
+        }),
+        "mint",
+      );
       if (taskIndex < tasks.length - 1) setTaskIndex(taskIndex + 1);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save this section's picks.", "rose");
+      toast(err instanceof ApiError ? err.message : tp("guided_could_not_save"), "rose");
     } finally {
       setSaving(false);
     }
@@ -247,8 +275,8 @@ export function GuidedSectionPicker({
             >
               <p className="truncate font-semibold text-ink">{t.sectionName}</p>
               <p className="text-ink-muted">
-                {QUESTION_TYPE_LABEL[t.rule.question_type]}
-                {t.rule.difficulty ? ` · ${t.rule.difficulty}` : ""}
+                {typeLabel(t.rule.question_type)}
+                {t.rule.difficulty ? ` · ${difficultyLabel(t.rule.difficulty)}` : ""}
               </p>
               <p className="mt-0.5">
                 {status === "complete" ? (
@@ -270,31 +298,33 @@ export function GuidedSectionPicker({
           <div>
             <h3 className="text-[15px] font-bold text-ink">{task.sectionName}</h3>
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-ink-muted">
-              <Badge tone="neutral">{task.subjectLabel}</Badge>
-              <Badge tone="neutral">{QUESTION_TYPE_LABEL[task.rule.question_type]}</Badge>
+              <Badge tone="neutral">{subjectText(task)}</Badge>
+              <Badge tone="neutral">{typeLabel(task.rule.question_type)}</Badge>
               {task.rule.difficulty && (
-                <Badge tone={DIFFICULTY_TONE[task.rule.difficulty]}>{task.rule.difficulty}</Badge>
+                <Badge tone={DIFFICULTY_TONE[task.rule.difficulty]}>
+                  {difficultyLabel(task.rule.difficulty)}
+                </Badge>
               )}
             </p>
           </div>
           <div className="text-right">
             <p className={cx("text-[15px] font-bold", canContinue ? "text-mint" : "text-ink")}>
-              Selected: {selectedCount} / {requiredCount}
+              {tp("guided_selected_count", { selected: selectedCount, required: requiredCount })}
             </p>
-            <p className="text-[11.5px] text-ink-muted">{pickable.length} matching available</p>
+            <p className="text-[11.5px] text-ink-muted">
+              {tp("guided_matching_available", { count: pickable.length })}
+            </p>
           </div>
         </div>
 
         {error && <Alert tone="rose">{error}</Alert>}
 
         {!loading && shortfall && (
-          <Alert tone="amber" title="Not enough matching questions">
-            Only {pickable.length} matching question{pickable.length === 1 ? "" : "s"}{" "}
-            {pickable.length === 1 ? "is" : "are"} available in the Question Bank. Please add
-            more questions to the bank, or change this section&apos;s requirements.
+          <Alert tone="amber" title={tp("guided_not_enough_title")}>
+            {tp("guided_not_enough_body", { count: pickable.length })}
             <div className="mt-2">
               <Button size="sm" variant="secondary" onClick={() => onWriteOne(task.sIdx, task.rIdx)}>
-                + Write a matching question
+                {tp("guided_write_matching")}
               </Button>
             </div>
           </Alert>
@@ -307,10 +337,7 @@ export function GuidedSectionPicker({
             ))}
           </div>
         ) : pickable.length === 0 ? (
-          <EmptyState
-            title="No matching questions"
-            body="Nothing in the bank matches this section's subject, type and difficulty yet."
-          />
+          <EmptyState title={tp("guided_no_matching_title")} body={tp("guided_no_matching_body")} />
         ) : (
           <ul className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
             {pickable.map((q) => {
@@ -338,7 +365,7 @@ export function GuidedSectionPicker({
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-[13.5px] text-ink">{q.body}</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <Badge tone="accent">{q.marks} marks</Badge>
+                        <Badge tone="accent">{tp("n_marks", { count: q.marks })}</Badge>
                         {q.topic && <Badge tone="neutral">{q.topic}</Badge>}
                       </div>
                     </div>
@@ -357,11 +384,13 @@ export function GuidedSectionPicker({
               disabled={taskIndex === 0}
               onClick={() => setTaskIndex((i) => Math.max(0, i - 1))}
             >
-              ← Previous section
+              {tp("guided_previous_section")}
             </Button>
           </div>
           <Button size="sm" disabled={!canContinue} loading={saving} onClick={() => void confirmAndContinue()}>
-            {taskIndex < tasks.length - 1 ? "Confirm & Continue →" : "Confirm selection"}
+            {taskIndex < tasks.length - 1
+              ? tp("guided_confirm_continue")
+              : tp("guided_confirm_selection")}
           </Button>
         </div>
       </Card>

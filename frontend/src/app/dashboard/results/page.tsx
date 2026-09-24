@@ -22,6 +22,7 @@ import type { Result } from "@/lib/types";
 export default function MyResultsPage() {
   const { user } = useRequireAuth(["candidate"]);
   const t = useTranslations("results");
+  const tr = useTranslations("examRunner");
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +33,12 @@ export default function MyResultsPage() {
       try {
         setResults(await api.get<Result[]>("/my/results"));
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : "Could not load your results.");
+        setError(err instanceof ApiError ? err.message : tr("load_results_failed"));
       } finally {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   if (!user) return null;

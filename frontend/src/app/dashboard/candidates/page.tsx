@@ -25,6 +25,7 @@ import type { CandidateAttempt, CandidateRow } from "@/lib/types";
 
 export default function CandidatesPage() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth(["examiner", "admin"]);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [search, setSearch] = useState("");
@@ -42,7 +43,7 @@ export default function CandidatesPage() {
       setCandidates(await api.get<CandidateRow[]>(`/admin/candidates${query}`));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load candidates.");
+      setError(err instanceof ApiError ? err.message : ta("error_load_candidates"));
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export default function CandidatesPage() {
       toast(response.detail, "mint");
       if (open) await openCandidate(open);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not publish the result", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_publish_result"), "rose");
     } finally {
       setPublishing(null);
     }
@@ -107,7 +108,7 @@ export default function CandidatesPage() {
         `report_${safeName}.pdf`,
       );
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not download the report", "rose");
+      toast(err instanceof ApiError ? err.message : ta("error_download_report"), "rose");
     } finally {
       setDownloading(null);
     }
@@ -118,8 +119,8 @@ export default function CandidatesPage() {
   return (
     <div className="space-y-6">
       <Hero
-        title="Candidates"
-        body="Everyone who can sit your papers, with their attempt history and how proctoring rated each sitting."
+        title={ta("nav_candidates")}
+        body={ta("candidates_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}
@@ -142,7 +143,7 @@ export default function CandidatesPage() {
             ))}
           </div>
         ) : candidates.length === 0 ? (
-          <EmptyState title="No candidates found" body="Nobody matches that search." />
+          <EmptyState title={ta("no_candidates_found")} body={ta("no_candidates_body")} />
         ) : (
           <div className="-mx-5 overflow-x-auto px-5">
             <table className="w-full min-w-[720px] border-collapse text-left">
@@ -181,7 +182,7 @@ export default function CandidatesPage() {
                     </td>
                     <td className="py-3 text-right">
                       <Button size="sm" variant="secondary" onClick={() => openCandidate(row)}>
-                        History
+                        {ta("history")}
                       </Button>
                     </td>
                   </tr>
@@ -207,7 +208,7 @@ export default function CandidatesPage() {
                 hint={open.email}
                 action={
                   <Button size="sm" variant="secondary" onClick={() => setOpen(null)}>
-                    Close
+                    {ta("close")}
                   </Button>
                 }
               />
@@ -220,8 +221,8 @@ export default function CandidatesPage() {
                 </div>
               ) : attempts.length === 0 ? (
                 <EmptyState
-                  title="No attempts"
-                  body="This candidate has not sat any of your papers yet."
+                  title={ta("no_attempts")}
+                  body={ta("no_attempts_body")}
                 />
               ) : (
                 <ul className="divide-y divide-line">
@@ -233,7 +234,7 @@ export default function CandidatesPage() {
                         </p>
                         <p className="text-[12px] text-ink-muted">
                           {formatDate(attempt.started_at)} ·{" "}
-                          {attempt.status.replace("_", " ")}
+                          {ta.has(`session_${attempt.status}`) ? ta(`session_${attempt.status}`) : attempt.status.replace("_", " ")}
                         </p>
                       </div>
 
@@ -250,20 +251,20 @@ export default function CandidatesPage() {
                           {attempt.percentage}%
                         </Badge>
                       )}
-                      {attempt.is_flagged && <Badge tone="rose">flagged</Badge>}
+                      {attempt.is_flagged && <Badge tone="rose">{ta("badge_flagged")}</Badge>}
 
                       {attempt.integrity_verdict === "malpractice" ? (
-                        <Badge tone="rose">malpractice</Badge>
+                        <Badge tone="rose">{ta("badge_malpractice")}</Badge>
                       ) : attempt.needs_integrity_review ? (
-                        <Badge tone="amber">needs ruling</Badge>
+                        <Badge tone="amber">{ta("badge_needs_ruling")}</Badge>
                       ) : attempt.integrity_verdict === "cleared" ? (
-                        <Badge tone="mint">genuine</Badge>
+                        <Badge tone="mint">{ta("badge_genuine")}</Badge>
                       ) : null}
 
                       {attempt.published ? (
-                        <Badge tone="mint">published</Badge>
+                        <Badge tone="mint">{ta("badge_published")}</Badge>
                       ) : attempt.pending_review_count > 0 ? (
-                        <Badge tone="amber">{attempt.pending_review_count} to grade</Badge>
+                        <Badge tone="amber">{ta("badge_to_grade", { count: attempt.pending_review_count })}</Badge>
                       ) : null}
 
                       <div className="flex gap-1.5">
@@ -272,13 +273,13 @@ export default function CandidatesPage() {
                             size="sm"
                             variant={attempt.needs_integrity_review ? "primary" : "ghost"}
                           >
-                            {attempt.needs_integrity_review ? "Review flags" : "Proctoring"}
+                            {attempt.needs_integrity_review ? ta("review_flags") : ta("nav_proctoring")}
                           </Button>
                         </Link>
                         {attempt.result_id && (
                           <Link href={`/results/${attempt.result_id}`}>
                             <Button size="sm" variant="secondary">
-                              Result
+                              {ta("result")}
                             </Button>
                           </Link>
                         )}
@@ -289,7 +290,7 @@ export default function CandidatesPage() {
                             loading={downloading === attempt.result_id}
                             onClick={() => void downloadReport(attempt)}
                           >
-                            Download Report
+                            {ta("download_report")}
                           </Button>
                         )}
                         {canPublish(attempt) && (
@@ -299,7 +300,7 @@ export default function CandidatesPage() {
                             disabled={publishing !== null}
                             onClick={() => void publishOne(attempt)}
                           >
-                            Publish to candidate
+                            {ta("publish_to_candidate")}
                           </Button>
                         )}
                       </div>

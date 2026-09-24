@@ -65,16 +65,17 @@ function PasswordInput({
   visible: boolean;
   onToggle: () => void;
 }) {
+  const ta = useTranslations("adminShell");
   return (
     <span className="relative block">
       <Input {...rest} type={visible ? "text" : "password"} className="pr-16" />
       <button
         type="button"
         onClick={onToggle}
-        aria-label={visible ? "Hide password" : "Show password"}
+        aria-label={visible ? ta("hide_password") : ta("show_password")}
         className="absolute inset-y-0 right-1.5 my-auto h-7 rounded-[7px] px-2.5 text-[12px] font-semibold text-ink-muted transition hover:bg-sunken hover:text-ink"
       >
-        {visible ? "Hide" : "Show"}
+        {visible ? ta("hide") : ta("show")}
       </button>
     </span>
   );
@@ -86,6 +87,7 @@ export default function LoginPage() {
   const t = useTranslations("auth");
   const tv = useTranslations("validation");
   const tc = useTranslations("common");
+  const ta = useTranslations("adminShell");
 
   const TABS: { key: Mode; label: string }[] = [
     { key: "signin", label: t("login_button") },
@@ -158,7 +160,7 @@ export default function LoginPage() {
           return;
         }
 
-        toast(`Welcome back, ${pair.user.first_name || pair.user.full_name}`, "mint");
+        toast(ta("toast_welcome_back", { name: pair.user.first_name || pair.user.full_name }), "mint");
         router.replace(homeFor(pair.user, pair.login_access));
         return;
       }
@@ -176,12 +178,12 @@ export default function LoginPage() {
         });
 
         if (pair.user.role === "candidate") {
-          toast("Account created. Sign in to request access.", "mint");
+          toast(ta("toast_account_created_candidate"), "mint");
           switchMode("signin");
           return;
         }
 
-        toast("Account created — an administrator must approve it", "amber");
+        toast(ta("toast_account_created_examiner"), "amber");
         router.replace(homeFor(pair.user, pair.login_access));
         return;
       }
@@ -193,7 +195,7 @@ export default function LoginPage() {
       );
       setNotice(response.detail);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+      setError(err instanceof ApiError ? err.message : ta("error_something_wrong"));
     } finally {
       setBusy(false);
     }
@@ -270,28 +272,28 @@ export default function LoginPage() {
               {/* Headline */}
               <div className="animate-rise" style={{ animationDelay: "0.1s" }}>
                 <h1 className="text-[30px] font-bold leading-[1.2] tracking-tight text-white max-w-xs">
-                  Assessments that hold up to{" "}
+                  {ta("login_headline_prefix")}{" "}
                   <span style={{
                     background: "linear-gradient(135deg, #818cf8, #a5b4fc)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   }}>
-                    scrutiny.
+                    {ta("login_headline_highlight")}
                   </span>
                 </h1>
                 <p className="mt-4 max-w-sm text-[13.5px] leading-relaxed" style={{ color: "#8b8ba7" }}>
-                  AI-powered proctoring, randomized papers, automated grading — and a human examiner reviews every decision.
+                  {ta("login_tagline")}
                 </p>
               </div>
 
               {/* Feature list */}
               <div className="mt-9 space-y-3.5 animate-rise" style={{ animationDelay: "0.15s" }}>
                 {[
-                  { icon: "🎯", text: "Academic & Corporate exam modes", color: "#818cf8" },
-                  { icon: "🤖", text: "AI question generation & grading", color: "#a5b4fc" },
-                  { icon: "🔒", text: "Live proctoring with webcam monitoring", color: "#818cf8" },
-                  { icon: "📊", text: "Deep performance analytics", color: "#a5b4fc" },
+                  { icon: "🎯", text: ta("feature_exam_modes"), color: "#818cf8" },
+                  { icon: "🤖", text: ta("feature_ai_generation"), color: "#a5b4fc" },
+                  { icon: "🔒", text: ta("feature_live_proctoring"), color: "#818cf8" },
+                  { icon: "📊", text: ta("feature_analytics"), color: "#a5b4fc" },
                 ].map((f, i) => (
                   <div key={f.text} className="flex items-center gap-3.5 animate-rise"
                     style={{ animationDelay: `${0.2 + i * 0.05}s` }}>
@@ -307,9 +309,9 @@ export default function LoginPage() {
               {/* Bottom stat strip */}
               <div className="mt-10 grid grid-cols-3 gap-4 animate-rise" style={{ animationDelay: "0.35s" }}>
                 {[
-                  { value: "10K+", label: "Exams taken" },
-                  { value: "99.8%", label: "Uptime" },
-                  { value: "4.9★", label: "Avg. rating" },
+                  { value: "10K+", label: ta("stat_exams_taken") },
+                  { value: "99.8%", label: ta("stat_uptime") },
+                  { value: "4.9★", label: ta("stat_avg_rating") },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-[12px] px-3 py-3 text-center"
                     style={{
@@ -475,7 +477,7 @@ export default function LoginPage() {
 
               {error && <Alert tone="rose">{error}</Alert>}
               {notice && (
-                <Alert tone="mint" title="Check your inbox">
+                <Alert tone="mint" title={ta("check_your_inbox")}>
                   {notice}
                 </Alert>
               )}
@@ -504,6 +506,7 @@ export default function LoginPage() {
  * inline in development. This form completes the loop without an inbox.
  */
 function ResetTokenForm({ onDone }: { onDone: () => void }) {
+  const ta = useTranslations("adminShell");
   const [token, setToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -517,10 +520,10 @@ function ResetTokenForm({ onDone }: { onDone: () => void }) {
       await api.post("/auth/reset-password", { token: token.trim(), new_password: newPassword }, {
         auth: false,
       });
-      toast("Password updated — sign in with your new password", "mint");
+      toast(ta("toast_password_updated_sign_in"), "mint");
       onDone();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not reset the password.");
+      setError(err instanceof ApiError ? err.message : ta("error_reset_password"));
     } finally {
       setBusy(false);
     }
@@ -529,18 +532,18 @@ function ResetTokenForm({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={submit} className="mt-7 space-y-4 border-t border-line pt-6">
       <div className="flex items-center gap-2">
-        <p className="text-[13px] font-semibold text-ink">Have a reset token?</p>
-        <Badge tone="amber">no mail server</Badge>
+        <p className="text-[13px] font-semibold text-ink">{ta("have_reset_token")}</p>
+        <Badge tone="amber">{ta("no_mail_server")}</Badge>
       </div>
-      <Field label="Reset token">
+      <Field label={ta("reset_token")}>
         <Input
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Paste the token from the message above"
+          placeholder={ta("reset_token_placeholder")}
           required
         />
       </Field>
-      <Field label="New password">
+      <Field label={ta("new_password")}>
         <Input
           type="password"
           value={newPassword}
@@ -552,29 +555,30 @@ function ResetTokenForm({ onDone }: { onDone: () => void }) {
       </Field>
       {error && <Alert tone="rose">{error}</Alert>}
       <Button type="submit" variant="secondary" loading={busy} className="w-full">
-        Set new password
+        {ta("set_new_password")}
       </Button>
     </form>
   );
 }
 
+// `role` is an "adminShell" message key.
 const DEMO = [
-  { role: "Administrator", email: "admin@exam.edu", password: "Admin@12345", tone: "accent" },
-  { role: "Examiner (approved)", email: "examiner@exam.edu", password: "Passw0rd!", tone: "mint" },
+  { role: "demo_administrator", email: "admin@exam.edu", password: "Admin@12345", tone: "accent" },
+  { role: "demo_examiner_approved", email: "examiner@exam.edu", password: "Passw0rd!", tone: "mint" },
   {
-    role: "Examiner (pending)",
+    role: "demo_examiner_pending",
     email: "pending.examiner@exam.edu",
     password: "Passw0rd!",
     tone: "amber",
   },
   {
-    role: "Candidate (login approved)",
+    role: "demo_candidate_approved",
     email: "candidate1@exam.edu",
     password: "Passw0rd!",
     tone: "neutral",
   },
   {
-    role: "Candidate (login pending)",
+    role: "demo_candidate_pending",
     email: "candidate3@exam.edu",
     password: "Passw0rd!",
     tone: "amber",
@@ -582,10 +586,11 @@ const DEMO = [
 ] as const;
 
 function DemoAccounts({ onPick }: { onPick: (email: string, password: string) => void }) {
+  const ta = useTranslations("adminShell");
   return (
     <div className="mt-6 border-t border-line pt-5">
       <p className="mb-3 text-[10.5px] font-bold uppercase tracking-[0.1em] text-ink-muted">
-        Demo Accounts — Click to fill
+        {ta("demo_accounts_title")}
       </p>
       <div className="grid gap-1.5">
         {DEMO.map((account) => (
@@ -596,7 +601,7 @@ function DemoAccounts({ onPick }: { onPick: (email: string, password: string) =>
             className="group flex items-center justify-between rounded-[10px] border border-line px-3.5 py-2.5 text-left transition-all duration-200 hover:border-accent/30 hover:bg-accent-soft hover:shadow-sm"
           >
             <span className="text-[12px] text-ink-muted font-mono group-hover:text-ink-soft transition-colors">{account.email}</span>
-            <Badge tone={account.tone}>{account.role}</Badge>
+            <Badge tone={account.tone}>{ta(account.role)}</Badge>
           </button>
         ))}
       </div>

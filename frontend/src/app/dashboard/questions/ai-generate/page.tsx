@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { AIGenerator } from "@/components/AIGenerator";
 import { Hero } from "@/components/Hero";
@@ -21,6 +22,7 @@ import type { Subject } from "@/lib/types";
 
 export default function AiGeneratePage() {
   const { user } = useRequireAuth(["examiner", "admin"]);
+  const t = useTranslations("questionBank");
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function AiGeneratePage() {
         if (!cancelled) setSubjects(data);
       } catch (err) {
         if (!cancelled)
-          setError(err instanceof ApiError ? err.message : "Could not load subjects.");
+          setError(err instanceof ApiError ? err.message : t("error_load_subjects"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -42,15 +44,15 @@ export default function AiGeneratePage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, t]);
 
   if (!user) return null;
 
   return (
     <div className="space-y-6">
       <Hero
-        title="AI Question Generation"
-        body="Pick a subject and the questions are generated for its syllabus, not in the abstract. Select as many drafts as you like and approve them together — nothing reaches the bank until you do."
+        title={t("ai_page_title")}
+        body={t("ai_page_body")}
       />
 
       {error && <Alert tone="rose">{error}</Alert>}

@@ -26,6 +26,7 @@ type Tab = "exams" | "candidates" | "proctoring" | "performance" | "export";
 
 export default function ReportsPage() {
   const t = useTranslations("dashboard-detail");
+  const ta = useTranslations("adminShell");
   const { user } = useRequireAuth(["admin"]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,7 +54,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <Hero title="Reports" body="A platform-wide view over exams, candidates and proctoring, drawn from the same data every other page reads." />
+      <Hero title={ta("reports_title")} body={ta("reports_body")} />
 
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
@@ -61,10 +62,10 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-1 text-[15px] font-semibold text-ink">{t("exam_reports")}</h2>
           <p className="mb-4 text-[13px] text-ink-muted">
-            {stats ? `${stats.exams} exams on the platform, ${stats.live_exams} live right now, ${stats.completed_exams} completed.` : "Loading…"}
+            {stats ? ta("reports_exams_summary", { exams: stats.exams, live: stats.live_exams, completed: stats.completed_exams }) : ta("loading")}
           </p>
           <Link href="/dashboard/exams">
-            <Button variant="secondary" size="sm">Open the Exams list →</Button>
+            <Button variant="secondary" size="sm">{ta("open_exams_list")}</Button>
           </Link>
         </Card>
       )}
@@ -73,10 +74,11 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-1 text-[15px] font-semibold text-ink">{t("candidate_reports")}</h2>
           <p className="mb-4 text-[13px] text-ink-muted">
-            {stats ? `${stats.candidates} registered candidates.` : "Loading…"} Attempts, completion and average scores are on the candidate roster.
+            {stats ? ta("reports_candidates_summary", { count: stats.candidates }) : ta("loading")}{" "}
+            {ta("reports_candidates_note")}
           </p>
           <Link href="/dashboard/candidates">
-            <Button variant="secondary" size="sm">Open the Candidate roster →</Button>
+            <Button variant="secondary" size="sm">{ta("open_candidate_roster")}</Button>
           </Link>
         </Card>
       )}
@@ -85,14 +87,14 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-1 text-[15px] font-semibold text-ink">{t("proctoring_reports")}</h2>
           <p className="mb-4 text-[13px] text-ink-muted">
-            {stats ? `${stats.flagged_sessions} sittings flagged for review across the platform.` : "Loading…"}
+            {stats ? ta("reports_flagged_summary", { count: stats.flagged_sessions }) : ta("loading")}
           </p>
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/proctoring">
-              <Button variant="secondary" size="sm">Open Proctoring review →</Button>
+              <Button variant="secondary" size="sm">{ta("open_proctoring_review")}</Button>
             </Link>
             <Link href="/dashboard/live">
-              <Button variant="secondary" size="sm">Open Live Console →</Button>
+              <Button variant="secondary" size="sm">{ta("open_live_console")}</Button>
             </Link>
           </div>
         </Card>
@@ -102,10 +104,10 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-1 text-[15px] font-semibold text-ink">{t("performance_reports")}</h2>
           <p className="mb-4 text-[13px] text-ink-muted">
-            Difficulty and topic breakdowns are computed per exam. Open an exam to see its analytics.
+            {ta("reports_performance_body")}
           </p>
           <Link href="/dashboard/exams">
-            <Button variant="secondary" size="sm">Choose an exam →</Button>
+            <Button variant="secondary" size="sm">{ta("choose_exam")}</Button>
           </Link>
         </Card>
       )}
@@ -114,25 +116,23 @@ export default function ReportsPage() {
         <Card>
           <h2 className="mb-1 text-[15px] font-semibold text-ink">{t("export_reports")}</h2>
           <p className="mb-4 text-[13px] text-ink-muted">
-            Certified result PDFs are available today, one candidate at a time, from that
-            candidate&apos;s own result. Platform-wide bulk exports (CSV/Excel across a
-            whole report) are not built yet.
+            {ta("reports_export_body")}
           </p>
           <ul className="space-y-2">
             <li className="flex items-center justify-between rounded-[10px] border border-line bg-surface px-3.5 py-2.5">
-              <span className="text-[13px] text-ink">Candidate result — PDF</span>
+              <span className="text-[13px] text-ink">{ta("export_candidate_result_pdf")}</span>
               <Badge tone="mint">{t("available")}</Badge>
             </li>
             <li className="flex items-center justify-between rounded-[10px] border border-line bg-sunken/50 px-3.5 py-2.5 opacity-70">
-              <span className="text-[13px] text-ink-muted">Exam report — CSV</span>
+              <span className="text-[13px] text-ink-muted">{ta("export_exam_report_csv")}</span>
               <Badge tone="neutral">{t("coming_soon")}</Badge>
             </li>
             <li className="flex items-center justify-between rounded-[10px] border border-line bg-sunken/50 px-3.5 py-2.5 opacity-70">
-              <span className="text-[13px] text-ink-muted">Candidate roster — Excel</span>
+              <span className="text-[13px] text-ink-muted">{ta("export_candidate_roster_excel")}</span>
               <Badge tone="neutral">{t("coming_soon")}</Badge>
             </li>
             <li className="flex items-center justify-between rounded-[10px] border border-line bg-sunken/50 px-3.5 py-2.5 opacity-70">
-              <span className="text-[13px] text-ink-muted">Proctoring report — PDF</span>
+              <span className="text-[13px] text-ink-muted">{ta("export_proctoring_report_pdf")}</span>
               <Badge tone="neutral">{t("coming_soon")}</Badge>
             </li>
           </ul>

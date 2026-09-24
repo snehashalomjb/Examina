@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Alert,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import {
-  QUESTION_TYPE_LABEL,
   type CandidateRow,
   type Difficulty,
   type PaperPreviewResult,
@@ -49,6 +49,7 @@ export function PaperPreview({
   durationMinutes,
   instructions,
 }: PaperPreviewProps) {
+  const t = useTranslations("examsOps");
   const [paper, setPaper] = useState<PaperPreviewResult | null>(null);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [candidateId, setCandidateId] = useState("");
@@ -76,14 +77,14 @@ export function PaperPreview({
         setError(
           err instanceof ApiError
             ? err.message
-            : "Could not build a paper from this pool.",
+            : t("preview_error_build"),
         );
         setPaper(null);
       } finally {
         setLoading(false);
       }
     },
-    [examId],
+    [examId, t],
   );
 
   useEffect(() => {
@@ -98,8 +99,8 @@ export function PaperPreview({
 
   if (!examId) {
     return (
-      <Alert tone="amber" title="Save the draft first">
-        A paper is generated from a saved exam and its pool.
+      <Alert tone="amber" title={t("preview_save_draft_first")}>
+        {t("preview_generated_from_saved")}
       </Alert>
     );
   }
@@ -111,8 +112,8 @@ export function PaperPreview({
       <Card>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <Field
-            label="Preview as"
-            hint="Papers are deterministic — the same candidate always gets the same paper."
+            label={t("preview_as")}
+            hint={t("preview_as_hint")}
           >
             <Select
               value={candidateId}
@@ -122,7 +123,7 @@ export function PaperPreview({
               }}
               className="min-w-[16rem]"
             >
-              <option value="">Yourself (a sample seed)</option>
+              <option value="">{t("preview_yourself")}</option>
               {candidates.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.full_name} — {candidate.email}
@@ -136,7 +137,7 @@ export function PaperPreview({
               loading={loading}
               onClick={() => void load(candidateId || undefined)}
             >
-              {paper ? "Rebuild paper" : "Generate a paper"}
+              {paper ? t("preview_rebuild") : t("preview_generate")}
             </Button>
           </div>
         </div>
@@ -149,13 +150,10 @@ export function PaperPreview({
 
         {paper && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-ink-muted">
-            <Badge tone="accent">{paper.entries.length} questions</Badge>
-            <Badge tone="neutral">{paper.total_marks} marks</Badge>
-            <span className="font-mono">seed {paper.seed.slice(0, 12)}…</span>
-            <span>
-              Two candidates get different papers from the same pool; one candidate gets
-              the same paper every time.
-            </span>
+            <Badge tone="accent">{t("questions_count", { count: paper.entries.length })}</Badge>
+            <Badge tone="neutral">{t("marks_count", { count: paper.total_marks })}</Badge>
+            <span className="font-mono">{t("preview_seed", { seed: paper.seed.slice(0, 12) })}</span>
+            <span>{t("preview_determinism_note")}</span>
           </div>
         )}
       </Card>
@@ -168,21 +166,21 @@ export function PaperPreview({
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2.5">
             <div className="min-w-0">
               <p className="truncate text-[13.5px] font-semibold text-ink">
-                {examTitle || "Untitled exam"}
+                {examTitle || t("preview_untitled_exam")}
               </p>
               <p className="text-[11.5px] text-ink-muted">
-                Question {index + 1} of {paper.entries.length}
+                {t("preview_question_of", { n: index + 1, total: paper.entries.length })}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge tone="neutral">⏱ {durationMinutes}:00 remaining</Badge>
-              <Badge tone="accent">AI proctored</Badge>
+              <Badge tone="neutral">⏱ {t("preview_remaining", { time: `${durationMinutes}:00` })}</Badge>
+              <Badge tone="accent">{t("preview_ai_proctored")}</Badge>
             </div>
           </div>
 
           {instructions && index === 0 && (
             <div className="border-b border-line bg-accent-soft/30 px-4 py-2.5 text-[12.5px] text-ink-soft">
-              <span className="font-semibold text-ink">Instructions: </span>
+              <span className="font-semibold text-ink">{t("preview_instructions_label")} </span>
               {instructions}
             </div>
           )}
@@ -191,11 +189,11 @@ export function PaperPreview({
             {/* the question */}
             <div>
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                <Badge tone="neutral">{QUESTION_TYPE_LABEL[entry.question_type]}</Badge>
-                <Badge tone={DIFFICULTY_TONE[entry.difficulty]}>{entry.difficulty}</Badge>
-                <Badge tone="accent">{entry.marks} marks</Badge>
+                <Badge tone="neutral">{t(`qtype_${entry.question_type}`)}</Badge>
+                <Badge tone={DIFFICULTY_TONE[entry.difficulty]}>{t(`difficulty_${entry.difficulty}`)}</Badge>
+                <Badge tone="accent">{t("marks_count", { count: entry.marks })}</Badge>
                 {entry.negative_marks > 0 && (
-                  <Badge tone="rose">−{entry.negative_marks} if wrong</Badge>
+                  <Badge tone="rose">{t("preview_if_wrong", { marks: entry.negative_marks })}</Badge>
                 )}
                 {entry.topic && <Badge tone="neutral">{entry.topic}</Badge>}
               </div>
@@ -241,9 +239,11 @@ export function PaperPreview({
                 </ul>
               ) : (
                 <div className="mt-4 rounded-[10px] border border-dashed border-line-strong bg-surface p-4 text-[13px] text-ink-muted">
-                  The candidate types their answer here
-                  {entry.question_type === "image_upload" && ", or uploads a photograph of it"}
-                  {entry.question_type === "coding" && " in the code editor"}.
+                  {entry.question_type === "image_upload"
+                    ? t("preview_answer_area_upload")
+                    : entry.question_type === "coding"
+                      ? t("preview_answer_area_coding")
+                      : t("preview_answer_area")}
                 </div>
               )}
 
@@ -254,7 +254,7 @@ export function PaperPreview({
                   disabled={index === 0}
                   onClick={() => setIndex((i) => Math.max(0, i - 1))}
                 >
-                  ← Previous
+                  {t("preview_previous")}
                 </Button>
                 <Button
                   size="sm"
@@ -267,15 +267,15 @@ export function PaperPreview({
                     )
                   }
                 >
-                  {flagged.includes(entry.question_id) ? "★ Flagged" : "☆ Flag for review"}
+                  {flagged.includes(entry.question_id) ? t("preview_flagged") : t("preview_flag_for_review")}
                 </Button>
                 {index === paper.entries.length - 1 ? (
-                  <Button size="sm" disabled title="Submitting is disabled in a preview">
-                    Submit exam
+                  <Button size="sm" disabled title={t("preview_submit_disabled")}>
+                    {t("preview_submit_exam")}
                   </Button>
                 ) : (
                   <Button size="sm" onClick={() => setIndex((i) => i + 1)}>
-                    Next →
+                    {t("preview_next")}
                   </Button>
                 )}
               </div>
@@ -284,7 +284,7 @@ export function PaperPreview({
             {/* the navigator */}
             <div className="rounded-[10px] border border-line bg-surface p-3">
               <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide text-ink-muted">
-                Navigator
+                {t("preview_navigator")}
               </p>
               <div className="grid grid-cols-5 gap-1.5">
                 {paper.entries.map((item, position) => {
@@ -312,17 +312,15 @@ export function PaperPreview({
                 })}
               </div>
               <ul className="mt-3 space-y-1 text-[11px] text-ink-muted">
-                <li>■ answered</li>
-                <li>■ flagged for review</li>
-                <li>■ not visited</li>
+                <li>■ {t("preview_legend_answered")}</li>
+                <li>■ {t("preview_legend_flagged")}</li>
+                <li>■ {t("preview_legend_not_visited")}</li>
               </ul>
             </div>
           </div>
 
           <p className="border-t border-line bg-surface px-4 py-2 text-[11.5px] text-ink-muted">
-            This is the candidate&apos;s view, fetched from the candidate-shaped
-            endpoint — no correct option, no model answer, no marking scheme. Answers
-            selected here are not saved anywhere.
+            {t("preview_candidate_view_note")}
           </p>
         </div>
       )}
@@ -330,7 +328,7 @@ export function PaperPreview({
       {!paper && !loading && !error && (
         <Card className="text-center">
           <p className="text-[13px] text-ink-muted">
-            Generate a paper to see exactly what a candidate will be shown.
+            {t("preview_generate_prompt")}
           </p>
         </Card>
       )}

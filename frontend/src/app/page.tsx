@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { Splash } from "@/components/Splash";
+import { Splash, useSplashText } from "@/components/Splash";
 import { homeFor, useAuth } from "@/lib/auth";
 
 /**
@@ -13,11 +13,12 @@ import { homeFor, useAuth } from "@/lib/auth";
 export default function Home() {
   const { user, booting } = useAuth();
   const router = useRouter();
+  const text = useSplashText();
 
   useEffect(() => {
     if (booting) return;
     router.replace(user ? homeFor(user) : "/login");
   }, [user, booting, router]);
 
-  return <Splash label={booting ? "Preparing your workspace" : "Taking you there"} />;
+  return <Splash label={booting ? text("splash_preparing") : text("splash_taking_you_there")} />;
 }

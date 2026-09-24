@@ -11,13 +11,13 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { Alert, Badge, Card, EmptyState, Skeleton, cx } from "@/components/ui";
 import type { ExamCategoryType } from "@/components/ExamCategoryCard";
 import type { SectionDraft } from "@/components/GuidedSectionPicker";
 import { ApiError, api } from "@/lib/api";
 import {
-  QUESTION_TYPE_LABEL,
   type Difficulty,
   type ExamPool,
   type Question,
@@ -58,6 +58,7 @@ export function ExaminerPaperPreview({
   sections,
   pool,
 }: ExaminerPaperPreviewProps) {
+  const t = useTranslations("examsOps");
   const [questions, setQuestions] = useState<Record<string, Question>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,15 +79,15 @@ export function ExaminerPaperPreview({
     Promise.all(ids.map((id) => api.get<Question>(`/questions/${id}`)))
       .then((list) => setQuestions(Object.fromEntries(list.map((q) => [q.id, q]))))
       .catch((err) => {
-        setError(err instanceof ApiError ? err.message : "Could not load the full paper.");
+        setError(err instanceof ApiError ? err.message : t("preview_error_load_full"));
       })
       .finally(() => setLoading(false));
-  }, [examId, pool]);
+  }, [examId, pool, t]);
 
   if (!examId) {
     return (
-      <Alert tone="amber" title="Save the draft first">
-        A paper preview is built from a saved exam and its pool.
+      <Alert tone="amber" title={t("preview_save_draft_first")}>
+        {t("preview_built_from_saved")}
       </Alert>
     );
   }
@@ -104,7 +105,7 @@ export function ExaminerPaperPreview({
 
   const entries = pool?.entries ?? [];
   if (entries.length === 0) {
-    return <EmptyState title="Nothing to preview yet" body="Add questions to the pool first." />;
+    return <EmptyState title={t("preview_nothing_yet")} body={t("preview_add_questions_first")} />;
   }
 
   const bySection = new Map<string | null, typeof entries>();
@@ -124,29 +125,29 @@ export function ExaminerPaperPreview({
     <div className="space-y-6">
       {/* exam details */}
       <Card className="space-y-3">
-        <h2 className="text-[16px] font-bold text-ink">Exam Details</h2>
+        <h2 className="text-[16px] font-bold text-ink">{t("preview_exam_details")}</h2>
         <dl className="grid grid-cols-2 gap-3 text-[13px] sm:grid-cols-3">
-          <Detail label="Exam Name" value={examTitle || "Untitled"} />
+          <Detail label={t("preview_exam_name")} value={examTitle || t("preview_untitled")} />
           {category === "academic" ? (
             <>
-              <Detail label="Subject" value={subjectName ?? "—"} />
-              <Detail label="Department" value={department ?? "—"} />
-              <Detail label="Semester" value={semester ?? "—"} />
+              <Detail label={t("exams_field_subject")} value={subjectName ?? "—"} />
+              <Detail label={t("exams_field_department")} value={department ?? "—"} />
+              <Detail label={t("preview_semester")} value={semester ?? "—"} />
             </>
           ) : (
             <>
-              <Detail label="Company" value={companyName ?? "—"} />
-              <Detail label="Job Role" value={jobRole ?? "—"} />
+              <Detail label={t("preview_company")} value={companyName ?? "—"} />
+              <Detail label={t("exams_field_job_role")} value={jobRole ?? "—"} />
             </>
           )}
-          <Detail label="Duration" value={`${durationMinutes} minutes`} />
-          <Detail label="Total Questions" value={String(entries.length)} />
-          <Detail label="Total Marks" value={String(totalMarks)} />
+          <Detail label={t("exams_stat_duration")} value={t("minutes_count", { count: durationMinutes })} />
+          <Detail label={t("preview_total_questions")} value={String(entries.length)} />
+          <Detail label={t("preview_total_marks")} value={String(totalMarks)} />
         </dl>
         {instructions && (
           <div className="rounded-[10px] border border-line bg-sunken/40 p-3">
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-              Instructions
+              {t("preview_instructions")}
             </p>
             <p className="whitespace-pre-wrap text-[13px] text-ink-soft">{instructions}</p>
           </div>
@@ -161,18 +162,18 @@ export function ExaminerPaperPreview({
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
               <div>
                 <h3 className="text-[15px] font-bold text-ink">
-                  Section {sIdx + 1}: {sec.name}
+                  {t("preview_section_heading", { n: sIdx + 1, name: sec.name })}
                 </h3>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {sec.rules.map((r, rIdx) => (
                     <Badge key={rIdx} tone="neutral">
-                      {r.topic ?? subjectName ?? "Any subject"} · {QUESTION_TYPE_LABEL[r.question_type]}
-                      {r.difficulty ? ` · ${r.difficulty}` : ""} · {r.count} q
+                      {r.topic ?? subjectName ?? t("preview_any_subject")} · {t(`qtype_${r.question_type}`)}
+                      {r.difficulty ? ` · ${t(`difficulty_${r.difficulty}`)}` : ""} · {t("analytics_questions_short", { count: r.count })}
                     </Badge>
                   ))}
                 </div>
               </div>
-              <Badge tone="accent">{list.length} question{list.length === 1 ? "" : "s"}</Badge>
+              <Badge tone="accent">{t("questions_count", { count: list.length })}</Badge>
             </div>
 
             <ol className="space-y-3">
@@ -182,10 +183,10 @@ export function ExaminerPaperPreview({
                 return (
                   <li key={entry.question_id} className="rounded-[10px] border border-line p-3">
                     <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                      <Badge tone="neutral">Q{qIdx + 1}</Badge>
-                      <Badge tone="neutral">{QUESTION_TYPE_LABEL[q.question_type]}</Badge>
-                      <Badge tone={DIFFICULTY_TONE[q.difficulty]}>{q.difficulty}</Badge>
-                      <Badge tone="accent">{entry.effective_marks} marks</Badge>
+                      <Badge tone="neutral">{t("q_number", { n: qIdx + 1 })}</Badge>
+                      <Badge tone="neutral">{t(`qtype_${q.question_type}`)}</Badge>
+                      <Badge tone={DIFFICULTY_TONE[q.difficulty]}>{t(`difficulty_${q.difficulty}`)}</Badge>
+                      <Badge tone="accent">{t("marks_count", { count: entry.effective_marks })}</Badge>
                     </div>
                     <p className="whitespace-pre-wrap text-[13.5px] text-ink">{q.body}</p>
                     {q.options.length > 0 && (
@@ -202,14 +203,14 @@ export function ExaminerPaperPreview({
                           >
                             <span className="font-semibold">{String.fromCharCode(65 + oi)}</span>
                             <span className="flex-1">{opt.text}</span>
-                            {opt.is_correct && <Badge tone="mint">correct</Badge>}
+                            {opt.is_correct && <Badge tone="mint">{t("preview_correct")}</Badge>}
                           </li>
                         ))}
                       </ul>
                     )}
                     {q.options.length === 0 && q.model_answer && (
                       <p className="mt-2 rounded-[8px] border border-line bg-sunken/40 px-2.5 py-1.5 text-[12.5px] text-ink-soft">
-                        <span className="font-semibold text-ink">Expected answer: </span>
+                        <span className="font-semibold text-ink">{t("preview_expected_answer")} </span>
                         {q.model_answer}
                       </p>
                     )}
@@ -223,10 +224,9 @@ export function ExaminerPaperPreview({
 
       {unassigned.length > 0 && (
         <Card className="space-y-3">
-          <h3 className="text-[15px] font-bold text-ink">Unassigned to a section</h3>
+          <h3 className="text-[15px] font-bold text-ink">{t("preview_unassigned")}</h3>
           <p className="text-[12.5px] text-ink-muted">
-            {unassigned.length} question(s) are in the pool but not pinned to a specific
-            section - any matching rule may draw them.
+            {t("preview_unassigned_body", { count: unassigned.length })}
           </p>
         </Card>
       )}

@@ -1,6 +1,26 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { LowPoly, Mark } from "@/components/LowPoly";
+
+/** Splash text keys ("adminShell") with the English shown while the bundle is still
+ * loading - the splash is often the very first paint, before any messages arrive, and
+ * should never flash a raw message key. */
+const SPLASH_FALLBACK = {
+  splash_preparing: "Preparing your workspace",
+  splash_taking_you_there: "Taking you there",
+  splash_opening_dashboard: "Opening your dashboard",
+  splash_tagline: "AI-Proctored Examination Platform",
+} as const;
+
+export type SplashKey = keyof typeof SPLASH_FALLBACK;
+
+/** Translate a splash key, falling back to English until messages have loaded. */
+export function useSplashText() {
+  const t = useTranslations("adminShell");
+  return (key: SplashKey) => (t.has(key) ? t(key) : SPLASH_FALLBACK[key]);
+}
 
 /**
  * Boot splash — Premium version.
@@ -9,7 +29,8 @@ import { LowPoly, Mark } from "@/components/LowPoly";
  * first paint is never a half-built dashboard or a login flash for someone who is
  * already signed in.
  */
-export function Splash({ label = "Preparing your workspace" }: { label?: string }) {
+export function Splash({ label }: { label?: string }) {
+  const text = useSplashText();
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center overflow-hidden"
       style={{ background: "#080b12" }}>
@@ -53,7 +74,7 @@ export function Splash({ label = "Preparing your workspace" }: { label?: string 
 
         <div className="mt-6 text-center animate-rise-sm" style={{ animationDelay: "0.15s" }}>
           <p className="text-[18px] font-bold tracking-tight text-white">Examina</p>
-          <p className="mt-1 text-[13px] font-medium" style={{ color: "#8b8ba7" }}>{label}</p>
+          <p className="mt-1 text-[13px] font-medium" style={{ color: "#8b8ba7" }}>{label ?? text("splash_preparing")}</p>
         </div>
 
         {/* Progress bar */}
@@ -78,7 +99,7 @@ export function Splash({ label = "Preparing your workspace" }: { label?: string 
       {/* Bottom tagline */}
       <p className="absolute bottom-8 text-[11px] font-semibold uppercase tracking-[0.2em]"
         style={{ color: "#444466" }}>
-        AI-Proctored Examination Platform
+        {text("splash_tagline")}
       </p>
     </div>
   );

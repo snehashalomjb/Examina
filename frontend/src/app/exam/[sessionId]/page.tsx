@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Mark } from "@/components/LowPoly";
 import { Splash } from "@/components/Splash";
@@ -22,14 +23,28 @@ import { LOCALE_NAMES, type Locale } from "@/lib/locale";
 import { ProctorEngine, type ProctorStatus } from "@/lib/proctor";
 import type { ExamSession, HeartbeatOut, PaperQuestion, SessionSection } from "@/lib/types";
 import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
-import { countWords, wordLabel, wordState } from "@/lib/words";
+import { countWords, wordState } from "@/lib/words";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const HEARTBEAT_MS = 30_000;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
+const QUESTION_TYPE_KEYS = new Set([
+  "mcq",
+  "multi_select",
+  "true_false",
+  "fill_blank",
+  "numerical",
+  "short_answer",
+  "long_answer",
+  "image_upload",
+  "passage",
+  "coding",
+]);
+
 export default function ExamRunner() {
+  const t = useTranslations("examRunner");
   const { user, booting } = useRequireAuth(["candidate"]);
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
@@ -105,12 +120,13 @@ export default function ExamRunner() {
         // Set first section active
         if (data.sections.length > 0) setActiveSection(data.sections[0].id);
         if (data.status !== "in_progress") {
-          setFinished(`This session is already ${data.status.replace("_", " ")}.`);
+          setFinished(t("session_already_status", { status: data.status }));
         }
       } catch (err) {
-        setLoadError(err instanceof ApiError ? err.message : "Could not load this exam session.");
+        setLoadError(err instanceof ApiError ? err.message : t("load_session_failed"));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, sessionId]);
 
   /**
@@ -130,16 +146,16 @@ export default function ExamRunner() {
         setSession(data);
         setLocaleNotice(
           data.locale !== locale
-            ? "Translation unavailable for this exam. Showing English."
+            ? t("translation_unavailable")
             : null,
         );
       } catch (err) {
-        toast(err instanceof ApiError ? err.message : "Could not switch language.", "rose");
+        toast(err instanceof ApiError ? err.message : t("switch_language_failed"), "rose");
       } finally {
         setSwitchingLocale(false);
       }
     },
-    [sessionId, switchingLocale],
+    [sessionId, switchingLocale, t],
   );
 
   /* -------------------------------------------------------------- proctoring */
@@ -242,8 +258,8 @@ export default function ExamRunner() {
         if (data.status !== "in_progress") {
           setFinished(
             data.status === "auto_submitted"
-              ? "Your time expired and the exam was submitted automatically."
-              : `This session is ${data.status.replace("_", " ")}.`,
+              ? t("time_expired_auto_submitted")
+              : t("session_is_status", { status: data.status }),
           );
         }
       } catch {
@@ -253,7 +269,7 @@ export default function ExamRunner() {
 
     const timer = window.setInterval(() => void beat(), HEARTBEAT_MS);
     return () => window.clearInterval(timer);
-  }, [session, sessionId, finished]);
+  }, [session, sessionId, finished, t]);
 
   /* ------------------------------------------------- time-up: submit for them */
   useEffect(() => {
@@ -316,7 +332,7 @@ export default function ExamRunner() {
     trap();
     const onPopState = () => {
       trap();
-      toast("You can't leave the exam until it's submitted.", "amber");
+      toast(t("cannot_leave_exam"), "amber");
     };
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -328,7 +344,7 @@ export default function ExamRunner() {
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("beforeunload", onBeforeUnload);
     };
-  }, [session, finished]);
+  }, [session, finished, t]);
 
   /* ---------------------------------------------------------------- saving */
   const persist = useCallback(
@@ -429,10 +445,10 @@ export default function ExamRunner() {
         },
       }));
       setSaveState("saved");
-      toast("Answer image uploaded", "mint");
+      toast(t("answer_image_uploaded"), "mint");
     } catch (err) {
       setSaveState("error");
-      toast(err instanceof ApiError ? err.message : "Upload failed", "rose");
+      toast(err instanceof ApiError ? err.message : t("upload_failed"), "rose");
     }
   }
 
@@ -452,7 +468,7 @@ export default function ExamRunner() {
         return next;
       });
     } catch {
-      toast("Could not update review flag", "rose");
+      toast(t("review_flag_failed"), "rose");
     }
   }
 
@@ -470,10 +486,10 @@ export default function ExamRunner() {
       }));
       setSaveState("saved");
       setClearTarget(null);
-      toast("Answer cleared", "mint");
+      toast(t("answer_cleared"), "mint");
     } catch {
       setSaveState("error");
-      toast("Could not clear answer", "rose");
+      toast(t("clear_answer_failed"), "rose");
     }
   }
 
@@ -491,12 +507,12 @@ export default function ExamRunner() {
       engine.current?.stop();
       broadcaster.current?.stop();
       broadcaster.current = null;
-      setFinished(auto ? "Your time expired and your paper was submitted." : result.message);
+      setFinished(auto ? t("time_expired_paper_submitted") : result.message);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setFinished(err.message);
       } else {
-        toast(err instanceof ApiError ? err.message : "Could not submit", "rose");
+        toast(err instanceof ApiError ? err.message : t("submit_failed"), "rose");
       }
     } finally {
       setSubmitting(false);
@@ -528,15 +544,15 @@ export default function ExamRunner() {
     engine.current?.setCurrentQuestionId(q?.question_id);
   }, [current, visibleQuestions, session]);
 
-  if (booting || (!session && !loadError)) return <Splash label="Loading your paper" />;
+  if (booting || (!session && !loadError)) return <Splash label={t("loading_paper")} />;
 
   if (loadError) {
     return (
       <CentredNotice
-        title="This exam could not be opened"
+        title={t("exam_open_failed_title")}
         body={loadError}
         action={
-          <Button onClick={() => router.replace("/dashboard/candidate")}>Back to dashboard</Button>
+          <Button onClick={() => router.replace("/dashboard/candidate")}>{t("back_to_dashboard")}</Button>
         }
       />
     );
@@ -548,15 +564,11 @@ export default function ExamRunner() {
     // candidate - that is the examiner's call, made later, on the evidence.
     return (
       <CentredNotice
-        title={lockedReason ? "Exam closed and submitted" : "Successfully submitted your exam"}
+        title={lockedReason ? t("exam_closed_submitted_title") : t("exam_submitted_title")}
         body={lockedReason ?? finished}
-        detail={
-          lockedReason
-            ? "Your answers were saved and submitted for marking. The examiner will review the proctoring record alongside your paper, and your result appears once it is published."
-            : "Objective questions were scored on submission. Written answers go to an examiner for review — your result appears once it is published."
-        }
+        detail={lockedReason ? t("exam_closed_detail") : t("exam_submitted_detail")}
         action={
-          <Button onClick={() => router.replace("/dashboard/candidate")}>Back to dashboard</Button>
+          <Button onClick={() => router.replace("/dashboard/candidate")}>{t("back_to_dashboard")}</Button>
         }
       />
     );
@@ -583,10 +595,11 @@ export default function ExamRunner() {
 
   return (
     <div className="flex h-screen flex-col bg-paper">
-      {/* Live camera - pinned to the top-left corner of the exam window itself, above
+      {/* Live camera - pinned to the bottom-right corner of the exam window itself, above
           everything else, so it stays put across every question and never depends on
-          the palette sidebar being open. */}
-      <div className="pointer-events-none fixed left-3 top-16 z-40 w-28 sm:w-32">
+          the palette sidebar being open. Not top-left: that is where the question palette
+          sits, and the tile hid its first buttons. */}
+      <div className="pointer-events-none fixed bottom-4 right-4 z-40 w-28 sm:w-32">
         <WebcamPreview
           videoRef={videoRef}
           canvasRef={canvasRef}
@@ -608,12 +621,10 @@ export default function ExamRunner() {
               ⛶
             </div>
             <h2 className="text-[17px] font-bold tracking-tight text-ink">
-              {fullscreenEverEntered ? "Return to fullscreen" : "This exam runs in fullscreen"}
+              {fullscreenEverEntered ? t("fullscreen_return_title") : t("fullscreen_required_title")}
             </h2>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-soft">
-              {fullscreenEverEntered
-                ? "You left fullscreen, and that has been recorded. Your timer is still running — return to fullscreen to carry on."
-                : "The paper opens once you enter fullscreen. Leaving fullscreen or switching tabs during the exam is recorded."}
+              {fullscreenEverEntered ? t("fullscreen_left_body") : t("fullscreen_intro_body")}
             </p>
 
             {violationLimit > 0 && (
@@ -628,32 +639,29 @@ export default function ExamRunner() {
                 {fullscreenEverEntered ? (
                   violationsLeft === 1 ? (
                     <>
-                      <span className="font-semibold">Final warning.</span> Leaving the
-                      exam once more will submit your answers and close the exam.
+                      <span className="font-semibold">{t("final_warning_label")}</span>{" "}
+                      {t("final_warning_body")}
                     </>
                   ) : (
                     <>
-                      Times you have left the exam:{" "}
-                      <span className="font-semibold">{violationCount}</span> of{" "}
-                      {violationLimit}. After {violationLimit}, your answers are
-                      submitted automatically and the exam closes.
+                      {t.rich("times_left_exam", {
+                        count: violationCount,
+                        limit: violationLimit,
+                        b: (chunks) => <span className="font-semibold">{chunks}</span>,
+                      })}
                     </>
                   )
                 ) : (
-                  <>
-                    You may leave the exam window {violationLimit} time
-                    {violationLimit === 1 ? "" : "s"}. After that your answers are
-                    submitted automatically and the exam closes.
-                  </>
+                  <>{t("leave_allowance", { limit: violationLimit })}</>
                 )}
               </p>
             )}
 
             <Button className="mt-5 w-full" onClick={() => void requestFullscreen()}>
-              {fullscreenEverEntered ? "Return to fullscreen" : "Enter fullscreen and begin"}
+              {fullscreenEverEntered ? t("return_to_fullscreen") : t("enter_fullscreen_begin")}
             </Button>
             <p className="mt-2 text-[11.5px] text-ink-muted">
-              Your answers are saved as you go, including right now.
+              {t("answers_saved_now")}
             </p>
           </div>
         </div>
@@ -678,9 +686,9 @@ export default function ExamRunner() {
               {session.exam_title}
             </p>
             <p className="text-[11px] text-ink-muted">
-              {answeredCount}/{session.questions.length} answered
+              {t("answered_progress", { answered: answeredCount, total: session.questions.length })}
               <span className="mx-1.5 opacity-40">·</span>
-              {session.total_marks} marks
+              {t("marks_count", { count: session.total_marks })}
             </p>
           </div>
         </div>
@@ -694,8 +702,12 @@ export default function ExamRunner() {
               onChange={changeExamLocale}
             />
           )}
-          <SaveIndicator state={saveState} />
-          <ProctorPill status={proctor} enabled={session.proctor_config.webcam_enabled} severity={lastSeverity} />
+          {/* Hidden on phones: with the timer and Submit they overflow a 390px header and
+              push Submit off-screen. The corner webcam tile still shows camera status. */}
+          <div className="hidden items-center gap-3 sm:flex">
+            <SaveIndicator state={saveState} />
+            <ProctorPill status={proctor} enabled={session.proctor_config.webcam_enabled} severity={lastSeverity} />
+          </div>
           {/* Premium timer */}
           <div
             className={cx(
@@ -707,7 +719,7 @@ export default function ExamRunner() {
                   : "border-accent/20 bg-accent-soft/30",
             )}
           >
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">Time Left</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">{t("time_left")}</p>
             <p
               className={cx(
                 "text-[18px] font-bold leading-tight tabular-nums tracking-tight",
@@ -719,7 +731,7 @@ export default function ExamRunner() {
           </div>
           <Button size="sm" onClick={() => setConfirming(true)}
             style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", border: "none", boxShadow: "0 2px 8px -2px rgba(79,70,229,0.4)" }}>
-            Submit
+            {t("submit")}
           </Button>
         </div>
       </header>
@@ -783,7 +795,7 @@ export default function ExamRunner() {
         <aside className="flex shrink-0 flex-col border-b border-line bg-surface p-3 lg:w-[228px] lg:border-b-0 lg:border-r lg:p-4">
           <div className="flex items-center justify-between gap-3 lg:block">
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted lg:mb-3">
-              Questions
+              {t("questions_heading")}
             </p>
             <button
               type="button"
@@ -791,7 +803,9 @@ export default function ExamRunner() {
               aria-expanded={paletteOpen}
               className="shrink-0 rounded-[8px] border border-line px-2.5 py-1 text-[12px] font-medium text-ink-soft transition hover:bg-sunken lg:hidden"
             >
-              {paletteOpen ? "Hide" : `${current + 1} of ${visibleQuestions.length}`}
+              {paletteOpen
+                ? t("hide")
+                : t("position_of", { current: current + 1, total: visibleQuestions.length })}
             </button>
           </div>
 
@@ -811,12 +825,12 @@ export default function ExamRunner() {
                     }}
                     title={
                       flagged && done
-                        ? "Answered + marked for review"
+                        ? t("state_answered_review")
                         : flagged
-                          ? "Marked for review"
+                          ? t("state_marked_review")
                           : done
-                            ? "Answered"
-                            : "Not answered"
+                            ? t("state_answered")
+                            : t("state_not_answered")
                     }
                     className={cx(
                       "btn-press relative flex h-9 items-center justify-center rounded-[8px] border text-[12.5px] font-medium transition-all duration-200",
@@ -843,11 +857,11 @@ export default function ExamRunner() {
             </div>
 
             <div className="mt-4 space-y-1.5 text-[11.5px] text-ink-muted lg:mt-5">
-              <Legend swatch="bg-accent" label="Current" />
-              <Legend swatch="bg-mint-soft border border-mint/30" label="Answered" />
-              <Legend swatch="bg-surface border border-line" label="Not answered" />
-              <Legend swatch="bg-amber-soft border border-amber/30" label="Marked for review" />
-              <Legend swatch="bg-amber-soft border border-amber/40" label="Answered + review" icon="⚑" />
+              <Legend swatch="bg-accent" label={t("legend_current")} />
+              <Legend swatch="bg-mint-soft border border-mint/30" label={t("state_answered")} />
+              <Legend swatch="bg-surface border border-line" label={t("state_not_answered")} />
+              <Legend swatch="bg-amber-soft border border-amber/30" label={t("state_marked_review")} />
+              <Legend swatch="bg-amber-soft border border-amber/40" label={t("legend_answered_review")} icon="⚑" />
             </div>
           </div>
         </aside>
@@ -857,19 +871,26 @@ export default function ExamRunner() {
           <div className="mx-auto max-w-3xl">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <Badge tone="accent">
-                Question {(activeSection
-                  ? session.questions.findIndex((q) => q.question_id === question.question_id)
-                  : current) + 1}
-                {session.sections.length > 0 && (
-                  <> of {session.questions.length}</>
-                )}
+                {(() => {
+                  const number =
+                    (activeSection
+                      ? session.questions.findIndex((q) => q.question_id === question.question_id)
+                      : current) + 1;
+                  return session.sections.length > 0
+                    ? t("question_number_of", { number, total: session.questions.length })
+                    : t("question_number", { number });
+                })()}
               </Badge>
-              <Badge>{TYPE_LABEL[question.question_type]}</Badge>
-              <Badge tone="mint">{question.marks} marks</Badge>
+              <Badge>
+                {QUESTION_TYPE_KEYS.has(question.question_type)
+                  ? t(`qtype_${question.question_type}`)
+                  : TYPE_LABEL[question.question_type]}
+              </Badge>
+              <Badge tone="mint">{t("marks_count", { count: question.marks })}</Badge>
               {question.negative_marks > 0 && (
-                <Badge tone="rose">−{question.negative_marks} if wrong</Badge>
+                <Badge tone="rose">{t("negative_if_wrong", { marks: question.negative_marks })}</Badge>
               )}
-              {isReviewing && <Badge tone="amber">⚑ Marked for review</Badge>}
+              {isReviewing && <Badge tone="amber">⚑ {t("state_marked_review")}</Badge>}
             </div>
 
             {/* Passage header (sticky text for passage children) */}
@@ -885,7 +906,7 @@ export default function ExamRunner() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={question.image_url}
-                  alt="Question figure"
+                  alt={t("question_figure_alt")}
                   className="mb-4 max-h-[300px] w-full rounded-[8px] object-contain bg-sunken"
                 />
               )}
@@ -924,14 +945,14 @@ export default function ExamRunner() {
                 }}
                 disabled={!isAnswered}
               >
-                Clear
+                {t("clear")}
               </Button>
               <Button
                 size="sm"
                 variant={isReviewing ? "secondary" : "ghost"}
                 onClick={() => void toggleReview(question.question_id)}
               >
-                {isReviewing ? "⚑ Reviewing" : "Mark for review"}
+                {isReviewing ? `⚑ ${t("reviewing")}` : t("mark_for_review")}
               </Button>
             </div>
 
@@ -941,7 +962,7 @@ export default function ExamRunner() {
                 onClick={() => setCurrent((i) => Math.max(0, i - 1))}
                 disabled={current === 0}
               >
-                Previous
+                {t("previous")}
               </Button>
 
               <div className="flex gap-2 lg:hidden">
@@ -951,10 +972,10 @@ export default function ExamRunner() {
               </div>
 
               {current === visibleQuestions.length - 1 ? (
-                <Button onClick={() => setConfirming(true)}>Review &amp; submit</Button>
+                <Button onClick={() => setConfirming(true)}>{t("review_and_submit")}</Button>
               ) : (
                 <Button onClick={() => setCurrent((i) => Math.min(visibleQuestions.length - 1, i + 1))}>
-                  Next
+                  {t("next")}
                 </Button>
               )}
             </div>
@@ -1052,6 +1073,7 @@ function QuestionRenderer({
   onWrite: (text: string) => void;
   onUpload: (file: File) => void;
 }) {
+  const t = useTranslations("examRunner");
   const qt = question.question_type;
 
   if (qt === "mcq" || qt === "multi_select") {
@@ -1067,8 +1089,8 @@ function QuestionRenderer({
 
   if (qt === "true_false") {
     const spec = question.spec as { true_label?: string; false_label?: string } | null;
-    const trueLabel = spec?.true_label ?? "True";
-    const falseLabel = spec?.false_label ?? "False";
+    const trueLabel = spec?.true_label ?? t("true_label");
+    const falseLabel = spec?.false_label ?? t("false_label");
     const tfOptions = question.options.length > 0
       ? question.options
       : [{ id: "tf-true", text: trueLabel }, { id: "tf-false", text: falseLabel }];
@@ -1105,12 +1127,12 @@ function QuestionRenderer({
   if (qt === "fill_blank") {
     return (
       <div>
-        <p className="mb-2 text-[12.5px] text-ink-muted">Type your answer in the blank.</p>
+        <p className="mb-2 text-[12.5px] text-ink-muted">{t("fill_blank_hint")}</p>
         <input
           type="text"
           value={answer.text}
           onChange={(e) => onWrite(e.target.value)}
-          placeholder="Your answer…"
+          placeholder={t("your_answer_placeholder")}
           className="w-full rounded-[10px] border border-line bg-surface px-4 py-3 text-[14.5px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
         />
       </div>
@@ -1121,7 +1143,7 @@ function QuestionRenderer({
     const spec = question.spec as { unit?: string | null } | null;
     return (
       <div>
-        <p className="mb-2 text-[12.5px] text-ink-muted">Enter a numerical value.</p>
+        <p className="mb-2 text-[12.5px] text-ink-muted">{t("numerical_hint")}</p>
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -1147,9 +1169,7 @@ function QuestionRenderer({
           onChange={(e) => onWrite(e.target.value)}
           rows={qt === "long_answer" ? 14 : 6}
           placeholder={
-            qt === "long_answer"
-              ? "Write your full answer here. Structure it clearly — an examiner reads this."
-              : "Write a concise answer."
+            qt === "long_answer" ? t("long_answer_placeholder") : t("short_answer_placeholder")
           }
         />
         <WordCounter text={answer.text} bounds={question} />
@@ -1171,13 +1191,13 @@ function QuestionRenderer({
     return (
       <div className="rounded-[11px] border border-line bg-sunken/50 p-5">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-          Passage {spec?.source ? `— ${spec.source}` : ""}
+          {t("passage_label")} {spec?.source ? `— ${spec.source}` : ""}
         </p>
         <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">
-          {spec?.passage_text ?? "Read the passage and answer the questions below."}
+          {spec?.passage_text ?? t("passage_default_text")}
         </p>
         <p className="mt-3 text-[12px] italic text-ink-muted">
-          This is a reading passage — no answer required for this item. Answer the numbered questions that follow.
+          {t("passage_no_answer")}
         </p>
       </div>
     );
@@ -1204,7 +1224,7 @@ function QuestionRenderer({
 
   return (
     <p className="text-[13.5px] italic text-ink-muted">
-      This question type ({qt}) is not yet supported in this interface.
+      {t("unsupported_type", { type: qt })}
     </p>
   );
 }
@@ -1221,10 +1241,11 @@ function OptionList({
   onChoose: (id: string) => void;
   multi: boolean;
 }) {
+  const t = useTranslations("examRunner");
   return (
     <div className="space-y-2">
       {multi && (
-        <p className="mb-3 text-[12.5px] text-ink-muted">Select every option that applies.</p>
+        <p className="mb-3 text-[12.5px] text-ink-muted">{t("select_all_that_apply")}</p>
       )}
       {question.options.map((option, index) => {
         const selected = answer.options.includes(option.id);
@@ -1275,6 +1296,7 @@ function CodingRenderer({
   } | null;
   onWrite: (text: string) => void;
 }) {
+  const t = useTranslations("examRunner");
   const [lang, setLang] = useState(languages[0] ?? "python");
 
   // Embed the language choice in the answer text as a header comment
@@ -1289,28 +1311,28 @@ function CodingRenderer({
       {(spec?.input_format || spec?.output_format || spec?.constraints) && (
         <div className="rounded-[10px] border border-line bg-sunken/60 p-4 text-[13px] space-y-2">
           {spec?.input_format && (
-            <p><span className="font-semibold text-ink-muted">Input: </span>{spec.input_format}</p>
+            <p><span className="font-semibold text-ink-muted">{t("input_label")}: </span>{spec.input_format}</p>
           )}
           {spec?.output_format && (
-            <p><span className="font-semibold text-ink-muted">Output: </span>{spec.output_format}</p>
+            <p><span className="font-semibold text-ink-muted">{t("output_label")}: </span>{spec.output_format}</p>
           )}
           {spec?.constraints && (
-            <p><span className="font-semibold text-ink-muted">Constraints: </span>{spec.constraints}</p>
+            <p><span className="font-semibold text-ink-muted">{t("constraints_label")}: </span>{spec.constraints}</p>
           )}
         </div>
       )}
 
       {spec?.sample_cases && spec.sample_cases.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Sample cases</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">{t("sample_cases")}</p>
           {spec.sample_cases.slice(0, 2).map((sc, i) => (
             <div key={i} className="grid gap-2 rounded-[9px] border border-line bg-surface p-3 text-[12.5px] sm:grid-cols-2">
               <div>
-                <p className="mb-1 text-[10.5px] font-medium uppercase tracking-wide text-ink-muted">Input</p>
+                <p className="mb-1 text-[10.5px] font-medium uppercase tracking-wide text-ink-muted">{t("input_label")}</p>
                 <pre className="whitespace-pre-wrap font-mono text-ink">{sc.input}</pre>
               </div>
               <div>
-                <p className="mb-1 text-[10.5px] font-medium uppercase tracking-wide text-ink-muted">Output</p>
+                <p className="mb-1 text-[10.5px] font-medium uppercase tracking-wide text-ink-muted">{t("output_label")}</p>
                 <pre className="whitespace-pre-wrap font-mono text-ink">{sc.output}</pre>
               </div>
             </div>
@@ -1320,7 +1342,7 @@ function CodingRenderer({
 
       <div>
         <div className="mb-2 flex items-center gap-3">
-          <p className="text-[12.5px] font-medium text-ink">Your solution</p>
+          <p className="text-[12.5px] font-medium text-ink">{t("your_solution")}</p>
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
@@ -1336,7 +1358,7 @@ function CodingRenderer({
           onChange={(e) => handleWrite(e.target.value)}
           rows={18}
           spellCheck={false}
-          placeholder={`# Write your ${lang} solution here`}
+          placeholder={t("code_placeholder", { language: lang })}
           className="w-full rounded-[10px] border border-line bg-[#1a1b26] px-4 py-3 font-mono text-[13px] leading-relaxed text-[#a9b1d6] outline-none placeholder:text-ink-muted/40 focus:border-accent/50 transition resize-y"
         />
       </div>
@@ -1354,12 +1376,13 @@ function PassageContext({
 }) {
   const parent = questions.find((q) => q.question_id === parentId);
   const spec = parent?.spec as { passage_text?: string | null } | null;
+  const t = useTranslations("examRunner");
   const text = spec?.passage_text ?? parent?.body;
   if (!text) return null;
   return (
     <div className="mb-4 max-h-48 overflow-y-auto rounded-[11px] border border-accent/20 bg-accent-soft/30 p-4">
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent-ink">
-        Passage — read before answering
+        {t("passage_read_before")}
       </p>
       <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">{text}</p>
     </div>
@@ -1381,11 +1404,12 @@ function Legend({ swatch, label, icon }: { swatch: string; label: string; icon?:
 }
 
 function SaveIndicator({ state }: { state: SaveState }) {
+  const t = useTranslations("examRunner");
   const map = {
-    idle: { text: "Ready", tone: "text-ink-muted", dot: "bg-ink-muted" },
-    saving: { text: "Saving…", tone: "text-accent-ink", dot: "bg-accent animate-pulse" },
-    saved: { text: "Saved", tone: "text-mint", dot: "bg-green" },
-    error: { text: "Not saved", tone: "text-rose", dot: "bg-rose" },
+    idle: { text: t("save_ready"), tone: "text-ink-muted", dot: "bg-ink-muted" },
+    saving: { text: t("save_saving"), tone: "text-accent-ink", dot: "bg-accent animate-pulse" },
+    saved: { text: t("save_saved"), tone: "text-mint", dot: "bg-green" },
+    error: { text: t("save_error"), tone: "text-rose", dot: "bg-rose" },
   } as const;
   const current = map[state];
   return (
@@ -1418,12 +1442,13 @@ function ExamLanguageSelector({
   busy: boolean;
   onChange: (locale: string) => void;
 }) {
+  const t = useTranslations("examRunner");
   return (
     <label className="flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft">
       <span aria-hidden="true">🌐</span>
-      <span className="sr-only">Language</span>
+      <span className="sr-only">{t("language")}</span>
       <select
-        aria-label="Exam language"
+        aria-label={t("exam_language")}
         value={locale}
         disabled={busy}
         onChange={(e) => onChange(e.target.value)}
@@ -1454,14 +1479,15 @@ function ProctorPill({
   enabled: boolean;
   severity: "info" | "warning" | "critical";
 }) {
+  const t = useTranslations("examRunner");
   const dot = <span aria-hidden className={cx(SEVERITY_DOT_CLASS[severity], "mr-1.5 align-middle")} />;
-  if (!enabled) return <Badge>Proctoring off</Badge>;
-  if (!status || !status.cameraReady) return <Badge tone="rose">{dot}Camera off</Badge>;
-  if (status.phoneDetected) return <Badge tone="rose">{dot}Phone detected</Badge>;
-  if (status.faceCount > 1) return <Badge tone="rose">{dot}{status.faceCount} faces</Badge>;
-  if (!status.facePresent) return <Badge tone="amber">{dot}Face not visible</Badge>;
-  if (status.lookingAway) return <Badge tone="amber">{dot}Look at the screen</Badge>;
-  return <Badge tone="mint">{dot}Proctoring active</Badge>;
+  if (!enabled) return <Badge>{t("proctoring_off")}</Badge>;
+  if (!status || !status.cameraReady) return <Badge tone="rose">{dot}{t("camera_off")}</Badge>;
+  if (status.phoneDetected) return <Badge tone="rose">{dot}{t("phone_detected")}</Badge>;
+  if (status.faceCount > 1) return <Badge tone="rose">{dot}{t("faces_count", { count: status.faceCount })}</Badge>;
+  if (!status.facePresent) return <Badge tone="amber">{dot}{t("face_not_visible")}</Badge>;
+  if (status.lookingAway) return <Badge tone="amber">{dot}{t("look_at_screen")}</Badge>;
+  return <Badge tone="mint">{dot}{t("proctoring_active")}</Badge>;
 }
 
 function WebcamPreview({
@@ -1475,6 +1501,7 @@ function WebcamPreview({
   status: ProctorStatus | null;
   enabled: boolean;
 }) {
+  const t = useTranslations("examRunner");
   const live = enabled && Boolean(status?.cameraReady);
   return (
     <div className="w-full rounded-[11px] border border-line bg-sunken p-1.5 shadow-md">
@@ -1488,19 +1515,19 @@ function WebcamPreview({
         <canvas ref={canvasRef} className="hidden" />
         {!enabled && (
           <div className="absolute inset-0 grid place-items-center text-[10px] text-white/70">
-            Webcam not required
+            {t("webcam_not_required")}
           </div>
         )}
         {live && (
           <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-            <span className="text-[9px] font-bold uppercase tracking-wide text-white">Live</span>
+            <span className="text-[9px] font-bold uppercase tracking-wide text-white">{t("live")}</span>
           </div>
         )}
         {!live && enabled && (
           <div className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
             <span className="text-[9px] font-semibold text-white/80">
-              {status?.visionMode === "degraded" ? "Recording" : "Connecting…"}
+              {status?.visionMode === "degraded" ? t("recording") : t("connecting")}
             </span>
           </div>
         )}
@@ -1516,18 +1543,31 @@ function WordCounter({
   text: string;
   bounds: { min_words: number | null; max_words: number | null };
 }) {
+  const t = useTranslations("examRunner");
   const count = countWords(text);
   const state = wordState(count, bounds);
+
+  /* Mirrors wordLabel() in lib/words, rendered through the translation catalogue. */
+  let label: string;
+  if (bounds.max_words != null) {
+    const over = count - bounds.max_words;
+    label = t("word_count_max", { count, max: bounds.max_words });
+    if (over > 0) label += ` · ${t("words_over_limit", { over })}`;
+  } else if (bounds.min_words != null && count > 0 && count < bounds.min_words) {
+    label = `${t("word_count", { count })} · ${t("words_to_minimum", { remaining: bounds.min_words - count })}`;
+  } else {
+    label = t("word_count", { count });
+  }
 
   return (
     <div className="mt-1.5 flex items-baseline justify-between gap-3">
       <p className="text-[11.5px] text-ink-muted">
         {bounds.min_words != null && state !== "over" && (
-          <span>Minimum {bounds.min_words} words</span>
+          <span>{t("minimum_words", { count: bounds.min_words })}</span>
         )}
         {state === "over" && (
           <span className="font-medium text-rose">
-            Trim this answer to save it — over the limit, nothing is being stored.
+            {t("trim_answer")}
           </span>
         )}
       </p>
@@ -1537,7 +1577,7 @@ function WordCounter({
           state === "over" ? "font-medium text-rose" : "text-ink-muted",
         )}
       >
-        {wordLabel(count, bounds)}
+        {label}
       </p>
     </div>
   );
@@ -1550,6 +1590,7 @@ function ImageAnswer({
   imageUrl: string | null;
   onSelect: (file: File) => void;
 }) {
+  const t = useTranslations("examRunner");
   const [isDragging, setIsDragging] = useState(false);
   const [cameraMode, setCameraMode] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -1570,12 +1611,12 @@ function ImageAnswer({
       }
       setCameraMode(true);
     } catch {
-      toast("Camera permission denied", "rose");
+      toast(t("camera_permission_denied"), "rose");
     }
   }
 
   function stopCamera() {
-    cameraStream?.getTracks().forEach((t) => t.stop());
+    cameraStream?.getTracks().forEach((track) => track.stop());
     setCameraStream(null);
     setCameraMode(false);
     setCapturedBlob(null);
@@ -1608,18 +1649,18 @@ function ImageAnswer({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={URL.createObjectURL(capturedBlob)}
-              alt="Captured preview"
+              alt={t("captured_preview_alt")}
               className="max-h-[360px] w-full object-contain bg-sunken"
             />
             <div className="flex gap-2 p-3">
               <Button size="sm" variant="secondary" onClick={() => setCapturedBlob(null)}>
-                Retake
+                {t("retake")}
               </Button>
               <Button size="sm" onClick={confirmCapture}>
-                Use this photo
+                {t("use_this_photo")}
               </Button>
               <Button size="sm" variant="ghost" onClick={stopCamera}>
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -1629,10 +1670,10 @@ function ImageAnswer({
             <canvas ref={captureCanvasRef} className="hidden" />
             <div className="flex gap-2 p-3">
               <Button size="sm" onClick={capturePhoto}>
-                📷 Capture
+                📷 {t("capture")}
               </Button>
               <Button size="sm" variant="ghost" onClick={stopCamera}>
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -1665,9 +1706,9 @@ function ImageAnswer({
             📎
           </div>
           <span className="text-[13.5px] font-medium text-ink">
-            {imageUrl ? "Replace your uploaded answer" : "Drag & drop or click to upload"}
+            {imageUrl ? t("replace_uploaded_answer") : t("drag_drop_upload")}
           </span>
-          <span className="mt-1 text-[12px] text-ink-muted">JPEG, PNG or WebP · up to 8 MB</span>
+          <span className="mt-1 text-[12px] text-ink-muted">{t("upload_formats")}</span>
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -1686,14 +1727,14 @@ function ImageAnswer({
           onClick={startCamera}
           className="text-[12.5px] font-medium text-accent hover:underline"
         >
-          📷 Use camera instead
+          📷 {t("use_camera_instead")}
         </button>
       </div>
 
       {imageUrl && (
         <div className="mt-4 overflow-hidden rounded-[12px] border border-line">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imageUrl} alt="Your uploaded answer" className="max-h-[420px] w-full object-contain bg-sunken" />
+          <img src={imageUrl} alt={t("uploaded_answer_alt")} className="max-h-[420px] w-full object-contain bg-sunken" />
         </div>
       )}
     </div>
@@ -1715,28 +1756,29 @@ function ConfirmSubmit({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useTranslations("examRunner");
   const unanswered = total - answered;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 px-5 backdrop-blur-sm">
       <Card className="animate-rise w-full max-w-md">
-        <h2 className="text-[17px] font-semibold tracking-tight text-ink">Submit your paper?</h2>
+        <h2 className="text-[17px] font-semibold tracking-tight text-ink">{t("submit_paper_title")}</h2>
         <p className="mt-1.5 text-[13.5px] text-ink-soft">
-          You cannot reopen this exam once it is submitted.
+          {t("cannot_reopen")}
         </p>
 
         <div className="mt-4 grid grid-cols-3 gap-3 rounded-[10px] bg-sunken/60 p-3 text-center">
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-ink-muted">Answered</p>
+            <p className="text-[11px] uppercase tracking-wide text-ink-muted">{t("state_answered")}</p>
             <p className="mt-0.5 text-[18px] font-semibold text-ink">{answered}</p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-ink-muted">Blank</p>
+            <p className="text-[11px] uppercase tracking-wide text-ink-muted">{t("blank_label")}</p>
             <p className={cx("mt-0.5 text-[18px] font-semibold", unanswered ? "text-amber" : "text-ink")}>
               {unanswered}
             </p>
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-ink-muted">Time left</p>
+            <p className="text-[11px] uppercase tracking-wide text-ink-muted">{t("time_left")}</p>
             <p className="mt-0.5 text-[18px] font-semibold tabular-nums text-ink">
               {formatDuration(remaining)}
             </p>
@@ -1746,18 +1788,17 @@ function ConfirmSubmit({
         {unanswered > 0 && (
           <div className="mt-4">
             <Alert tone="amber">
-              {unanswered} question{unanswered === 1 ? " is" : "s are"} still blank. Blank answers
-              score zero but never attract a negative mark.
+              {t("blank_warning", { count: unanswered })}
             </Alert>
           </div>
         )}
 
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onCancel} disabled={submitting}>
-            Keep working
+            {t("keep_working")}
           </Button>
           <Button onClick={onConfirm} loading={submitting}>
-            Submit paper
+            {t("submit_paper")}
           </Button>
         </div>
       </Card>
@@ -1772,16 +1813,17 @@ function ConfirmClear({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const t = useTranslations("examRunner");
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 px-5 backdrop-blur-sm">
       <Card className="animate-rise w-full max-w-sm">
-        <h2 className="text-[16px] font-semibold tracking-tight text-ink">Clear your answer?</h2>
+        <h2 className="text-[16px] font-semibold tracking-tight text-ink">{t("clear_answer_title")}</h2>
         <p className="mt-1.5 text-[13.5px] text-ink-soft">
-          This will delete your saved answer for this question. You can answer again afterwards.
+          {t("clear_answer_body")}
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-          <Button onClick={onConfirm}>Clear answer</Button>
+          <Button variant="secondary" onClick={onCancel}>{t("cancel")}</Button>
+          <Button onClick={onConfirm}>{t("clear_answer")}</Button>
         </div>
       </Card>
     </div>

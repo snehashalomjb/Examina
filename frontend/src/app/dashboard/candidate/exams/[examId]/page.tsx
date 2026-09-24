@@ -46,6 +46,21 @@ interface SystemCheck {
   message?: string;
 }
 
+/** Server `reason` strings (exam_sessions.py) are English; map the known ones to keys. */
+function translateReason(
+  reason: string | null | undefined,
+  startsAt: string | null | undefined,
+  tc: ReturnType<typeof useTranslations>,
+): string | null {
+  if (!reason) return null;
+  if (reason === "Attempt in progress") return tc("reason_attempt_in_progress");
+  if (reason === "Already attempted") return tc("reason_already_attempted");
+  if (reason === "This exam is closed") return tc("reason_exam_closed");
+  if (reason === "The exam window has closed") return tc("reason_window_closed");
+  if (reason.startsWith("Opens ")) return tc("reason_opens", { date: formatDate(startsAt) });
+  return reason;
+}
+
 /**
  * Exam details → system check → instructions → start.
  *
@@ -56,6 +71,7 @@ interface SystemCheck {
  */
 export default function ExamDetailPage() {
   const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   const { user } = useRequireAuth(["candidate"]);
   const params = useParams<{ examId: string }>();
   const router = useRouter();
@@ -137,7 +153,7 @@ export default function ExamDetailPage() {
         </Link>
       </div>
 
-      <Hero title={card.title} body={`${card.subject_name} · ${card.reason ?? t("assigned_to_you")}`} />
+      <Hero title={card.title} body={`${card.subject_name} · ${translateReason(card.reason, card.starts_at, tc) ?? t("assigned_to_you")}`} />
 
       <Stepper stage={stage} />
 
@@ -209,6 +225,7 @@ function ExamDetails({
   onContinue: () => void;
 }) {
   const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   return (
     <Card>
       <SectionTitle title={t("exam_details_title")} hint={t("read_before_continue")} />
@@ -216,7 +233,7 @@ function ExamDetails({
       <dl className="grid gap-3 sm:grid-cols-4">
         {(
           [
-            { label: t("duration_label"), value: `${card.duration_minutes} min`, Icon: IconClock },
+            { label: t("duration_label"), value: tc("minutes_short", { count: card.duration_minutes }), Icon: IconClock },
             { label: t("questions_label"), value: String(card.total_questions), Icon: IconExam },
             { label: t("opens_label"), value: formatDate(card.starts_at), Icon: IconClock },
             { label: t("closes_label"), value: formatDate(card.ends_at), Icon: IconClock },
@@ -248,7 +265,7 @@ function ExamDetails({
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <p className="text-[12.5px] text-ink-muted">
-          {card.can_start ? t("exam_open_now") : card.reason}
+          {card.can_start ? t("exam_open_now") : translateReason(card.reason, card.starts_at, tc)}
         </p>
         <Button onClick={onContinue} disabled={!card.can_start}>
           {t("continue_to_system_check")}
@@ -291,6 +308,7 @@ function SystemCheckStage({
   onContinue: () => void;
 }) {
   const t = useTranslations("exam");
+  const tc = useTranslations("candidatePages");
   const config = card.proctor_config;
   const needCamera = proctorFlag(config, "webcam_enabled", true);
   const needMic = proctorFlag(config, "require_microphone", true);
@@ -355,12 +373,18 @@ function SystemCheckStage({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  /** Id of the newest check run. The checks run on open (twice in React dev mode) and
+   * again on "Re-run"; an older run still awaiting the camera must not report over the
+   * newer one - it would also have its video source swapped out mid-play(). */
+  const runIdRef = useRef(0);
 
   const update = useCallback((key: string, patch: Partial<SystemCheck>) => {
     setChecks((current) => current.map((c) => (c.key === key ? { ...c, ...patch } : c)));
   }, []);
 
   const runAuto = useCallback(async () => {
+    const runId = ++runIdRef.current;
+    const stale = () => runId !== runIdRef.current;
     setRunning(true);
     setChecks((current) =>
       current.map((c) =>
@@ -387,37 +411,59 @@ function SystemCheckStage({
 
     // --- camera + face -----------------------------------------------------
     if (needCamera) {
+      // Two different failures, kept apart: the browser refusing the camera is the
+      // candidate's to fix (permissions); the face model failing to load or run is not,
+      // and telling them to "allow camera permission" would send them the wrong way.
+      let cameraOk = false;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (stale()) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
         cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
         cameraStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          await waitForFrame(videoRef.current);
-        }
-        const { faceCount } = videoRef.current
-          ? await detectFaceOnce(videoRef.current)
-          : { faceCount: 0 };
-        if (faceCount === 1) {
-          update("camera", { state: "pass", message: t("face_detected") });
-        } else if (faceCount === 0) {
-          update("camera", {
-            state: "fail",
-            message: t("no_face_detected"),
-          });
-        } else {
-          update("camera", {
-            state: "fail",
-            message: t("multiple_faces_detected", { faceCount }),
-          });
-        }
+        cameraOk = true;
       } catch {
+        if (stale()) return;
         cameraStreamRef.current = null;
         update("camera", {
           state: "fail",
           message: t("camera_access_denied"),
         });
+      }
+      if (cameraOk) {
+        try {
+          if (videoRef.current) {
+            videoRef.current.srcObject = cameraStreamRef.current;
+            await videoRef.current.play();
+            await waitForFrame(videoRef.current);
+          }
+          const { faceCount } = videoRef.current
+            ? await detectFaceOnce(videoRef.current)
+            : { faceCount: 0 };
+          if (stale()) return;
+          if (faceCount === 1) {
+            update("camera", { state: "pass", message: t("face_detected") });
+          } else if (faceCount === 0) {
+            update("camera", {
+              state: "fail",
+              message: t("no_face_detected"),
+            });
+          } else {
+            update("camera", {
+              state: "fail",
+              message: t("multiple_faces_detected", { faceCount }),
+            });
+          }
+        } catch (err) {
+          if (stale()) return;
+          console.error("Face check failed", err);
+          update("camera", {
+            state: "fail",
+            message: t("face_check_failed"),
+          });
+        }
       }
     }
 
@@ -465,12 +511,13 @@ function SystemCheckStage({
       });
     }
 
-    setRunning(false);
+    if (!stale()) setRunning(false);
   }, [needCamera, needMic, minMbps, update]);
 
   useEffect(() => {
     void runAuto();
     return () => {
+      runIdRef.current += 1; // abandon any run still in flight
       cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
       cameraStreamRef.current = null;
     };
@@ -516,11 +563,12 @@ function SystemCheckStage({
   }, [needDisplay, t]);
 
   async function checkDisplays() {
-    const getScreenDetails = (window as WindowWithScreenDetails).getScreenDetails;
-    if (!getScreenDetails) return;
+    const win = window as WindowWithScreenDetails;
+    if (typeof win.getScreenDetails !== "function") return;
     update("display", { state: "running" });
     try {
-      const details = await getScreenDetails();
+      // Called on `window`: Web APIs are not guaranteed to work detached from it.
+      const details = await win.getScreenDetails();
       const count = details.screens.length;
       update("display", {
         state: count === 1 ? "pass" : "fail",
@@ -588,10 +636,10 @@ function SystemCheckStage({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[13.5px] font-medium text-ink">{check.label}</p>
-                  {check.state === "running" && <Badge>checking…</Badge>}
-                  {check.state === "pass" && <Badge tone="mint">ready</Badge>}
-                  {check.state === "fail" && <Badge tone="rose">problem</Badge>}
-                  {check.state === "unsupported" && <Badge tone="neutral">unverified</Badge>}
+                  {check.state === "running" && <Badge>{tc("check_running")}</Badge>}
+                  {check.state === "pass" && <Badge tone="mint">{tc("check_ready")}</Badge>}
+                  {check.state === "fail" && <Badge tone="rose">{tc("check_problem")}</Badge>}
+                  {check.state === "unsupported" && <Badge tone="neutral">{tc("check_unverified")}</Badge>}
                 </div>
                 <p className="mt-0.5 text-[12.5px] text-ink-muted">
                   {check.message ?? check.detail}

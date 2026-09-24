@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/lib/auth";
 import { LOCALE_NAMES, SUPPORTED_LOCALES, useLocale } from "@/lib/locale";
@@ -20,6 +21,7 @@ export function LanguageSelector({
   variant?: "light" | "dark";
 }) {
   const { locale } = useLocale();
+  const t = useTranslations("adminShell");
   const { changeLocale } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +49,7 @@ export function LanguageSelector({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Select language"
+        aria-label={t("select_language")}
         className="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors"
         style={
           variant === "dark"
@@ -62,7 +64,7 @@ export function LanguageSelector({
       {open && (
         <ul
           role="listbox"
-          aria-label="Available languages"
+          aria-label={t("available_languages")}
           className="absolute right-0 z-50 mt-2 min-w-[10rem] overflow-hidden rounded-xl border bg-white py-1 shadow-lg"
           style={{ borderColor: "var(--color-border, #e5e7eb)" }}
         >
