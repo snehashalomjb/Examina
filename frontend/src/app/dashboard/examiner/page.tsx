@@ -122,18 +122,6 @@ export default function ExaminerDashboard() {
               {t("examiner_workspace_body")}
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Link href="/dashboard/questions/ai-generate">
-              <Button variant="secondary" size="sm">
-                <SparkleIcon /> AI Generate
-              </Button>
-            </Link>
-            <Link href="/dashboard/exams/create">
-              <Button size="sm">
-                <PlusIcon /> {t("create_exam_button")}
-              </Button>
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -502,14 +490,6 @@ function ExamCard({ exam, t }: { exam: Exam; t: ReturnType<typeof useTranslation
 }
 
 /* ─── Inline Icons ───────────────────────────────────────────────── */
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2} strokeLinecap="round" aria-hidden>
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
 function SparkleIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
