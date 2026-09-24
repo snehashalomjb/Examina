@@ -1,4 +1,4 @@
-"""Parse a spreadsheet, CSV or Word document into reviewable question rows.
+"""Parse a spreadsheet, CSV, Word document or PDF into reviewable question rows.
 
 Three deliberate properties:
 
@@ -574,8 +574,25 @@ _BULLET_PREFIX = re.compile(r"^[\s•●○◦‣▪✓✔☑☒☐➤►\-–�
 
 #: "1. What is X?" / "Q3) What is X?" - the numbering examiners actually type.
 QUESTION_START = re.compile(r"^\s*(?:q(?:uestion)?\s*)?(\d{1,3})\s*[\.\):]\s*(.+)$", re.IGNORECASE)
+#: "Question 1 (Easy)" / "Q.4 [Hard]" / "Question 7" - a labelled heading, often with the
+#: body on the *next* line and the difficulty in brackets. The "Q"/"Question" prefix is
+#: required here, since without the punctuation QUESTION_START demands, a bare number
+#: at the start of a wrapped line would otherwise read as a new question.
+QUESTION_LABEL = re.compile(
+    r"^\s*q(?:uestion)?\.?\s*(?:no\.?\s*)?(\d{1,3})\s*"
+    r"(?:[\(\[]\s*(easy|medium|hard)\s*[\)\]])?\s*[\.\):\-–—]?\s*(.*)$",
+    re.IGNORECASE,
+)
 #: "A. Learning from data" / "(b) Removing data" / "C) ..." - optionally starred correct.
-OPTION_LINE = re.compile(r"^\s*\(?([a-fA-F])\)?\s*[\.\):]?\s*(.+?)\s*(\*)?\s*$")
+#: The separator is required: without it, a wrapped body line such as "BY dept_id;" or
+#: "failure?" reads as option B or F. "e.g." is excluded for the same reason.
+OPTION_LINE = re.compile(
+    r"^\s*(?:\(([a-fA-F])\)|([a-fA-F])[\.\):])(?![A-Za-z]\.)\s*(.+?)\s*(\*)?\s*$"
+)
+#: "B. SELECT" / "(C) PRIMARY KEY" on an answer line - the letter, then the option's own
+#: text repeated. Only the letter is the key; the text must not be mined for more
+#: letters ("B. It references a column" is one answer, not B and A).
+_LETTERED_ANSWER = re.compile(r"^\(?([A-F])\)?[\.\):]\s+\S", re.IGNORECASE)
 #: A True/False option written without a letter at all - just the word on its own line,
 #: which is how a True/False question is commonly laid out ("True" / "False", one per
 #: line) rather than "A. True" / "B. False".
@@ -651,11 +668,17 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
     #: about to begin.
     active_section_type: QuestionType | None = None
     active_section_difficulty: str = ""
+    #: "(Easy)" on a "Question 3 (Easy)" heading - applies to that question only.
+    heading_difficulty: str = ""
 
     def flush() -> None:
         nonlocal body, options, answer, meta, saw_bare_true, saw_bare_false
-        if body is None:
+        if not body:
+            body, options, answer, meta = None, [], "", {}
             return
+        lettered = _LETTERED_ANSWER.match(answer)
+        if lettered:
+            answer = lettered.group(1).upper()
         cells = [""] * 6
         starred: list[str] = []
         for letter, text, is_correct in options:
@@ -704,7 +727,7 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
                 correct_cell,
                 meta.get("Subject", ""),
                 meta.get("Topic", ""),
-                meta.get("Difficulty", "") or active_section_difficulty,
+                meta.get("Difficulty", "") or heading_difficulty or active_section_difficulty,
                 meta.get("Marks", ""),
                 meta.get("Negative Marks", ""),
             ]
@@ -718,10 +741,16 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
             continue
         text = _BULLET_PREFIX.sub("", raw).strip() or raw
 
+        label = QUESTION_LABEL.match(text)
         start = QUESTION_START.match(text)
-        if start:
+        if label or start:
             flush()
-            body = start.group(2).strip()
+            if label:
+                body = label.group(3).strip()
+                heading_difficulty = (label.group(2) or "").lower()
+            else:
+                body = start.group(2).strip()
+                heading_difficulty = ""
             active_section_type, active_section_difficulty = section_type, section_difficulty
             continue
 
@@ -738,6 +767,12 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
             continue
 
         if body is None:
+            continue
+
+        # First line under a bare "Question 3 (Easy)" heading is the body, whatever it
+        # starts with - "Define ..." must not be mistaken for option D.
+        if body == "":
+            body = raw
             continue
 
         # A line may bundle several "Key: value" fields separated by "|" - match each
@@ -769,7 +804,8 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
 
         option = OPTION_LINE.match(text)
         if option and len(text) < 400:
-            options.append((option.group(1), option.group(2).strip(), bool(option.group(3))))
+            letter = option.group(1) or option.group(2)
+            options.append((letter, option.group(3).strip(), bool(option.group(4))))
             continue
 
         # A continuation line - part of the question, wrapped. Kept from the raw,
@@ -780,12 +816,29 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
     return rows
 
 
+#: A page whose text layer holds fewer characters than this is treated as scanned.
+_MIN_TEXT_LAYER_CHARS = 40
+#: OCR costs a second or two a page, and the import request is synchronous.
+MAX_OCR_PAGES = 50
+
+
+def _page_has_images(page: Any) -> bool:
+    try:
+        return len(page.images) > 0
+    except Exception:  # noqa: BLE001 - a malformed image stream just means "unknown"
+        return False
+
+
 def _rows_from_pdf(data: bytes) -> list[list[str]]:
     """Read a PDF the same way as a Word paper: numbered questions, options, answers.
 
-    A PDF containing an actual question table is imported directly, same as a DOCX. A
-    PDF that turns out to hold no questions - a syllabus, a topic list - is refused
-    with a message pointing at AI Generate, which is what reads that kind of document.
+    Pages with a real text layer are read directly. Scanned pages - no text layer, just
+    a picture of the paper - are rendered and read with OCR. If the text layer yields
+    no questions but some pages carry images, those are OCR'd too, for papers where the
+    questions were pasted in as screenshots under a typed title.
+
+    A PDF that still holds no questions - a syllabus, a topic list - is refused with a
+    message pointing at AI Generate, which is what reads that kind of document.
     """
     try:
         from pypdf import PdfReader
@@ -797,12 +850,43 @@ def _rows_from_pdf(data: bytes) -> list[list[str]]:
     except Exception as exc:
         raise ImportError_("That file could not be opened as a PDF.") from exc
 
-    lines: list[str] = []
-    for page in reader.pages:
-        lines.extend((page.extract_text() or "").splitlines())
+    page_text: list[str] = [(page.extract_text() or "") for page in reader.pages]
+    scanned = [i for i, text in enumerate(page_text) if len(text.strip()) < _MIN_TEXT_LAYER_CHARS]
+    ocr_error: str | None = None
 
-    rows = _rows_from_prose(lines)
+    def ocr(indexes: list[int]) -> bool:
+        nonlocal ocr_error
+        indexes = indexes[:MAX_OCR_PAGES]
+        if not indexes:
+            return False
+        from app.services.ocr import read_pdf_pages
+
+        try:
+            for index, text in read_pdf_pages(data, indexes).items():
+                page_text[index] = text
+        except RuntimeError as exc:
+            ocr_error = str(exc)
+            return False
+        return True
+
+    def parse() -> list[list[str]]:
+        return _rows_from_prose([line for text in page_text for line in text.splitlines()])
+
+    ocr(scanned)
+    rows = parse()
     if len(rows) < 2:
+        with_images = [
+            i for i, page in enumerate(reader.pages) if i not in scanned and _page_has_images(page)
+        ]
+        if ocr(with_images):
+            rows = parse()
+
+    if len(rows) < 2:
+        if ocr_error and scanned:
+            raise ImportError_(
+                "This PDF looks scanned, but text recognition (OCR) is not available on "
+                "the server, so no questions could be read from it."
+            )
         raise ImportError_(
             "No questions were found in this PDF. If it's a syllabus rather than a "
             "question paper, use AI Generate instead."

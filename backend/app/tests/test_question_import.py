@@ -366,6 +366,68 @@ class TestPdf:
         assert rows[0].ok, rows[0].problems
         assert rows[0].options[1].is_correct
 
+    def test_labelled_headings_with_the_body_on_the_next_line_are_read(self):
+        """The "Question 1 (Easy)" layout - heading, then body, then options."""
+        data = self._pdf_bytes(
+            [
+                "SQL Question Bank",
+                "Question 1 (Easy)",
+                "Define the clause that sorts query results.",
+                "A. SORT BY",
+                "B. ORDER BY",
+                "Answer: B. ORDER BY",
+                "Question 2 (Hard)",
+                "Which property keeps a committed transaction saved after a system",
+                "failure?",
+                "A. Atomicity",
+                "B. Durability",
+                "Answer: B. It is durability, a property of a transaction",
+            ]
+        )
+        rows = parse_questions(filename="paper.pdf", data=data)
+        assert [r.problems for r in rows] == [[], []]
+        assert rows[0].body == "Define the clause that sorts query results."
+        assert rows[0].difficulty.value == "easy"
+        assert [o.is_correct for o in rows[0].options] == [False, True]
+        # A wrapped line starting with a-f is body text, not option F.
+        assert rows[1].body.endswith("system failure?")
+        assert len(rows[1].options) == 2
+        assert rows[1].difficulty.value == "hard"
+        assert [o.is_correct for o in rows[1].options] == [False, True]
+
+    def test_a_scanned_pdf_is_read_with_ocr(self):
+        """No text layer at all - a picture of the paper - still yields its questions."""
+        from app.services.ocr import engine_version
+
+        if engine_version() is None:
+            pytest.skip("Tesseract is not installed on this machine")
+        from PIL import Image, ImageDraw, ImageFont
+
+        page = Image.new("RGB", (1700, 1100), "white")
+        draw = ImageDraw.Draw(page)
+        try:
+            font = ImageFont.truetype("arial.ttf", 40)
+        except OSError:
+            font = ImageFont.load_default(size=40)
+        lines = [
+            "Question 1 (Easy)",
+            "Which SQL command retrieves data from a table?",
+            "A. INSERT",
+            "B. SELECT",
+            "C. UPDATE",
+            "Answer: B",
+        ]
+        for n, line in enumerate(lines):
+            draw.text((100, 100 + n * 90), line, fill="black", font=font)
+        buffer = io.BytesIO()
+        page.save(buffer, "PDF")
+
+        rows = parse_questions(filename="scan.pdf", data=buffer.getvalue())
+        assert len(rows) == 1
+        assert rows[0].ok, rows[0].problems
+        assert "SQL command" in rows[0].body
+        assert [o.is_correct for o in rows[0].options] == [False, True, False]
+
     def test_a_pdf_with_no_questions_points_at_ai_generate(self):
         data = self._pdf_bytes(["Syllabus", "Unit 1: Introduction", "Unit 2: Data structures"])
         with pytest.raises(ImportError_, match="AI Generate"):

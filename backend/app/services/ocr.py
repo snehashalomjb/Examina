@@ -1,4 +1,4 @@
-"""OCR pre-pass over handwritten answer scans (Tesseract).
+"""OCR over handwritten answer scans and scanned question papers (Tesseract).
 
 Handwritten ``image_upload`` answers go straight to a human - the spec routes them past
 the automatic grader on purpose. This module runs first and attaches whatever text
@@ -98,6 +98,46 @@ def extract_text(data: bytes) -> OcrResult:
     text = " ".join(words).strip()
     confidence = (sum(confidences) / len(confidences) / 100.0) if confidences else 0.0
     return OcrResult(text=text, confidence=round(confidence, 4), engine="tesseract")
+
+
+#: PSM 4 - "a single column of text of variable sizes" - keeps a printed paper's line
+#: breaks, which the question parser depends on to tell a heading from an option.
+_PAGE_CONFIG = "--oem 1 --psm 4"
+#: Render scale for PDF pages: 300 DPI over PDF's native 72.
+_PDF_RENDER_SCALE = 300 / 72
+
+
+def read_pdf_pages(data: bytes, page_indexes: list[int]) -> dict[int, str]:
+    """Render the given PDF pages and OCR each one, line breaks preserved.
+
+    For scanned question papers - pages that are a picture of text with no text layer
+    for ``pypdf`` to read. Raises ``RuntimeError`` if the PDF cannot be rendered or
+    Tesseract cannot be run.
+    """
+    import pypdfium2 as pdfium
+
+    _configure()
+    try:
+        document = pdfium.PdfDocument(data)
+    except Exception as exc:  # noqa: BLE001 - any render failure means "cannot OCR"
+        raise RuntimeError(f"The PDF could not be rendered for OCR: {exc}") from exc
+
+    pages: dict[int, str] = {}
+    try:
+        for index in page_indexes:
+            image = document[index].render(scale=_PDF_RENDER_SCALE).to_pil().convert("L")
+            try:
+                pages[index] = pytesseract.image_to_string(
+                    image, lang=settings.OCR_LANGUAGES, config=_PAGE_CONFIG
+                )
+            except pytesseract.TesseractNotFoundError as exc:
+                raise RuntimeError(
+                    "Tesseract is not installed or not on PATH. Install it and/or set "
+                    "TESSERACT_CMD."
+                ) from exc
+    finally:
+        document.close()
+    return pages
 
 
 def _prepare(image: Image.Image) -> Image.Image:
