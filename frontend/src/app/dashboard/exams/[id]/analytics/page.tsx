@@ -104,9 +104,13 @@ export default function AnalyticsPage() {
               },
               {
                 label: "Pass Rate",
-                value: `${analytics.pass_rate.toFixed(1)}%`,
-                hint: `Passing threshold: ${exam?.passing_percentage ?? 50}%`,
-                tone: analytics.pass_rate >= 70 ? "mint" as const : "amber" as const,
+                value: analytics.pass_rate === null ? "—" : `${analytics.pass_rate.toFixed(1)}%`,
+                hint: analytics.pass_rate === null
+                  ? "No pass mark set for this exam"
+                  : `Passing threshold: ${exam?.passing_percentage ?? 50}%`,
+                tone: analytics.pass_rate === null
+                  ? "neutral" as const
+                  : analytics.pass_rate >= 70 ? "mint" as const : "amber" as const,
               },
               {
                 label: "Score Range",
@@ -158,7 +162,8 @@ export default function AnalyticsPage() {
                       <div className="mb-1.5 flex items-baseline justify-between gap-2">
                         <p className="truncate text-[13.5px] font-medium text-ink">{sec.section_name}</p>
                         <span className="shrink-0 text-[12px] text-ink-muted">
-                          {sec.avg_percentage.toFixed(1)}% avg · {sec.pass_rate.toFixed(1)}% pass rate
+                          {sec.avg_percentage.toFixed(1)}% avg
+                          {sec.pass_rate !== null && ` · ${sec.pass_rate.toFixed(1)}% pass rate`}
                         </span>
                       </div>
                       <ProgressBar

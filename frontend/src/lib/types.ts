@@ -679,7 +679,8 @@ export interface SectionAnalytics {
   total_marks: number;
   avg_obtained: number;
   avg_percentage: number;
-  pass_rate: number;
+  /** null when the exam declared no pass mark - no verdict, not 0% passing. */
+  pass_rate: number | null;
 }
 
 export interface ExamAnalytics {
@@ -691,7 +692,8 @@ export interface ExamAnalytics {
   avg_percentage: number;
   highest_percentage: number;
   lowest_percentage: number;
-  pass_rate: number;
+  /** null when the exam declared no pass mark - no verdict, not 0% passing. */
+  pass_rate: number | null;
   avg_time_seconds: number | null;
   difficulty_breakdown: Array<{
     difficulty: Difficulty;
