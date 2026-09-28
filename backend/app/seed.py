@@ -42,6 +42,7 @@ from app.seed_question_bank_bulk import FLOOR_PER_TYPE
 from app.seed_question_bank_bulk import top_up as top_up_question_bank
 from app.seed_question_bank_images import top_up_images
 from app.seed_sql_questions import seed_sql_questions
+from app.subject_translation_catalog import seed_subject_translations
 
 logger = get_logger("seed")
 
@@ -1348,6 +1349,7 @@ def seed(db: Session) -> None:
 
     # Seed All Subjects
     subjects = {
+        "PY101": _subject(db, "PY101", "Python", "Python fundamentals, data types, functions, OOP, I/O, and concurrency."),
         "CS101": _subject(db, "CS101", "Computer Science Fundamentals", "Core CS: OS, DBMS, Computer Networks, Systems"),
         "CS102": _subject(db, "CS102", "Data Structures & Algorithms", "Linear & non-linear structures, graphs, complexity"),
         "CS201": _subject(db, "CS201", "Database Management Systems", "Relational SQL, ACID, Indexes, Normalization"),
@@ -1366,6 +1368,10 @@ def seed(db: Session) -> None:
         "CODE101": _subject(db, "CODE101", "Programming Challenges", "Hands-on coding problems, algorithmic implementations"),
         "SQL101": _subject(db, "SQL101", "SQL & Databases", "Structured Query Language: DDL, DML, joins, aggregations, window functions, normalisation, transactions"),
     }
+
+    # Every shipped subject gets its Malayalam, Tamil, Hindi, Kannada and Telugu label.
+    # The English ``Subject.name`` remains canonical; these are display-only siblings.
+    seed_subject_translations(db, subjects.values())
 
     questions = _seed_questions(db, subjects, examiner)
     _seed_exams(db, subjects, examiner, candidates, questions)

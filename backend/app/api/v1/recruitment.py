@@ -71,6 +71,7 @@ def exam_ranking(
     )
     if exam is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    exam_engine.assert_exam_owned(exam, staff)
 
     # Load completed sessions + results
     sessions = list(
@@ -84,6 +85,7 @@ def exam_ranking(
                 selectinload(ExamSession.candidate),
                 selectinload(ExamSession.result),
                 selectinload(ExamSession.answers).selectinload(Answer.question),
+                selectinload(ExamSession.proctor_events),
             )
             .limit(limit)
         )
@@ -172,6 +174,7 @@ def exam_ranking(
                 shortlist_status=shortlists.get(session.candidate_id),
                 suspicion_score=session.suspicion_score,
                 is_flagged=session.is_flagged,
+                flag_count=len(session.proctor_events),
                 result_id=result.id,
                 session_id=session.id,
                 published=result.published,

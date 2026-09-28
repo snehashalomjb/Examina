@@ -42,7 +42,7 @@ export function Hero({
         <div className="max-w-xl">
           <h1 className="text-[21px] font-bold tracking-tight sm:text-[24px]"
             style={{
-              background: "linear-gradient(135deg, #1e1b4b 0%, #4f46e5 60%, #7c3aed 100%)",
+              backgroundImage: "linear-gradient(135deg, #1e1b4b 0%, #4f46e5 60%, #7c3aed 100%)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               WebkitTextFillColor: "transparent",

@@ -27,7 +27,13 @@ from app.db.models import (
     Subject,
     UserRole,
 )
-from app.db.models.enums import Difficulty, QuestionCategory, QuestionType
+from app.db.models.enums import (
+    DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
+    Difficulty,
+    QuestionCategory,
+    QuestionType,
+)
 from app.schemas.ai_gen import (
     AiDraftApprove,
     AiDraftOut,
@@ -37,7 +43,9 @@ from app.schemas.ai_gen import (
     AiRegenerateRequest,
 )
 from app.services.ai_generator import generate_questions
+from app.services.language_purity import check_language_purity
 from app.services.pdf_extract import PdfError, extract_pdf_text
+from app.services.translation.base import LOCALE_LABELS
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
 router = APIRouter(tags=["ai-questions"])
@@ -48,15 +56,41 @@ def _draft_out(draft: AiQuestionDraft) -> AiDraftOut:
     return AiDraftOut.model_validate(draft)
 
 
+def _language_directive(language: str) -> str | None:
+    """A strict, unambiguous instruction for a non-English draft.
+
+    "Write every question and option in Telugu" (the old wording) is exactly how a
+    model ends up half-translating - a stem in English with a Telugu tail. This spells
+    out every field and forbids the failure mode by name, and only exempts genuine
+    technical acronyms/identifiers, matching ``app.services.language_purity`` - the
+    same bar a hand-authored question is held to.
+    """
+    if language == DEFAULT_LOCALE:
+        return None
+    label = LOCALE_LABELS.get(language, language)
+    return (
+        f"Write the ENTIRE draft only in {label}: the question body, every option, the "
+        f"model answer and the explanation must all be complete {label} sentences. Do "
+        f"not write any part of it in English and do not mix English words into a "
+        f"{label} sentence. The only exception is a genuine technical acronym, "
+        f"protocol/product name or code identifier (e.g. TCP, DNS, IPv4, HTTP, Python, "
+        f"SQL, or Python keywords like def/print/len) - those may stay in Latin script; "
+        f"every ordinary word, including common technical nouns like 'protocol', "
+        f"'layer' or 'router', must be written in {label}, not in English."
+    )
+
+
 def _compose_instructions(payload: AiGenerateRequest) -> str | None:
     """Fold the language choice into the free-text instructions.
 
-    Kept out of the generator's signature: "write in Tamil" is an instruction like any
-    other, and threading a language parameter through every provider would buy nothing.
+    Kept out of the generator's signature: a language directive is an instruction like
+    any other, and threading a language parameter through every provider would buy
+    nothing.
     """
     parts = [payload.extra_instructions] if payload.extra_instructions else []
-    if payload.language:
-        parts.append(f"Write every question and option in {payload.language}.")
+    directive = _language_directive(payload.language)
+    if directive:
+        parts.append(directive)
     return " ".join(parts) or None
 
 
@@ -81,6 +115,31 @@ def ai_generate(payload: AiGenerateRequest, staff: CurrentStaff, db: DbSession) 
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
 
     saved: list[AiQuestionDraft] = []
+    # Never offer a question the examiner already has: pull the bodies already
+    # in this subject's question bank and the drafts awaiting review, and keep
+    # the generator away from all of them.
+    existing = list(
+        db.scalars(
+            select(Question.body).where(
+                Question.subject_id == payload.subject_id
+            )
+        ).all()
+    )
+    existing.extend(
+        db.scalars(
+            select(AiQuestionDraft.payload).where(
+                AiQuestionDraft.subject_id == payload.subject_id,
+                AiQuestionDraft.status == DraftStatus.PENDING,
+            )
+        ).all()
+    )
+    seen_bodies: list[str] = []
+    for raw in existing:
+        if isinstance(raw, str):
+            seen_bodies.append(raw)
+        elif isinstance(raw, dict) and raw.get("body"):
+            seen_bodies.append(raw["body"])
+
     for question_type, share in payload.type_plan():
         raw_drafts = generate_questions(
             category=payload.category,
@@ -91,11 +150,18 @@ def ai_generate(payload: AiGenerateRequest, staff: CurrentStaff, db: DbSession) 
             extra_instructions=_compose_instructions(payload),
             source_text=payload.syllabus,
             subject_name=subject.name if subject else None,
+            exclude_bodies=seen_bodies,
+        )
+        seen_bodies.extend(
+            item.get("payload", {}).get("body", "") for item in raw_drafts
         )
         for item in raw_drafts:
             body = dict(item.get("payload", {}))
             if payload.marks_per_question is not None:
                 body["marks"] = payload.marks_per_question
+            # Stamped explicitly rather than inferred from the prompt at approval time -
+            # the bank this draft is destined for must be unambiguous.
+            body["language"] = payload.language
             draft = AiQuestionDraft(
                 subject_id=payload.subject_id,
                 category=payload.category,
@@ -149,6 +215,7 @@ def ai_generate_from_pdf(
     question_type: QuestionType = Form(default=QuestionType.MCQ),
     count: int = Form(default=5, ge=1, le=20),
     extra_instructions: str | None = Form(default=None, max_length=500),
+    language: str = Form(default=DEFAULT_LOCALE),
 ) -> AiPdfImportOut:
     """Turn an uploaded PDF into question drafts.
 
@@ -161,6 +228,16 @@ def ai_generate_from_pdf(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Upload a PDF file",
+        )
+    if language not in SUPPORTED_LOCALES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported language '{language}'. Supported: {SUPPORTED_LOCALES}",
+        )
+    if language != DEFAULT_LOCALE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The question bank is English-only; AI drafts are generated in English.",
         )
     subject: Subject | None = None
     if subject_id is not None:
@@ -182,13 +259,15 @@ def ai_generate_from_pdf(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
+    directive = _language_directive(language)
+    combined_instructions = " ".join(p for p in (extra_instructions, directive) if p) or None
     raw_drafts = generate_questions(
         category=category,
         topic=(topic or None),
         difficulty=difficulty,
         question_type=question_type,
         count=count,
-        extra_instructions=extra_instructions,
+        extra_instructions=combined_instructions,
         source_text=extracted.text,
         subject_name=subject.name if subject else None,
     )
@@ -200,6 +279,7 @@ def ai_generate_from_pdf(
         # The provenance travels with the draft, so the review queue can show where a
         # question came from long after this request is gone.
         payload["source_pdf"] = filename
+        payload["language"] = language
         draft = AiQuestionDraft(
             subject_id=subject_id,
             category=category,
@@ -307,6 +387,14 @@ def approve_draft(
         )
 
     p = payload.payload
+    language = p.get("language") or (draft.payload or {}).get("language") or DEFAULT_LOCALE
+    if language not in SUPPORTED_LOCALES:
+        language = DEFAULT_LOCALE
+    if language != DEFAULT_LOCALE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The question bank is English-only; only English drafts can be approved.",
+        )
     try:
         options_raw = p.get("options", [])
         option_drafts = [
@@ -325,6 +413,22 @@ def approve_draft(
             spec=p.get("spec"),
             image_key=p.get("image_key"),
         )
+        # An AI draft is held to exactly the bar a hand-authored question is: a
+        # Telugu draft must be Telugu throughout, not English with a few translated
+        # words. This is what actually stops a half-translated model output from
+        # reaching the bank, whatever the prompt asked for.
+        check_language_purity(
+            language=language,
+            fields={
+                "question": p.get("body"),
+                "model answer": p.get("model_answer"),
+                "explanation": p.get("explanation"),
+                **{
+                    f"option {chr(65 + i)}": o.get("text")
+                    for i, o in enumerate(options_raw)
+                },
+            },
+        )
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
@@ -332,6 +436,7 @@ def approve_draft(
 
     question = Question(
         subject_id=draft.subject_id,
+        language=language,
         question_type=draft.question_type,
         category=draft.category,
         topic=draft.topic,
@@ -434,7 +539,11 @@ def regenerate_draft(
         )
 
     subject = db.get(Subject, draft.subject_id) if draft.subject_id else None
+    language = (draft.payload or {}).get("language", DEFAULT_LOCALE)
+    directive = _language_directive(language)
     instructions = payload.feedback or "Write a different question on the same material."
+    if directive:
+        instructions = f"{instructions} {directive}"
     generated = generate_questions(
         category=draft.category,
         topic=draft.topic,
@@ -443,8 +552,13 @@ def regenerate_draft(
         count=1,
         extra_instructions=instructions,
         subject_name=subject.name if subject else None,
+        # "Regenerate" must not hand back the question it is replacing, or the
+        # examiner clicks it and gets an identical draft back.
+        exclude_bodies=[(draft.payload or {}).get("body", "")],
     )
     item = generated[0] if generated else {"payload": {}, "provider": "stub"}
+    regenerated_payload = dict(item.get("payload", {}))
+    regenerated_payload["language"] = language
 
     replacement = AiQuestionDraft(
         subject_id=draft.subject_id,
@@ -452,8 +566,8 @@ def regenerate_draft(
         topic=draft.topic,
         difficulty=payload.difficulty or draft.difficulty,
         question_type=draft.question_type,
-        payload=item.get("payload", {}),
-        original_payload=item.get("payload", {}),
+        payload=regenerated_payload,
+        original_payload=regenerated_payload,
         provider=item.get("provider", "stub"),
         model=item.get("model"),
         error=item.get("error"),

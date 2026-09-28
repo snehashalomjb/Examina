@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from typing import Any
 
 from app.core.config import settings
@@ -29,29 +30,103 @@ from app.services.ai_stub_templates import (
 logger = get_logger("ai_generator")
 
 
-def _pick_template(question_type: QuestionType, category: QuestionCategory) -> dict[str, Any]:
-    """Return a random stub template for the given type and category."""
+def _normalise_body(text: str) -> str:
+    """Collapse a question body to a comparable key for duplicate detection.
+
+    Two questions are "the same" for our purposes when they differ only in
+    casing, punctuation or whitespace, so all three are stripped before
+    comparison.
+    """
+    lowered = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return re.sub(r"\s+", " ", lowered).strip()
+
+
+def _template_pool(
+    question_type: QuestionType, category: QuestionCategory
+) -> list[dict[str, Any]]:
+    """Return the full pool of stub templates for a type/category pair."""
     cat_key = category.value
 
     if question_type is QuestionType.MCQ or question_type is QuestionType.MULTI_SELECT:
-        pool = MCQ_TEMPLATES.get(cat_key, MCQ_TEMPLATES["technical"])
-        return random.choice(pool)
+        return list(MCQ_TEMPLATES.get(cat_key, MCQ_TEMPLATES["technical"]))
     if question_type is QuestionType.TRUE_FALSE:
-        return random.choice(TRUE_FALSE_TEMPLATES)
+        return list(TRUE_FALSE_TEMPLATES)
     if question_type is QuestionType.FILL_BLANK:
-        return random.choice(FILL_BLANK_TEMPLATES)
+        return list(FILL_BLANK_TEMPLATES)
     if question_type is QuestionType.NUMERICAL:
-        return random.choice(NUMERICAL_TEMPLATES)
+        return list(NUMERICAL_TEMPLATES)
     if question_type is QuestionType.SHORT_ANSWER:
-        return random.choice(SHORT_ANSWER_TEMPLATES)
+        return list(SHORT_ANSWER_TEMPLATES)
     if question_type is QuestionType.CODING:
-        return random.choice(CODING_TEMPLATES)
+        return list(CODING_TEMPLATES)
     # Fallback for long_answer, image_upload, passage
-    return {
-        "body": f"[AI Stub] Describe an important concept related to {category.value}.",
-        "model_answer": "See explanation.",
-        "explanation": f"This is a stub placeholder for a {question_type.value} question.",
-    }
+    return [
+        {
+            "body": f"[AI Stub] Describe an important concept related to {category.value}.",
+            "model_answer": "See explanation.",
+            "explanation": f"This is a stub placeholder for a {question_type.value} question.",
+        }
+    ]
+
+
+def _pick_templates(
+    question_type: QuestionType,
+    category: QuestionCategory,
+    count: int,
+    exclude_bodies: list[str] | None = None,
+    topic: str | None = None,
+) -> list[dict[str, Any]]:
+    """Pick `count` distinct templates, never repeating a question.
+
+    Drafts are sampled *without replacement*, so a single batch can never
+    contain the same question twice. Anything already seen - in this call, in
+    ``exclude_bodies`` (the bodies already in the bank) - is filtered out on
+    the normalised form, so punctuation and casing differences do not sneak a
+    duplicate past the check.
+
+    The stub ships a deliberately small canned pool, which a few repeated
+    generations can exhaust. Rather than hand back a verbatim repeat, the
+    shortfall is topped up with topic-scoped variants so the caller always
+    receives the requested number of *distinct* drafts. The review screen
+    already labels stub output as not source-grounded, so an examiner can see
+    these are canned before approving.
+    """
+    taken = {_normalise_body(b) for b in (exclude_bodies or [])}
+    full_pool = _template_pool(question_type, category)
+    pool = [t for t in full_pool if _normalise_body(t["body"]) not in taken]
+    random.shuffle(pool)
+    chosen = pool[:count]
+
+    shortfall = count - len(chosen)
+    if shortfall > 0:
+        logger.info(
+            "Stub template pool for %s/%s supplied %d of %d requested; topping up "
+            "with %d topic-scoped variants",
+            category.value,
+            question_type.value,
+            len(chosen),
+            count,
+            shortfall,
+        )
+        seen = {_normalise_body(t["body"]) for t in chosen} | taken
+        qualifier = topic or "variant"
+        attempts = 0
+        n = 0
+        # Every returned body must differ from every body already in the bank,
+        # so `taken` seeds the seen-set and the variant number keeps advancing
+        # past slots that are already occupied.
+        while len(chosen) < count and attempts < 500:
+            attempts += 1
+            n += 1
+            template = full_pool[(n - 1) % len(full_pool)]
+            variant = dict(template)
+            variant["body"] = f"{template['body']} (focus: {qualifier} #{n})"
+            key = _normalise_body(variant["body"])
+            if key in seen:
+                continue
+            seen.add(key)
+            chosen.append(variant)
+    return chosen
 
 
 def _marks_for_difficulty(difficulty: Difficulty) -> float:
@@ -65,14 +140,13 @@ def _generate_stub(
     question_type: QuestionType,
     count: int,
     subject_name: str | None = None,
+    exclude_bodies: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Generate `count` stub drafts without any network call."""
+    templates = _pick_templates(question_type, category, count, exclude_bodies, topic)
     drafts: list[dict[str, Any]] = []
-    for _ in range(count):
-        template = _pick_template(question_type, category)
+    for template in templates:
         body = template["body"]
-        if topic:
-            body = body  # keep as-is; topic context already embedded in templates
 
         payload: dict[str, Any] = {
             "body": body,
@@ -113,6 +187,17 @@ def _generate_with_llm(
     try:
         if provider == "openai" and settings.OPENAI_API_KEY:
             return _openai_generate(
+                category,
+                topic,
+                difficulty,
+                question_type,
+                count,
+                extra_instructions,
+                source_text,
+                subject_name,
+            )
+        if provider == "gemini" and settings.GEMINI_API_KEY:
+            return _gemini_generate(
                 category,
                 topic,
                 difficulty,
@@ -223,6 +308,52 @@ def _openai_generate(
     ]
 
 
+def _gemini_generate(
+    category: QuestionCategory,
+    topic: str | None,
+    difficulty: Difficulty,
+    question_type: QuestionType,
+    count: int,
+    extra_instructions: str | None,
+    source_text: str | None = None,
+    subject_name: str | None = None,
+) -> list[dict[str, Any]]:
+    from google import genai  # type: ignore[import]
+
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    prompt = _build_prompt(
+        category,
+        topic,
+        difficulty,
+        question_type,
+        count,
+        extra_instructions,
+        source_text,
+        subject_name,
+    )
+    response = client.models.generate_content(
+        model=settings.GRADER_MODEL,
+        contents=prompt,
+        config={"response_mime_type": "application/json"},
+    )
+    content = response.text or "[]"
+    data = json.loads(content)
+    items = data if isinstance(data, list) else data.get("questions", [data])
+    return [
+        {
+            "payload": {
+                **item,
+                "category": category.value,
+                "topic": topic,
+                "difficulty": difficulty.value,
+            },
+            "provider": "gemini",
+            "model": settings.GRADER_MODEL,
+        }
+        for item in items
+    ]
+
+
 # --------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------
@@ -237,6 +368,7 @@ def generate_questions(
     extra_instructions: str | None = None,
     source_text: str | None = None,
     subject_name: str | None = None,
+    exclude_bodies: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Entry point called by the API route.
 
@@ -255,9 +387,14 @@ def generate_questions(
     Algorithms subject genuinely produce different questions on the same topic name.
     """
     provider = settings.GRADER_PROVIDER
-    if provider == "stub" or not settings.OPENAI_API_KEY:
+    key_present = (provider == "openai" and settings.OPENAI_API_KEY) or (
+        provider == "gemini" and settings.GEMINI_API_KEY
+    )
+    if provider == "stub" or not key_present:
         logger.info("Using stub AI generator (%d questions)", count)
-        drafts = _generate_stub(category, topic, difficulty, question_type, count, subject_name)
+        drafts = _generate_stub(
+            category, topic, difficulty, question_type, count, subject_name, exclude_bodies
+        )
         if source_text:
             for draft in drafts:
                 draft["payload"]["source_grounded"] = False

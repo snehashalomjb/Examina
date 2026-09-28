@@ -10,9 +10,15 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from app.db.models.enums import Difficulty, QuestionCategory, QuestionType
+from app.db.models.enums import (
+    DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
+    Difficulty,
+    QuestionCategory,
+    QuestionType,
+)
 
 
 class ImportedOption(BaseModel):
@@ -31,11 +37,11 @@ class ImportedRow(BaseModel):
     #: exist - see ``problems`` for that case.
     subject_id: uuid.UUID | None = None
     subject_name: str | None = None
-    question_type: QuestionType
-    difficulty: Difficulty
+    question_type: QuestionType | None
+    difficulty: Difficulty | None
     category: QuestionCategory
     topic: str | None = None
-    marks: float
+    marks: float | None
     negative_marks: float
     model_answer: str | None = None
     explanation: str | None = None
@@ -73,11 +79,11 @@ class ImportRowIn(BaseModel):
     #: Per-row subject override. Null means "use the import's default subject" - the
     #: only behaviour a single-subject file has ever needed.
     subject_id: uuid.UUID | None = None
-    question_type: QuestionType
-    difficulty: Difficulty = Difficulty.MEDIUM
+    question_type: QuestionType | None = QuestionType.MCQ
+    difficulty: Difficulty | None = Difficulty.MEDIUM
     category: QuestionCategory = QuestionCategory.ACADEMIC
     topic: str | None = Field(default=None, max_length=120)
-    marks: float = Field(1.0, ge=0)
+    marks: float | None = Field(1.0, gt=0)
     negative_marks: float = Field(0.0, ge=0)
     model_answer: str | None = None
     explanation: str | None = None
@@ -93,9 +99,19 @@ class ImportRowIn(BaseModel):
 
 class ImportCommit(BaseModel):
     subject_id: uuid.UUID
+    #: The bank every row in this file lands in. One language per import, since a
+    #: spreadsheet is authored in one language at a time - see ``Question.language``.
+    language: str = DEFAULT_LOCALE
     #: When set, the imported questions also join that exam's pool.
     exam_id: uuid.UUID | None = None
     rows: list[ImportRowIn] = Field(..., min_length=1, max_length=500)
+
+    @field_validator("language")
+    @classmethod
+    def _language_supported(cls, value: str) -> str:
+        if value not in SUPPORTED_LOCALES:
+            raise ValueError(f"Unsupported language '{value}'. Supported: {SUPPORTED_LOCALES}")
+        return value
 
 
 class ImportResult(BaseModel):

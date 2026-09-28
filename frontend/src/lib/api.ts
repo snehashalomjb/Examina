@@ -105,12 +105,21 @@ async function request<T>(path: string, options: RequestOptions = {}, isRetry = 
   if (examToken) headers["X-Exam-Token"] = examToken;
   if (body !== undefined && !formData) headers["Content-Type"] = "application/json";
 
-  const response = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
-    signal,
-  });
+  // A dead backend is a fetch rejection, not an HTTP error, so it needs its own message.
+  // "Something went wrong" sends people looking for a bad password when the API simply
+  // is not running - the single most common cause of a local login that refuses to work.
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
+      signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError(0, `Cannot reach the server at ${BASE}. Is the backend running?`);
+  }
 
   if (response.status === 401 && auth && !isRetry) {
     // One shot at a silent refresh before we surface an expiry to the user.
@@ -151,22 +160,7 @@ export const api = {
    * download silently returns a 403 page the browser cheerfully saves as a CSV.
    */
   async download(path: string, filename: string): Promise<void> {
-    const token = tokens.access();
-    const response = await fetch(`${BASE}${path}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) {
-      let payload: unknown = null;
-      try {
-        payload = await response.json();
-      } catch {
-        /* non-JSON error body */
-      }
-      const { message } = messageFrom(response.status, payload);
-      throw new ApiError(response.status, message);
-    }
-
-    const url = URL.createObjectURL(await response.blob());
+    const url = URL.createObjectURL(await fetchFile(path));
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = filename;
@@ -175,7 +169,47 @@ export const api = {
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   },
+  /**
+   * Open an authenticated file (a PDF report) in a new tab to read, without saving it.
+   *
+   * The tab is opened before the fetch, while still inside the click - a window opened
+   * after an `await` is treated as a pop-up and blocked.
+   */
+  async preview(path: string): Promise<void> {
+    const tab = window.open("", "_blank");
+    try {
+      const url = URL.createObjectURL(await fetchFile(path));
+      if (tab) tab.location.href = url;
+      else window.open(url, "_blank");
+      // The tab has loaded it by then; keep memory from growing with every preview.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      tab?.close();
+      throw err;
+    }
+  },
 };
+
+/** GET an authenticated file as a Blob, turning an error response into an ApiError. */
+async function fetchFile(path: string): Promise<Blob> {
+  const token = tokens.access();
+  const locale = localePrefs.get();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (locale) headers["Accept-Language"] = locale;
+  const response = await fetch(`${BASE}${path}`, { headers });
+  if (!response.ok) {
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      /* non-JSON error body */
+    }
+    const { message } = messageFrom(response.status, payload);
+    throw new ApiError(response.status, message);
+  }
+  return response.blob();
+}
 
 /**
  * Last-gasp flush on `pagehide`, when a normal fetch would be cancelled by the page

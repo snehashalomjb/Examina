@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 
@@ -60,6 +60,7 @@ export default function RankingPage() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadingFullReport, setDownloadingFullReport] = useState(false);
 
   useEffect(() => {
     if (!user || !examId) return;
@@ -136,6 +137,28 @@ export default function RankingPage() {
     }
   }
 
+  async function downloadFullExamReport() {
+    if (!exam) return;
+    setDownloadingFullReport(true);
+    try {
+      const safeName = exam.title.replace(/\s+/g, "_");
+      await api.download(`/reports/exams/${examId}/pdf`, `marklist_${safeName}.pdf`);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not download the exam report", "rose");
+    } finally {
+      setDownloadingFullReport(false);
+    }
+  }
+
+  async function previewReport(row: RankingRow) {
+    if (!row.result_id) return;
+    try {
+      await api.preview(`/results/${row.result_id}/pdf?simple=true`);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not open the report", "rose");
+    }
+  }
+
   if (!user) return null;
 
   const topPerformer = rows.length > 0 ? rows[0] : null;
@@ -159,9 +182,20 @@ export default function RankingPage() {
             : "Every candidate who sat this exam: score, questions attempted, and proctoring flags."
         }
         action={
-          <Link href="/dashboard/exams">
-            <Button variant="secondary" size="sm">← Back to Exams</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={downloadingFullReport}
+              disabled={!rows.some((r) => r.published)}
+              onClick={() => void downloadFullExamReport()}
+            >
+              Download Full Exam Report PDF
+            </Button>
+            <Link href="/dashboard/exams">
+              <Button variant="secondary" size="sm">← Back to Exams</Button>
+            </Link>
+          </div>
         }
       />
 
@@ -265,9 +299,8 @@ export default function RankingPage() {
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((row) => (
-                  <>
+                  <Fragment key={row.candidate_id}>
                     <tr
-                      key={row.candidate_id}
                       className={cx(
                         "cursor-pointer transition hover:bg-sunken/40",
                         expandedRow === row.candidate_id && "bg-sunken/60"
@@ -386,15 +419,25 @@ export default function RankingPage() {
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                           {row.published ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              loading={downloading === row.result_id}
-                              disabled={!row.result_id}
-                              onClick={() => downloadReport(row)}
-                            >
-                              Download Report
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!row.result_id}
+                                onClick={() => void previewReport(row)}
+                              >
+                                Preview
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                loading={downloading === row.result_id}
+                                disabled={!row.result_id}
+                                onClick={() => downloadReport(row)}
+                              >
+                                Download Report
+                              </Button>
+                            </>
                           ) : canPublish(row) ? (
                             <Button
                               size="sm"
@@ -457,7 +500,7 @@ export default function RankingPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

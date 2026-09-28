@@ -51,6 +51,8 @@ export interface QuestionImporterProps {
   /** Imported questions also join this exam's pool when set. */
   examId?: string;
   subjectId?: string;
+  /** The bank every imported row lands in - see `Question.language`. Defaults to English. */
+  language?: string;
   onImported?: (result: ImportResult) => void;
 }
 
@@ -58,6 +60,7 @@ export function QuestionImporter({
   subjects,
   examId,
   subjectId,
+  language = "en",
   onImported,
 }: QuestionImporterProps) {
   const t = useTranslations("question");
@@ -99,7 +102,8 @@ export function QuestionImporter({
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const row of rows) {
-      counts.set(row.question_type, (counts.get(row.question_type) ?? 0) + 1);
+      const type = row.question_type ?? "unknown";
+      counts.set(type, (counts.get(type) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [rows]);
@@ -196,6 +200,7 @@ export function QuestionImporter({
     try {
       const outcome = await api.post<ImportResult>("/questions/import", {
         subject_id: subject,
+        language,
         exam_id: examId ?? null,
         rows: selectedRows.map((row) => ({
           row_number: row.row_number,
@@ -623,10 +628,12 @@ export function QuestionImporter({
                           <Badge tone="purple">{row.subject_name}</Badge>
                         )}
                         <Badge tone="neutral">
-                          {QUESTION_TYPE_LABEL[row.question_type] ?? row.question_type}
+                          {row.question_type
+                            ? QUESTION_TYPE_LABEL[row.question_type] ?? row.question_type
+                            : "Unknown type"}
                         </Badge>
-                        <Badge tone="neutral">{row.difficulty}</Badge>
-                        <Badge tone="accent">{row.marks} marks</Badge>
+                        <Badge tone="neutral">{row.difficulty ?? "difficulty unavailable"}</Badge>
+                        <Badge tone="accent">{row.marks ?? "?"} marks</Badge>
                         {row.options.length > 0 && (
                           <Badge tone="neutral">
                             {row.options.length} options ·{" "}
@@ -696,7 +703,7 @@ function RowFixer({
   onChange: (patch: Partial<ImportedRow>) => void;
 }) {
   const t = useTranslations("question");
-  const optionBearing = ["mcq", "multi_select", "true_false"].includes(row.question_type);
+  const optionBearing = ["mcq", "multi_select", "true_false"].includes(row.question_type ?? "");
   const single = row.question_type === "mcq" || row.question_type === "true_false";
   const written = row.question_type === "short_answer" || row.question_type === "long_answer";
 
@@ -713,7 +720,7 @@ function RowFixer({
       <div className="grid gap-3 sm:grid-cols-4">
         <Field label="Type">
           <Select
-            value={row.question_type}
+            value={row.question_type ?? ""}
             onChange={(e) =>
               onChange({ question_type: e.target.value as QuestionType, problems: [] })
             }
@@ -727,7 +734,7 @@ function RowFixer({
         </Field>
         <Field label="Difficulty">
           <Select
-            value={row.difficulty}
+            value={row.difficulty ?? ""}
             onChange={(e) => onChange({ difficulty: e.target.value as Difficulty })}
           >
             <option value="easy">{t("difficulty_easy")}</option>
@@ -740,7 +747,7 @@ function RowFixer({
             type="number"
             min="0"
             step="0.5"
-            value={row.marks}
+            value={row.marks ?? ""}
             onChange={(e) => onChange({ marks: Number(e.target.value), problems: [] })}
           />
         </Field>

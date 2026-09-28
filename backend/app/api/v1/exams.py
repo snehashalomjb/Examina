@@ -14,7 +14,6 @@ from app.core.logging_config import get_logger
 from app.core.security import generate_salt
 from app.core.storage import presigned_url
 from app.db.models import (
-    Difficulty,
     Exam,
     ExamQuestion,
     ExamSection,
@@ -22,9 +21,7 @@ from app.db.models import (
     ExamStatus,
     ExamType,
     Question,
-    QuestionCategory,
     QuestionStatus,
-    QuestionType,
     Subject,
     UserRole,
 )
@@ -52,7 +49,12 @@ from app.schemas.exam import (
     SectionOut,
 )
 from app.services.i18n import resolve_locale, translated_field, upsert_translations
-from app.services.paper_generator import check_pool_satisfies_rules, generate_paper
+from app.services.paper_generator import (
+    check_pool_satisfies_rules,
+    generate_paper,
+    unfit_for_rules,
+)
+from app.services.question_import import fingerprint
 from app.services.validators import ValidationError, normalise_selection_rules
 
 router = APIRouter(prefix="/exams", tags=["exams"])
@@ -63,6 +65,35 @@ def _get_locale(staff: CurrentStaff, lang: str | None, accept_language: str | No
     return resolve_locale(
         query_lang=lang, user_locale=staff.preferred_locale, accept_language=accept_language
     )
+
+
+def _subject_language_mismatch(db: DbSession, subject_id: uuid.UUID, primary_language: str) -> bool:
+    """Whether ``subject_id`` is unsuitable for an exam declared in ``primary_language``.
+
+    Two coexisting patterns share the bank, and this must only police the second one:
+
+    - The long-standing one: every subject is authored in English, and ``primary_language``
+      is candidate-facing metadata only (a Tamil-*declared* exam legitimately runs an
+      English-content paper - see ``TestCandidateSeesTheExamLanguage``). A subject with any
+      English rows is always fine, whatever language the exam declares.
+    - The newer one: a subject imported as a standalone non-English bank (e.g. the KA-*
+      Kannada subjects - see ``app.seed_kannada_question_bank``) has no English rows at
+      all, so it has a real language of its own. Picking one for an exam declared in a
+      *different* language (English or otherwise) is the actual invalid combination the
+      language dropdown must prevent - e.g. KA-AI on a Malayalam or English exam.
+
+    Driven entirely by ``Question.language`` - the same field the question bank itself
+    filters subjects on (``list_subjects``'s ``language`` param) - rather than a second,
+    hardcoded language/subject mapping. A subject with no questions yet (freshly created
+    while authoring this exam) is never a mismatch: it has no language of its own until
+    an examiner writes into it.
+    """
+    existing_languages = set(
+        db.scalars(select(Question.language).where(Question.subject_id == subject_id).distinct())
+    )
+    if not existing_languages or "en" in existing_languages:
+        return False
+    return primary_language not in existing_languages
 
 
 def _required_count(exam: Exam) -> int:
@@ -122,6 +153,7 @@ def _to_out(exam: Exam, locale: str = "en") -> ExamOut:
         job_role=translated_field(exam.job_role, t, locale, "job_role"),
         sections=sections,
         languages=exam.languages,
+        primary_language=exam.primary_language,
     )
 
 
@@ -185,6 +217,9 @@ def _resolve_pool_questions(db, exam: Exam, question_ids: list[uuid.UUID]) -> li
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"{len(off_subject)} question(s) belong to a different subject",
             )
+    # The question bank is English-only, so an exam's pool draws from English rows no
+    # matter which language the exam itself declares for its UI/candidate selector.
+
     # A question authored for a *different* exam is not shared material. Letting one
     # into a second paper would surprise the examiner who wrote it as a one-off.
     borrowed = [q for q in ordered if q.origin_exam_id is not None and q.origin_exam_id != exam.id]
@@ -320,6 +355,11 @@ def list_exams(
 def create_exam(payload: ExamCreate, staff: CurrentStaff, db: DbSession) -> ExamOut:
     if db.get(Subject, payload.subject_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    if _subject_language_mismatch(db, payload.subject_id, payload.primary_language):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This subject's content isn't in the exam's declared language",
+        )
 
     exam = Exam(
         exam_type=payload.exam_type,
@@ -348,6 +388,7 @@ def create_exam(payload: ExamCreate, staff: CurrentStaff, db: DbSession) -> Exam
         company_name=payload.company_name,
         job_role=payload.job_role,
         enabled_languages=payload.enabled_languages,
+        primary_language=payload.primary_language,
     )
     db.add(exam)
     db.flush()
@@ -422,8 +463,36 @@ def update_exam(
             detail="Candidates have already started this exam; it can no longer be edited",
         )
 
+    # A draft can be rebound to a different subject, but only when doing so cannot leave
+    # an academic paper with questions from its former subject. Corporate assessments may
+    # legitimately contain several subjects, so their primary subject is metadata only.
+    if payload.subject_id is not None and payload.subject_id != exam.subject_id:
+        if db.get(Subject, payload.subject_id) is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+        if exam.exam_type is not ExamType.CORPORATE:
+            off_subject = [
+                eq.question_id
+                for eq in exam.exam_questions
+                if eq.question.subject_id != payload.subject_id
+            ]
+            if off_subject:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "This academic exam already contains questions from another subject. "
+                        "Remove or replace them before changing its primary subject."
+                    ),
+                )
+
+    # mode="json" matters here, not just for tidiness. Without it this dump turns the
+    # nested SelectionRules model into a plain dict while leaving SelectionRule.subject_id
+    # as a live uuid.UUID, so the isinstance(value, dict) branch below passes that dict
+    # straight through and psycopg's json.dumps() then refuses it when the JSONB column is
+    # written - a 500 on every exam save whose rules narrow by subject.
     data = payload.model_dump(
-        exclude_unset=True, exclude={"question_ids", "sections", "translations"}
+        mode="json",
+        exclude_unset=True,
+        exclude={"subject_id", "question_ids", "sections", "translations"},
     )
     for field, value in data.items():
         if field in {"selection_rules", "proctor_config", "grading_config"} and value is not None:
@@ -432,6 +501,17 @@ def update_exam(
             )
         else:
             setattr(exam, field, value)
+
+    # Keep the UUID as a UUID. model_dump(mode="json") is right for JSONB payloads, but
+    # this column is a native PostgreSQL UUID and is deliberately assigned separately.
+    if payload.subject_id is not None:
+        exam.subject_id = payload.subject_id
+
+    if _subject_language_mismatch(db, exam.subject_id, exam.primary_language):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="This subject's content isn't in the exam's declared language",
+        )
 
     if exam.ends_at <= exam.starts_at:
         raise HTTPException(
@@ -585,15 +665,88 @@ def get_pool(exam_id: uuid.UUID, staff: CurrentStaff, db: DbSession) -> ExamPool
 def add_to_pool(
     exam_id: uuid.UUID, payload: PoolAdd, staff: CurrentStaff, db: DbSession
 ) -> ExamPoolOut:
-    """Append questions to the pool. Ids already present are ignored, not duplicated."""
+    """Append questions to the pool, optionally choosing them for one section.
+
+    A question can sit in an exam once. The same id twice in one request is refused; an
+    id already in the shared pool is *pinned* to the section rather than silently left
+    unpinned (the picker would count it as chosen while the validator did not); an id
+    already chosen for a different section is refused; and a question whose text is
+    identical to one already in the pool - a duplicate, an AI regeneration or a
+    re-import under a new id - is refused, so the same question cannot appear twice.
+    """
     exam = _load_exam(db, exam_id)
     _guard_editable(db, exam)
 
-    present = {eq.question_id for eq in exam.exam_questions}
-    fresh = [qid for qid in payload.question_ids if qid not in present]
-    _resolve_pool_questions(db, exam, fresh)  # validates subject and ownership
+    repeated = len(payload.question_ids) - len(set(payload.question_ids))
+    if repeated:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"The same question was selected more than once ({repeated} repeat(s))",
+        )
 
     section_id = _resolve_section(exam, payload.section_id)
+
+    by_question = {eq.question_id: eq for eq in exam.exam_questions}
+    elsewhere = [
+        qid
+        for qid in payload.question_ids
+        if qid in by_question
+        and by_question[qid].section_id is not None
+        and by_question[qid].section_id != section_id
+    ]
+    if elsewhere and section_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"{len(elsewhere)} question(s) are already chosen for another section",
+        )
+    if section_id is not None:
+        for qid in payload.question_ids:
+            entry = by_question.get(qid)
+            if entry is not None and entry.section_id is None:
+                entry.section_id = section_id
+
+    fresh = [qid for qid in payload.question_ids if qid not in by_question]
+    new_questions = _resolve_pool_questions(db, exam, fresh)  # validates subject/ownership
+
+    # A question chosen *for* a section must be one that section's rules can draw. This
+    # catches category/type/topic mismatches here instead of leaving the section empty
+    # until the publish-time pool check.
+    if section_id is not None:
+        section = next(s for s in exam.sections if s.id == section_id)
+        try:
+            section_rules = normalise_selection_rules(section.selection_rules)
+        except ValidationError:
+            section_rules = []
+        chosen = new_questions + [
+            by_question[qid].question for qid in payload.question_ids if qid in by_question
+        ]
+        unfit = [(q, why) for q in chosen if (why := unfit_for_rules(q, section_rules))]
+        if unfit:
+            question, why = unfit[0]
+            subject = question.subject.name if question.subject else "its subject"
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"{len(unfit)} question(s) do not fit {section.name}'s rules - e.g. a "
+                    f"{subject} question that {why}"
+                ),
+            )
+
+    pool_texts = {fingerprint(eq.question.body) for eq in exam.exam_questions if eq.question}
+    copies = 0
+    for question in new_questions:
+        key = fingerprint(question.body)
+        if key and key in pool_texts:
+            copies += 1
+        pool_texts.add(key)
+    if copies:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{copies} question(s) have the same text as a question already in this "
+                "exam's pool"
+            ),
+        )
 
     next_index = max((eq.order_index for eq in exam.exam_questions), default=-1) + 1
     for offset, question_id in enumerate(fresh):
@@ -646,6 +799,8 @@ def apply_blueprint(
     next_section_order = max((s.order_index for s in exam.sections), default=-1) + 1
     next_pool_order = max((eq.order_index for eq in exam.exam_questions), default=-1) + 1
     present = {eq.question_id for eq in exam.exam_questions}
+    #: Text already in the pool: an identical copy under another id is the same question.
+    pool_texts = {fingerprint(eq.question.body) for eq in exam.exam_questions if eq.question}
 
     row_results: list[BlueprintRowResult] = []
     for row in payload.rows:
@@ -667,7 +822,13 @@ def apply_blueprint(
             stmt = stmt.where(or_(*[Question.tags.contains([t]) for t in row.tags]))
 
         matched = list(db.scalars(stmt))
-        fresh = [q for q in matched if q.id not in present]
+        fresh = []
+        for q in sorted(matched, key=lambda q: str(q.id)):
+            key = fingerprint(q.body)
+            if q.id in present or (key and key in pool_texts):
+                continue
+            pool_texts.add(key)
+            fresh.append(q)
 
         # Section names are unique per exam; re-running the blueprint (or a title that
         # collides with a hand-made section) gets a suffix rather than a 409.
@@ -927,13 +1088,19 @@ def preview_paper(
         title=exam.title,
         subject_name=exam.subject.name if exam.subject else "",
         exam_type=exam.exam_type.value,
-        category_label="Corporate Assessment" if exam.exam_type == ExamType.CORPORATE else "Academic Examination",
+        category_label=(
+            "Corporate Assessment"
+            if exam.exam_type == ExamType.CORPORATE
+            else "Academic Examination"
+        ),
         duration_minutes=exam.duration_minutes,
         negative_marking=exam.negative_marking,
         instructions=exam.instructions,
         languages=exam.languages,
         sections=[
-            PreviewSection(id=s.id, name=s.name, description=s.description, order_index=s.order_index)
+            PreviewSection(
+                id=s.id, name=s.name, description=s.description, order_index=s.order_index
+            )
             for s in sorted(exam.sections, key=lambda s: s.order_index)
         ],
         total_questions=len(entries),

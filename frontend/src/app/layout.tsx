@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import { AuthProvider } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/locale";
 import { ToastHost } from "@/components/ui";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 /**
@@ -23,6 +24,22 @@ export const metadata: Metadata = {
   title: "Examina — AI-Proctored Examination Platform",
   description:
     "Question banks, randomized papers, timed exams with AI proctoring, and examiner-reviewed grading.",
+  applicationName: "Examina",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Examina",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 /** Explicit so the layout scales on a phone and clears a notched screen. */
@@ -30,6 +47,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#181b2e",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // hydration warning in the tree.
     <html lang="en" className={jakarta.variable} suppressHydrationWarning>
       <body className="min-h-screen antialiased" suppressHydrationWarning>
+        <ServiceWorkerRegister />
         <LocaleProvider>
           <AuthProvider>
             {children}
@@ -51,3 +70,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+

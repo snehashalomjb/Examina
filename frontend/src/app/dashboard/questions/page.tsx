@@ -21,10 +21,12 @@ import {
   toast,
 } from "@/components/ui";
 import { QuestionEditor } from "@/components/QuestionEditor";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import { QuestionImporter } from "@/components/QuestionImporter";
 import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { useLocale, type Locale } from "@/lib/locale";
 import type {
   Difficulty,
   PdfImportResult,
@@ -62,6 +64,12 @@ const SHELVES: { key: Shelf; label: string }[] = [
 
 export default function QuestionBankPage() {
   const { user } = useRequireAuth(["examiner", "admin"]);
+  const { locale } = useLocale();
+  // The bank has its own content-language control: the surrounding UI may stay in
+  // English while subjects and questions are browsed in another language.
+  const [contentLanguageOverride, setContentLanguageOverride] = useState<Locale | null>(null);
+  const contentLanguage = contentLanguageOverride ?? locale;
+  const setContentLanguage = (next: Locale) => setContentLanguageOverride(next);
   // "Create Question" from the dashboard lands here with the editor already open,
   // rather than on a list the examiner then has to find a button on.
   const searchParams = useSearchParams();
@@ -93,11 +101,13 @@ export default function QuestionBankPage() {
 
   const loadSubjects = useCallback(async () => {
     try {
-      setSubjects(await api.get<Subject[]>("/subjects"));
+      setSubjects(
+        await api.get<Subject[]>(`/subjects?lang=${contentLanguage}&language=${contentLanguage}`),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load subjects.");
     }
-  }, []);
+  }, [contentLanguage]);
 
   const loadTypeCounts = useCallback(async () => {
     try {
@@ -109,6 +119,11 @@ export default function QuestionBankPage() {
 
   const loadQuestions = useCallback(async () => {
     const query = new URLSearchParams();
+    query.set("lang", contentLanguage);
+    // Each language is its own standalone bank - the content-language switcher above
+    // doubles as "which bank am I browsing", so it hard-filters rather than falling
+    // back to English when a question has no match.
+    query.set("language", contentLanguage);
     if (subjectFilter) query.set("subject_id", subjectFilter);
     if (typeFilter) query.set("question_type", typeFilter);
     if (difficultyFilter) query.set("difficulty", difficultyFilter);
@@ -152,16 +167,19 @@ export default function QuestionBankPage() {
     search,
     shelf,
     user,
+    contentLanguage,
   ]);
 
   const loadTopics = useCallback(async () => {
     try {
-      const params = subjectFilter ? `?subject_id=${subjectFilter}` : "";
-      setTopics(await api.get<string[]>(`/questions/topics${params}`));
+      const params = new URLSearchParams();
+      if (subjectFilter) params.set("subject_id", subjectFilter);
+      params.set("language", contentLanguage);
+      setTopics(await api.get<string[]>(`/questions/topics?${params.toString()}`));
     } catch {
       setTopics([]); // a missing topic list is a degraded filter, not a failure
     }
-  }, [subjectFilter]);
+  }, [subjectFilter, contentLanguage]);
 
   const loadTags = useCallback(async () => {
     try {
@@ -192,6 +210,16 @@ export default function QuestionBankPage() {
     const timer = window.setTimeout(() => void loadQuestions(), 250);
     return () => window.clearTimeout(timer);
   }, [user, loadQuestions]);
+
+  async function openEditor(question: Question) {
+    try {
+      // The list is rendered in the selected content language. Open the editor against the
+      // English master so saving a Malayalam/Tamil/etc. view never overwrites the source text.
+      setEditing(await api.get<Question>(`/questions/${question.id}?lang=en`));
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not open that question.", "rose");
+    }
+  }
 
   async function remove(question: Question) {
     try {
@@ -255,7 +283,12 @@ export default function QuestionBankPage() {
               : "Five question types, tagged by subject and difficulty."}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <LanguageSelect
+            value={contentLanguage}
+            onChange={setContentLanguage}
+            ariaLabel="Question language"
+          />
           <Link href="/dashboard/questions/ai-generate">
             <Button size="sm" variant="secondary">
               ✨ AI Generate
@@ -279,7 +312,11 @@ export default function QuestionBankPage() {
       {error && <Alert tone="rose">{error}</Alert>}
 
       {importingFile && (
-        <QuestionImporter subjects={subjects} onImported={() => void loadQuestions()} />
+        <QuestionImporter
+          subjects={subjects}
+          language={contentLanguage}
+          onImported={() => void loadQuestions()}
+        />
       )}
 
       {importingPdf && <PdfImportSection subjects={subjects} />}
@@ -305,6 +342,8 @@ export default function QuestionBankPage() {
           </div>
           <QuestionEditor
             subjects={subjects}
+            language={contentLanguage}
+            onLanguageChange={setContentLanguage}
             stayOpen
             onCancel={() => setComposing(false)}
             onSaved={() => {
@@ -320,6 +359,8 @@ export default function QuestionBankPage() {
           <QuestionEditor
             subjects={subjects}
             question={editing}
+            language={contentLanguage}
+            onLanguageChange={setContentLanguage}
             onCancel={() => setEditing(null)}
             onSaved={() => {
               setEditing(null);
@@ -571,7 +612,7 @@ export default function QuestionBankPage() {
                       Preview
                     </Button>
                     {mayEdit(question) ? (
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(question)}>
+                      <Button size="sm" variant="ghost" onClick={() => void openEditor(question)}>
                         Edit
                       </Button>
                     ) : (
@@ -953,7 +994,7 @@ function SubjectManager({
 
   function startEdit(subject: Subject) {
     setEditingId(subject.id);
-    setEditName(subject.name);
+    setEditName(subject.base_name ?? subject.name);
   }
 
   async function saveEdit(subject: Subject) {

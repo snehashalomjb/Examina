@@ -93,6 +93,15 @@ def test_generate_result_pdf_structure():
         percentile=94.5,
         cohort_size=45,
         time_taken_seconds=2700,
+        candidate_id=uuid.uuid4(),
+        started_at=datetime.now(UTC),
+        exam_language="en",
+        is_flagged=False,
+        suspicion_score=0.0,
+        integrity_verdict="cleared",
+        integrity_reviewed_by_name="Test Examiner",
+        integrity_reviewed_at=datetime.now(UTC),
+        proctor_event_count=0,
     )
 
     pdf_bytes = generate_result_pdf(detail, candidate_email="priya.sharma@example.com")

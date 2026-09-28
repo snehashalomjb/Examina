@@ -166,7 +166,7 @@ export function Brand({
         style={onDark
           ? { color: "#ffffff" }
           : {
-              background: "linear-gradient(135deg, #1e1b4b, #4f46e5)",
+              backgroundImage: "linear-gradient(135deg, #1e1b4b, #4f46e5)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               WebkitTextFillColor: "transparent",

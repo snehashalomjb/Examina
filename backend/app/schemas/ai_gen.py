@@ -6,9 +6,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.db.models.enums import Difficulty, DraftStatus, QuestionCategory, QuestionType
+from app.db.models.enums import DEFAULT_LOCALE, SUPPORTED_LOCALES, Difficulty, DraftStatus, QuestionCategory, QuestionType
 from app.schemas.common import ORMModel
 
 
@@ -29,11 +29,22 @@ class AiGenerateRequest(BaseModel):
     #: Syllabus text or learning objectives the questions must be drawn from. Folded
     #: into the prompt as source material rather than as loose instructions.
     syllabus: str | None = Field(default=None, max_length=20_000)
-    #: The language to write in. Free text so regional languages are not gate-kept by
-    #: an enum somebody has to remember to extend.
-    language: str | None = Field(default=None, max_length=40)
+    #: The bank this batch is generated for - see ``Question.language``. The bank is
+    #: English-only, so only ``en`` may be requested.
+    language: str = DEFAULT_LOCALE
     #: Extra instructions injected into the generation prompt (e.g. "focus on OOP concepts")
     extra_instructions: str | None = Field(default=None, max_length=500)
+
+    @field_validator("language")
+    @classmethod
+    def _language_supported(cls, value: str) -> str:
+        if value not in SUPPORTED_LOCALES:
+            raise ValueError(f"Unsupported language '{value}'. Supported: {SUPPORTED_LOCALES}")
+        if value != DEFAULT_LOCALE:
+            raise ValueError(
+                "The question bank is English-only; AI generation only supports 'en'."
+            )
+        return value
 
     @model_validator(mode="after")
     def types_are_a_set(self) -> AiGenerateRequest:

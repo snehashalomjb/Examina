@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -25,6 +26,8 @@ from app.db.models import (
     QuestionType,
     Result,
     SessionStatus,
+    User,
+    UserRole,
 )
 from app.db.models.enums import AUTO_SCORED_TYPES, CONTAINER_TYPES, IntegrityVerdict
 from app.services.auto_evaluator import score_answer
@@ -67,6 +70,19 @@ def needs_integrity_review(session: ExamSession) -> bool:
     into a rubber stamp, which is how safeguards stop being read.
     """
     return session.is_flagged and session.integrity_verdict is IntegrityVerdict.PENDING
+
+
+def assert_exam_owned(exam: Exam, staff: User) -> None:
+    """An examiner may only read or download results for exams they created.
+
+    Admins bypass - platform-wide visibility is exactly what an admin needs. Without this,
+    any examiner could read or download another examiner's candidate results by exam id.
+    """
+    if staff.role is UserRole.EXAMINER and exam.created_by_id != staff.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This exam is not assigned to you",
+        )
 
 
 def withholds_result(session: ExamSession) -> bool:

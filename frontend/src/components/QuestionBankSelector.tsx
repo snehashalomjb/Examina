@@ -56,6 +56,12 @@ export interface QuestionBankSelectorProps {
   subjects: Subject[];
   /** Restricts the browser to the exam's subject. A pool may not mix subjects. */
   subjectId?: string;
+  /**
+   * The exam's language. Each language is its own standalone question bank (see
+   * `Question.language` on the backend), so this is a hard filter - only questions
+   * authored in this language are ever shown, never an English or Hindi fallback.
+   */
+  language?: string;
   /** Question ids already in the pool - shown as "added" rather than selectable. */
   alreadyIn?: string[];
   onAdd: (questionIds: string[]) => Promise<void> | void;
@@ -70,6 +76,7 @@ export interface QuestionBankSelectorProps {
 export function QuestionBankSelector({
   subjects,
   subjectId,
+  language,
   alreadyIn = [],
   onAdd,
   onEdit,
@@ -102,6 +109,7 @@ export function QuestionBankSelector({
     setLoading(true);
     setError(null);
     const params = new URLSearchParams();
+    if (language) params.set("language", language);
     if (effectiveSubject) params.set("subject_id", effectiveSubject);
     if (type) params.set("question_type", type);
     if (category) params.set("category", category);
@@ -133,7 +141,7 @@ export function QuestionBankSelector({
     } finally {
       setLoading(false);
     }
-  }, [effectiveSubject, type, category, difficulty, topic, marks, search, shelf, currentUserId]);
+  }, [language, effectiveSubject, type, category, difficulty, topic, marks, search, shelf, currentUserId]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), search ? 300 : 0);
@@ -143,13 +151,15 @@ export function QuestionBankSelector({
   useEffect(() => {
     (async () => {
       try {
-        const params = effectiveSubject ? `?subject_id=${effectiveSubject}` : "";
-        setTopics(await api.get<string[]>(`/questions/topics${params}`));
+        const params = new URLSearchParams();
+        if (effectiveSubject) params.set("subject_id", effectiveSubject);
+        if (language) params.set("language", language);
+        setTopics(await api.get<string[]>(`/questions/topics?${params.toString()}`));
       } catch {
         setTopics([]); // a missing topic list is a degraded filter, not a failure
       }
     })();
-  }, [effectiveSubject]);
+  }, [effectiveSubject, language]);
 
   const selectable = questions.filter((q) => !inPool.has(q.id));
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
@@ -207,7 +217,9 @@ export function QuestionBankSelector({
               <option value="">All subjects</option>
               {subjects.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.code}
+                  {/* The localized name, so a Tamil paper offers "கணினி வலைப்பின்னல்கள்"
+                      rather than CS203. The code stays visible as a stable handle. */}
+                  {s.name} ({s.code})
                 </option>
               ))}
             </Select>

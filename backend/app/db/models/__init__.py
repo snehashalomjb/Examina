@@ -39,6 +39,7 @@ from app.db.models.exam import (
 from app.db.models.exam_session import Answer, ExamSession
 from app.db.models.grading import AiEvaluation, Result
 from app.db.models.login_access import LoginAccessRequest
+from app.db.models.notification import Notification
 from app.db.models.proctor import ProctorEvent
 from app.db.models.question import Question, QuestionOption, Subject
 from app.db.models.recruitment import CandidateShortlist, ExamTemplate
@@ -83,6 +84,7 @@ __all__ = [
     "IntegrityVerdict",
     "LoginAccessRequest",
     "LoginAccessStatus",
+    "Notification",
     "ProctorEvent",
     "ProctorEventType",
     "ProctorSeverity",

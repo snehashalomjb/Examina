@@ -31,6 +31,7 @@ import {
 } from "@/components/icons";
 import { API_BASE, ApiError, api, tokens } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { examReasonText } from "@/lib/examReason";
 import { detectFaceOnce } from "@/lib/proctor";
 import type { CandidateExamCard, ProctorConfig } from "@/lib/types";
 
@@ -45,6 +46,31 @@ interface SystemCheck {
   state: CheckState;
   message?: string;
 }
+
+/** What the camera is actually doing, as distinct from what the check concluded.
+ *
+ * `SystemCheck.state` is the *verdict* (did face detection pass). These are the
+ * *facts*: whether a stream exists and whether it is painting frames. The UI shows the
+ * camera as connected only when `streamActive` is true, so "ready" can never appear
+ * over a dead preview.
+ */
+interface CameraState {
+  /** Permission granted and `getUserMedia` resolved. */
+  granted: boolean;
+  /** A MediaStream is held and has at least one live track. */
+  streamActive: boolean;
+  /** The <video> is really decoding frames (readyState >= HAVE_CURRENT_DATA). */
+  painting: boolean;
+  /** Face detection ran and returned a count; null = not run yet. */
+  faceCount: number | null;
+}
+
+const IDLE_CAMERA: CameraState = {
+  granted: false,
+  streamActive: false,
+  painting: false,
+  faceCount: null,
+};
 
 /**
  * Exam details → system check → instructions → start.
@@ -216,7 +242,7 @@ function ExamDetails({
       <dl className="grid gap-3 sm:grid-cols-4">
         {(
           [
-            { label: t("duration_label"), value: `${card.duration_minutes} min`, Icon: IconClock },
+            { label: t("duration_label"), value: t("value_min", { count: card.duration_minutes }), Icon: IconClock },
             { label: t("questions_label"), value: String(card.total_questions), Icon: IconExam },
             { label: t("opens_label"), value: formatDate(card.starts_at), Icon: IconClock },
             { label: t("closes_label"), value: formatDate(card.ends_at), Icon: IconClock },
@@ -248,7 +274,9 @@ function ExamDetails({
 
       <div className="mt-6 flex items-center justify-between gap-3">
         <p className="text-[12.5px] text-ink-muted">
-          {card.can_start ? t("exam_open_now") : card.reason}
+          {card.can_start
+            ? t("exam_open_now")
+            : examReasonText(card, t, (v) => formatDate(v))}
         </p>
         <Button onClick={onContinue} disabled={!card.can_start}>
           {t("continue_to_system_check")}
@@ -279,6 +307,64 @@ async function waitForFrame(video: HTMLVideoElement): Promise<void> {
     video.addEventListener("loadeddata", onLoaded);
     window.setTimeout(resolve, 1500);
   });
+}
+
+/**
+ * Why a `getUserMedia` call failed, said in terms the candidate can act on.
+ *
+ * Every failure used to be reported as "allow camera permission in your browser", which
+ * is wrong for a machine with no webcam, a camera another app is holding, and a Windows
+ * privacy switch that blocks desktop apps - all of which land in the same `catch`. The
+ * `DOMException.name` is the only thing that actually distinguishes them, so it decides
+ * the message. `NotAllowedError` and `SecurityError` mean what the old message said, and
+ * fall through to it.
+ */
+function mediaFailureKey(error: unknown, kind: "camera" | "microphone"): string | null {
+  const name =
+    typeof error === "object" && error !== null && "name" in error
+      ? String((error as { name?: unknown }).name ?? "")
+      : "";
+
+  switch (name) {
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+    case "OverconstrainedError":
+      return kind === "camera" ? "camera_not_found" : "microphone_not_found";
+    case "NotReadableError":
+    case "TrackStartError":
+    case "AbortError":
+      return kind === "camera" ? "camera_busy" : "microphone_busy";
+    default:
+      return null;
+  }
+}
+
+/** One honest line of camera status: a tick only when the fact is actually true. */
+function CameraFact({
+  ok,
+  fail = false,
+  pass,
+  failText,
+  pending,
+}: {
+  ok: boolean;
+  /** When true and `ok` is false, this is a confirmed failure rather than "not yet". */
+  fail?: boolean;
+  pass: string;
+  failText: string;
+  pending: string;
+}) {
+  const tone = ok
+    ? "text-mint"
+    : fail
+      ? "text-rose"
+      : "text-ink-muted";
+  return (
+    <li className={cx("flex items-center gap-1.5", tone)}>
+      <span aria-hidden>{ok ? "✓" : fail ? "✕" : "○"}</span>
+      <span>{ok ? pass : fail ? failText : pending}</span>
+    </li>
+  );
 }
 
 function SystemCheckStage({
@@ -355,6 +441,9 @@ function SystemCheckStage({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  // The <video> is a ref, not state, so React will not re-create it when the check list
+  // changes - one element, one stream, for the whole lifetime of this stage.
+  const [camera, setCamera] = useState<CameraState>(IDLE_CAMERA);
 
   const update = useCallback((key: string, patch: Partial<SystemCheck>) => {
     setChecks((current) => current.map((c) => (c.key === key ? { ...c, ...patch } : c)));
@@ -374,8 +463,9 @@ function SystemCheckStage({
     // Feature-detected rather than sniffed from the user-agent string, which lies
     // constantly - a browser that actually has these APIs can actually run the exam,
     // regardless of what it claims to be.
+    const mediaAvailable = typeof navigator.mediaDevices?.getUserMedia === "function";
     const browserSupported =
-      typeof navigator.mediaDevices?.getUserMedia === "function" &&
+      mediaAvailable &&
       typeof document.documentElement.requestFullscreen === "function" &&
       typeof window.WebSocket !== "undefined";
     update("browser", {
@@ -385,44 +475,106 @@ function SystemCheckStage({
         : t("browser_not_supported"),
     });
 
+    // Missing `navigator.mediaDevices` means this is not a secure context: Chrome and
+    // Firefox only expose it over HTTPS, or on localhost. Nothing the candidate changes in
+    // their browser's permission list will help until the connection does - and without
+    // this the two checks below would throw a bare TypeError and report it as a denied
+    // permission, sending them to the wrong setting entirely.
+    if (!mediaAvailable && (needCamera || needMic)) {
+      const message = t("media_needs_https");
+      if (needCamera) update("camera", { state: "fail", message });
+      if (needMic) update("microphone", { state: "fail", message });
+    }
+
     // --- camera + face -----------------------------------------------------
-    if (needCamera) {
+    if (needCamera && mediaAvailable) {
+      let stream: MediaStream | null = null;
+      // Any previous attempt's tracks are released *before* asking for a new stream.
+      // Two live camera tracks is how a candidate ends up with "camera busy" on retry,
+      // because the browser is refusing our own still-open handle.
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setCamera(IDLE_CAMERA);
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
-        cameraStreamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-          await waitForFrame(videoRef.current);
-        }
-        const { faceCount } = videoRef.current
-          ? await detectFaceOnce(videoRef.current)
-          : { faceCount: 0 };
-        if (faceCount === 1) {
-          update("camera", { state: "pass", message: t("face_detected") });
-        } else if (faceCount === 0) {
-          update("camera", {
-            state: "fail",
-            message: t("no_face_detected"),
-          });
-        } else {
-          update("camera", {
-            state: "fail",
-            message: t("multiple_faces_detected", { faceCount }),
-          });
-        }
-      } catch {
-        cameraStreamRef.current = null;
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      } catch (error) {
+        console.warn("Pre-flight camera check: getUserMedia failed", error);
+        const key = mediaFailureKey(error, "camera");
         update("camera", {
           state: "fail",
-          message: t("camera_access_denied"),
+          message: key
+            ? t(key)
+            : `${t("camera_access_denied")} ${t("media_os_permission_hint")}`,
         });
+      }
+
+      // The camera opening and the face model running are two different things. They were
+      // one `try` block, so a GPU-less machine (hardware acceleration off, remote desktop)
+      // reported "no camera access" for a camera that had opened perfectly well.
+      if (stream) {
+        cameraStreamRef.current = stream;
+        setCamera((c) => ({ ...c, granted: true, streamActive: true }));
+
+        // A stream can exist and still paint nothing (camera opened by another app that
+        // grabbed the sensor, or a tab that was never allowed to composite video). The
+        // preview and the verdict must both key off real frames, so wait for the element
+        // to actually have data before trusting either one.
+        const video = videoRef.current;
+        if (video) {
+          try {
+            video.srcObject = stream;
+            // `autoplay` is intentionally absent from the markup: this stage is opened by
+            // a click on the previous step, so `play()` here is still user-initiated and
+            // is not blocked by autoplay policy. The `catch` below turns a blocked play
+            // into an honest "not painting" rather than a silent black rectangle.
+            await video.play();
+            await waitForFrame(video);
+            setCamera((c) => ({ ...c, painting: video.readyState >= 2 }));
+          } catch (error) {
+            console.warn("Pre-flight camera check: preview failed to start", error);
+            setCamera((c) => ({ ...c, painting: false }));
+          }
+        }
+
+        // No frames means no face verdict. Report the real reason and carry on to the
+        // microphone and bandwidth checks rather than bailing out - those are independent,
+        // and the candidate deserves the whole report in one pass.
+        const painting = videoRef.current !== null && videoRef.current.readyState >= 2;
+        if (!painting) {
+          update("camera", { state: "fail", message: t("camera_no_preview") });
+        } else {
+          try {
+            const { faceCount } = await detectFaceOnce(videoRef.current as HTMLVideoElement);
+            setCamera((c) => ({ ...c, faceCount }));
+            if (faceCount === 1) {
+              update("camera", { state: "pass", message: t("face_detected") });
+            } else if (faceCount === 0) {
+              update("camera", {
+                state: "fail",
+                message: t("no_face_detected"),
+              });
+            } else {
+              update("camera", {
+                state: "fail",
+                message: t("multiple_faces_detected", { faceCount }),
+              });
+            }
+          } catch (error) {
+            console.warn("Pre-flight camera check: face detection unavailable", error);
+            setCamera((c) => ({ ...c, faceCount: null }));
+            update("camera", {
+              state: "fail",
+              message: t("face_check_unavailable"),
+            });
+          }
+        }
       }
     }
 
     // --- microphone ---------------------------------------------------------
-    if (needMic) {
+    if (needMic && mediaAvailable) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
         const track = stream.getAudioTracks()[0];
@@ -432,10 +584,14 @@ function SystemCheckStage({
           state: live ? "pass" : "fail",
           message: live ? t("microphone_available") : t("microphone_not_active"),
         });
-      } catch {
+      } catch (error) {
+        console.warn("Pre-flight microphone check: getUserMedia failed", error);
+        const key = mediaFailureKey(error, "microphone");
         update("microphone", {
           state: "fail",
-          message: t("microphone_access_denied"),
+          message: key
+            ? t(key)
+            : `${t("microphone_access_denied")} ${t("media_os_permission_hint")}`,
         });
       }
     }
@@ -466,13 +622,19 @@ function SystemCheckStage({
     }
 
     setRunning(false);
-  }, [needCamera, needMic, minMbps, update]);
+  }, [needCamera, needMic, minMbps, update, t]);
 
   useEffect(() => {
+    // The video element only exists once the camera row has rendered, and it is rendered
+    // with `display: none` until the check is running. Both used to be a problem for
+    // `readyState`: a `display: none` video is not guaranteed to decode frames. The
+    // preview below no longer hides the element, and `runAuto` waits for a real frame
+    // before it trusts `readyState`, so the two are consistent.
     void runAuto();
     return () => {
       cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
       cameraStreamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -537,6 +699,34 @@ function SystemCheckStage({
     }
   }
 
+  /**
+   * Re-run the whole check list, not just the part that runs itself.
+   *
+   * `getScreenDetails()` refuses to run without a user gesture, so the display check can
+   * never fire on its own at mount. This click *is* that gesture. Without it, a candidate
+   * who unplugged the second monitor and pressed "Re-run checks" still saw the display row
+   * red, the Continue button disabled, and no way to re-test the thing they had just fixed.
+   */
+  async function rerunChecks() {
+    await runAuto();
+
+    const display = checks.find((c) => c.key === "display");
+    if (needDisplay && display && display.state !== "unsupported") {
+      await checkDisplays();
+    }
+
+    // The fullscreen row is driven by events, so a stale "not in fullscreen yet" survives
+    // a re-run unless it is read back explicitly.
+    if (needFullscreen) {
+      update(
+        "fullscreen",
+        document.fullscreenElement
+          ? { state: "pass", message: t("fullscreen_active") }
+          : { state: "fail", message: t("fullscreen_not_enabled") },
+      );
+    }
+  }
+
   const blocking = checks.filter((c) => c.state !== "pass" && c.state !== "unsupported");
   const allClear = blocking.length === 0;
 
@@ -588,25 +778,78 @@ function SystemCheckStage({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[13.5px] font-medium text-ink">{check.label}</p>
-                  {check.state === "running" && <Badge>checking…</Badge>}
-                  {check.state === "pass" && <Badge tone="mint">ready</Badge>}
-                  {check.state === "fail" && <Badge tone="rose">problem</Badge>}
-                  {check.state === "unsupported" && <Badge tone="neutral">unverified</Badge>}
+                  {check.state === "running" && <Badge>{t("check_running")}</Badge>}
+                  {check.state === "pass" && <Badge tone="mint">{t("check_ready")}</Badge>}
+                  {check.state === "fail" && <Badge tone="rose">{t("check_problem")}</Badge>}
+                  {check.state === "unsupported" && <Badge tone="neutral">{t("check_unverified")}</Badge>}
                 </div>
                 <p className="mt-0.5 text-[12.5px] text-ink-muted">
                   {check.message ?? check.detail}
                 </p>
 
                 {check.key === "camera" && needCamera && (
-                  <video
-                    ref={videoRef}
-                    muted
-                    playsInline
-                    className={cx(
-                      "mt-2 h-[90px] w-[120px] rounded-[8px] border border-line bg-sunken object-cover",
-                      check.state === "running" || check.state === "pass" ? "" : "hidden",
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <div className="relative overflow-hidden rounded-[8px] border border-line bg-sunken">
+                      {/* The element itself is never `display: none`. A hidden video is not
+                          guaranteed to decode frames, so `readyState` can sit at 0 forever
+                          and the face check then reports "no face" for a camera that is
+                          working perfectly. Visibility is handled by the overlay below. */}
+                      <video
+                        ref={videoRef}
+                        muted
+                        playsInline
+                        autoPlay
+                        className="h-[90px] w-[120px] scale-x-[-1] object-cover"
+                      />
+                      {!camera.painting && (
+                        <div className="absolute inset-0 grid place-items-center bg-ink/85 px-2 text-center text-[10px] font-medium text-white/80">
+                          {camera.streamActive
+                            ? t("camera_starting_preview")
+                            : t("camera_preview_off")}
+                        </div>
+                      )}
+                    </div>
+
+                    <ul className="space-y-1 text-[12px]">
+                      <CameraFact
+                        ok={camera.granted}
+                        fail={camera.streamActive}
+                        pass={t("camera_perm_granted")}
+                        failText={t("camera_perm_denied")}
+                        pending={t("camera_perm_pending")}
+                      />
+                      <CameraFact
+                        ok={camera.streamActive}
+                        pass={t("camera_stream_live")}
+                        failText={t("camera_stream_off")}
+                        pending={t("camera_stream_off")}
+                      />
+                      <CameraFact
+                        ok={camera.faceCount === 1}
+                        fail={camera.faceCount !== null}
+                        pass={t("camera_face_ok")}
+                        failText={
+                          camera.faceCount === 0
+                            ? t("camera_face_none")
+                            : camera.faceCount
+                              ? t("multiple_faces_detected", { faceCount: camera.faceCount })
+                              : t("camera_face_waiting")
+                        }
+                        pending={t("camera_face_waiting")}
+                      />
+                    </ul>
+
+                    {check.state === "fail" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void runAuto()}
+                        loading={running}
+                      >
+                        {t("retry_camera")}
+                      </Button>
                     )}
-                  />
+                  </div>
                 )}
 
                 {check.key === "fullscreen" && check.state !== "pass" && (
@@ -644,7 +887,7 @@ function SystemCheckStage({
           {t("back_button")}
         </Button>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => void runAuto()} loading={running}>
+          <Button variant="secondary" onClick={() => void rerunChecks()} loading={running}>
             {t("rerun_checks")}
           </Button>
           <Button onClick={onContinue} disabled={running || !allClear}>
@@ -688,6 +931,7 @@ function InstructionsStage({
           </p>
           <ul className="space-y-1.5 text-[12.5px] leading-relaxed text-ink-soft">
             <li>· {t("questions_duration", { total_questions: card.total_questions, duration_minutes: card.duration_minutes })}</li>
+            <li>· {t("language_locked")}</li>
             <li>· {t("move_between_questions")}</li>
             <li>· {t("answers_auto_save")}</li>
             <li>· {t("blank_no_negative")}</li>

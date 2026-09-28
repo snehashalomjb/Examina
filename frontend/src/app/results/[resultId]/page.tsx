@@ -66,23 +66,12 @@ export default function ResultDetailPage() {
     if (!detail) return;
     setDownloading(true);
     try {
-      const BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
-      const token = typeof window !== "undefined" ? localStorage.getItem("exam.access") : null;
-      const res = await fetch(`${BASE}/results/${params.resultId}/pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("Failed to download PDF scorecard");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `scorecard_${detail.exam_title.replace(/\s+/g, "_")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch {
-      setError("Could not generate PDF scorecard. Please try again.");
+      await api.download(
+        `/results/${params.resultId}/pdf`,
+        `scorecard_${detail.exam_title.replace(/\s+/g, "_")}.pdf`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not generate PDF scorecard. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -123,6 +112,21 @@ export default function ResultDetailPage() {
           <span className="text-[14px] font-bold tracking-tight text-ink">Examina</span>
         </Link>
         <div className="flex items-center gap-2.5">
+          {detail && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                void api
+                  .preview(`/results/${params.resultId}/pdf`)
+                  .catch((err) =>
+                    setError(err instanceof ApiError ? err.message : "Could not open the PDF scorecard."),
+                  )
+              }
+            >
+              Preview PDF
+            </Button>
+          )}
           {detail && (
             <Button
               size="sm"

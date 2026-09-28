@@ -3,13 +3,33 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import json
 from pathlib import Path
+from typing import Annotated, Any
 
-from pydantic import Field
+from pydantic import BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
+
+
+def parse_cors_origins(v: Any) -> list[str]:
+    if isinstance(v, str):
+        v = v.strip()
+        if not v:
+            return ["http://localhost:3000", "http://127.0.0.1:3000"]
+        if v.startswith("[") and v.endswith("]"):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except json.JSONDecodeError:
+                pass
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
+    if isinstance(v, (list, tuple, set)):
+        return [str(item).strip() for item in v if str(item).strip()]
+    return ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 
 class Settings(BaseSettings):
@@ -24,9 +44,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI-Based Intelligent Examination Platform"
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
-    BACKEND_CORS_ORIGINS: list[str] = Field(
+    BACKEND_CORS_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors_origins)] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"]
     )
+
 
     # Database
     DATABASE_URL: str = "postgresql+psycopg://exam:exam@localhost:5433/examdb"
@@ -56,6 +77,7 @@ class Settings(BaseSettings):
     GRADER_PROVIDER: str = "stub"
     GRADER_MODEL: str = "gpt-4o"
     OPENAI_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
 
     # Question/exam translation (auto-translate "Generate Translations" button)
     TRANSLATION_PROVIDER: str = "stub"

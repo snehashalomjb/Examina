@@ -283,14 +283,29 @@ export default function CandidatesPage() {
                           </Link>
                         )}
                         {attempt.published && attempt.result_id && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            loading={downloading === attempt.result_id}
-                            onClick={() => void downloadReport(attempt)}
-                          >
-                            Download Report
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                void api
+                                  .preview(`/results/${attempt.result_id}/pdf?simple=true`)
+                                  .catch((err) =>
+                                    toast(err instanceof ApiError ? err.message : "Could not open the report", "rose"),
+                                  )
+                              }
+                            >
+                              Preview
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              loading={downloading === attempt.result_id}
+                              onClick={() => void downloadReport(attempt)}
+                            >
+                              Download Report
+                            </Button>
+                          </>
                         )}
                         {canPublish(attempt) && (
                           <Button

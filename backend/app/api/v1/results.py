@@ -47,11 +47,7 @@ def _answer_text(answer: Answer, question: Question, locale: str) -> str | None:
         selected = set(answer.selected_option_ids or [])
         if not selected:
             return None
-        chosen = [
-            translated_field(o.text, o.translations, locale, "text")
-            for o in question.options
-            if str(o.id) in selected
-        ]
+        chosen = [o.text for o in question.options if str(o.id) in selected]
         return ", ".join(chosen) if chosen else None
     if question.question_type is QuestionType.IMAGE_UPLOAD:
         return presigned_url(answer.image_object_key)
@@ -60,14 +56,7 @@ def _answer_text(answer: Answer, question: Question, locale: str) -> str | None:
 
 def _correct_text(question: Question, locale: str) -> str | None:
     if question.question_type in OBJECTIVE_TYPES:
-        return (
-            ", ".join(
-                translated_field(o.text, o.translations, locale, "text")
-                for o in question.options
-                if o.is_correct
-            )
-            or None
-        )
+        return ", ".join(o.text for o in question.options if o.is_correct) or None
     # Deliberately the base (English) model answer, never a translated one - it is
     # graded against and reviewed by examiners as the canonical text, same invariant as
     # the grading prompt in app.services.grading.openai.
@@ -155,6 +144,8 @@ def result_detail(
             selectinload(Result.session)
             .selectinload(ExamSession.answers)
             .selectinload(Answer.ai_evaluations),
+            selectinload(Result.session).selectinload(ExamSession.integrity_reviewed_by),
+            selectinload(Result.session).selectinload(ExamSession.proctor_events),
         )
     )
     if result is None:
@@ -163,6 +154,9 @@ def result_detail(
     session = result.session
     exam = session.exam
     is_staff = user.role in {UserRole.EXAMINER, UserRole.ADMIN}
+
+    if is_staff:
+        exam_engine.assert_exam_owned(exam, user)
 
     if not is_staff:
         if session.candidate_id != user.id:
@@ -238,7 +232,7 @@ def result_detail(
         questions.append(
             QuestionResult(
                 question_id=question.id,
-                body=translated_field(question.body, question.translations, locale, "body"),
+                body=question.body,
                 question_type=question.question_type,
                 marks=answer.max_marks,
                 awarded_marks=answer.awarded_marks,
@@ -314,6 +308,17 @@ def result_detail(
         percentile=percentile,
         cohort_size=cohort_size,
         time_taken_seconds=time_taken_seconds,
+        candidate_id=session.candidate_id,
+        started_at=session.started_at,
+        exam_language=exam.primary_language,
+        is_flagged=session.is_flagged,
+        suspicion_score=session.suspicion_score,
+        integrity_verdict=session.integrity_verdict.value,
+        integrity_reviewed_by_name=(
+            session.integrity_reviewed_by.full_name if session.integrity_reviewed_by else None
+        ),
+        integrity_reviewed_at=session.integrity_reviewed_at,
+        proctor_event_count=len(session.proctor_events),
     )
 
 
@@ -326,6 +331,11 @@ def exam_results(
     limit: int = Query(300, ge=1, le=1000),
 ) -> list[dict]:
     """Every attempt at one exam - the examiner's marks sheet."""
+    exam = db.get(Exam, exam_id)
+    if exam is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    exam_engine.assert_exam_owned(exam, staff)
+
     sessions = db.scalars(
         select(ExamSession)
         .where(ExamSession.exam_id == exam_id)
@@ -475,6 +485,8 @@ def result_pdf(
     user: CurrentUser,
     db: DbSession,
     simple: bool = Query(False),
+    lang: str | None = None,
+    accept_language: str | None = Header(default=None),
 ) -> Response:
     """Downloads a result as a PDF.
 
@@ -482,7 +494,12 @@ def result_pdf(
     percentage, status, subject-wise split) instead of the full certified scorecard -
     the one-candidate download an examiner picks from an exam's candidate list.
     """
-    detail = result_detail(result_id=result_id, user=user, db=db)
+    # Every argument passed explicitly: called as a plain function, result_detail's
+    # ``Header(default=None)`` default is the Header marker object itself, not None -
+    # which is what made every result PDF download fail with a 500.
+    detail = result_detail(
+        result_id=result_id, user=user, db=db, lang=lang, accept_language=accept_language
+    )
     safe_title = "".join(c if c.isalnum() or c in "-_" else "_" for c in detail.exam_title)[:30]
 
     if simple:

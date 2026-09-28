@@ -237,9 +237,13 @@ export interface EnrollmentRow {
 export interface Subject {
   id: string;
   code: string;
+  /** Resolved for the request's content language. */
   name: string;
   description: string | null;
   question_count: number;
+  /** Canonical English values, present when returned by the subject API. */
+  base_name?: string | null;
+  base_description?: string | null;
 }
 
 export interface Option {
@@ -256,6 +260,9 @@ export interface Option {
 export interface Question {
   id: string;
   subject_id: string;
+  /** The bank this question belongs to - a standalone bank per language, not a
+   * translation of an English master. See `translations` for the older mechanism. */
+  language: string;
   question_type: QuestionType;
   category: QuestionCategory;
   topic: string | null;
@@ -495,6 +502,11 @@ export interface Exam {
   sections: ExamSection[];
   /** Language codes the candidate's selector offers for this exam. Always leads "en". */
   languages: string[];
+  /**
+   * The exam's own language, as picked in Exam Details. The paper is rendered in this
+   * language unless the candidate switches away from it with the in-exam selector.
+   */
+  primary_language?: string;
 }
 
 // ---------------------------------------------------------------- templates
@@ -546,12 +558,29 @@ export interface RankingRow {
   shortlist_status: ShortlistStatus | null;
   suspicion_score: number;
   is_flagged: boolean;
+  flag_count: number;
   result_id: string | null;
   session_id: string | null;
   published: boolean;
   needs_integrity_review: boolean;
   integrity_verdict: string;
   pending_review_count: number;
+}
+
+export interface ExamReportSummary {
+  exam_id: string;
+  exam_title: string;
+  subject_name: string | null;
+  exam_date: string;
+  total_candidates: number;
+  completed: number;
+  pending_review: number;
+  approved: number;
+  flagged: number;
+  rejected: number;
+  average_marks: number | null;
+  highest_marks: number | null;
+  lowest_marks: number | null;
 }
 
 export interface TopPerformer {
@@ -623,11 +652,11 @@ export interface ImportedRow {
   /** Resolved from the row's own "Subject" cell, or the import's default subject. */
   subject_id: string | null;
   subject_name: string | null;
-  question_type: QuestionType;
-  difficulty: Difficulty;
+  question_type: QuestionType | null;
+  difficulty: Difficulty | null;
   category: QuestionCategory;
   topic: string | null;
-  marks: number;
+  marks: number | null;
   negative_marks: number;
   model_answer: string | null;
   explanation: string | null;
@@ -834,6 +863,12 @@ export interface CandidateExamCard {
   submitted_at?: string | null;
   can_start: boolean;
   reason: string | null;
+  /**
+   * Stable twin of `reason` - "in_progress" | "already_attempted" | "not_published" |
+   * "opens_later" | "window_closed", or null when the exam can start. Render this through
+   * `examReasonText`; `reason` is a fixed English sentence kept only as a fallback.
+   */
+  reason_code?: string | null;
   exam_type?: ExamType;
   course?: string | null;
   department?: string | null;

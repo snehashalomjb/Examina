@@ -18,6 +18,7 @@ import {
 import { IconArrowRight, IconClock, IconShield } from "@/components/icons";
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
+import { examReasonText } from "@/lib/examReason";
 import type { CandidateExamCard, SessionStatus } from "@/lib/types";
 
 const STATUS_TONE: Record<SessionStatus, "accent" | "mint" | "amber" | "rose"> = {
@@ -281,7 +282,7 @@ function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof u
 
         <dl className="mt-4 grid grid-cols-3 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
           {[
-            [t("duration_label"), `${card.duration_minutes} min`],
+            [t("duration_label"), t("value_min", { count: card.duration_minutes })],
             [t("questions_label"), String(card.total_questions)],
             [t("closes_label"), formatDate(card.ends_at, false)],
           ].map(([label, value]) => (
@@ -313,7 +314,9 @@ function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof u
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-line/60 pt-3">
-        <p className="text-[11.5px] text-ink-muted">{card.reason ?? t("ready_for_sitting")}</p>
+        <p className="text-[11.5px] text-ink-muted">
+          {examReasonText(card, t, (v) => formatDate(v)) ?? t("ready_for_sitting")}
+        </p>
         <Link href={`/dashboard/candidate/exams/${card.exam_id}`}>
           <Button size="sm" variant={card.can_start ? "primary" : "secondary"}>
             {card.can_start ? t("start_resume") : t("view_details")}

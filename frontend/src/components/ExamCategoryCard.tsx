@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Badge, cx } from "@/components/ui";
 
 export type ExamCategoryType = "academic" | "corporate";
@@ -16,7 +17,24 @@ export function ExamCategoryCard({
   selected = false,
   onSelect,
 }: ExamCategoryCardProps) {
+  const t = useTranslations("examCategory");
   const isAcademic = category === "academic";
+
+  const academicFeatures = [
+    t("academic_cap_1"),
+    t("academic_cap_2"),
+    t("academic_cap_3"),
+    t("academic_cap_4"),
+    t("academic_cap_5"),
+  ];
+
+  const corporateFeatures = [
+    t("corporate_cap_1"),
+    t("corporate_cap_2"),
+    t("corporate_cap_3"),
+    t("corporate_cap_4"),
+    t("corporate_cap_5"),
+  ];
 
   return (
     <div
@@ -58,48 +76,29 @@ export function ExamCategoryCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-bold text-ink">
-                {isAcademic ? "Academic Exam" : "Corporate Hiring Exam"}
+                {isAcademic ? t("academic_title") : t("corporate_title")}
               </h3>
               <Badge tone={isAcademic ? "accent" : "purple"}>
-                {isAcademic ? "Education" : "Recruitment"}
+                {isAcademic ? t("academic_badge") : t("corporate_badge")}
               </Badge>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              {isAcademic
-                ? "Colleges, Universities, Schools & Courses"
-                : "Companies, Startups & Recruitment Drives"}
+              {isAcademic ? t("academic_subtitle") : t("corporate_subtitle")}
             </p>
           </div>
         </div>
 
         {/* Description */}
         <p className="text-sm text-ink-muted leading-relaxed mb-5">
-          {isAcademic
-            ? "Designed for semester finals, mid-terms, subject quizzes, and laboratory exams with rich rubrics, essay evaluation, and negative marking."
-            : "Engineered for talent acquisition with multi-section timing, aptitude filtering, live coding challenges, and candidate shortlisting."}
+          {isAcademic ? t("academic_description") : t("corporate_description")}
         </p>
 
         {/* Feature List */}
         <div className="space-y-2 border-t border-line/60 pt-4 mb-4">
           <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2">
-            Key Capabilities
+            {t("key_capabilities")}
           </div>
-          {(isAcademic
-            ? [
-                "Course, Department & Semester metadata",
-                "Mixed question formats (MCQ, Short, Essay, Image upload)",
-                "AI-assisted rubric grading with human-in-the-loop",
-                "Speed quizzes with instant result auto-publishing",
-                "6 Academic blueprint patterns included",
-              ]
-            : [
-                "Company Name & Target Job Role binding",
-                "Multi-section papers with individual timers & cutoffs",
-                "Aptitude, Reasoning, Technical & Coding evaluation",
-                "Candidate Shortlisting & Recruitment Ranking",
-                "6 Corporate hiring blueprint patterns included",
-              ]
-          ).map((feature, i) => (
+          {(isAcademic ? academicFeatures : corporateFeatures).map((feature, i) => (
             <div key={i} className="flex items-start gap-2 text-xs text-ink">
               <span
                 className={cx(
@@ -133,8 +132,12 @@ export function ExamCategoryCard({
           )}
         >
           {selected
-            ? `✓ Selected ${isAcademic ? "Academic" : "Corporate"} Mode`
-            : `Select ${isAcademic ? "Academic" : "Corporate"} Mode`}
+            ? isAcademic
+              ? t("selected_academic")
+              : t("selected_corporate")
+            : isAcademic
+              ? t("select_academic")
+              : t("select_corporate")}
         </button>
       </div>
     </div>

@@ -921,15 +921,32 @@ export async function detectFaceOnce(
 ): Promise<{ faceDetected: boolean; faceCount: number }> {
   const vision = await import("@mediapipe/tasks-vision");
   const fileset = await quietingMediaPipeLogs(() => vision.FilesetResolver.forVisionTasks(WASM_PATH));
-  const landmarker = await quietingMediaPipeLogs(() =>
-    vision.FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
-      runningMode: "VIDEO",
-      numFaces: 3,
-      outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: false,
-    }),
-  );
+
+  type Landmarker = Awaited<ReturnType<typeof vision.FaceLandmarker.createFromOptions>>;
+  const build = (delegate: "GPU" | "CPU"): Promise<Landmarker> =>
+    quietingMediaPipeLogs(() =>
+      vision.FaceLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: MODEL_PATH, delegate },
+        runningMode: "VIDEO",
+        numFaces: 3,
+        outputFaceBlendshapes: false,
+        outputFacialTransformationMatrixes: false,
+      }),
+    );
+
+  // `delegate: "GPU"` needs a WebGL2 context. With hardware acceleration switched off -
+  // or over remote desktop - creating it throws, and the pre-exam gate used to report
+  // that as "no camera access": the camera was fine, only the delegate was not. The CPU
+  // delegate costs a little per frame and keeps the check honest; the live engine
+  // degrades rather than giving up on faces for the same reason.
+  let landmarker: Landmarker;
+  try {
+    landmarker = await build("GPU");
+  } catch (error) {
+    console.warn("Face landmarker GPU delegate unavailable, retrying on CPU", error);
+    landmarker = await build("CPU");
+  }
+
   try {
     // The delegate is already created by this point, but the very first inference can
     // still emit the same startup notices, so this call is quieted too.

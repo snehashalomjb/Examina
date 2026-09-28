@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Avatar } from "@/components/Avatar";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { Brand } from "@/components/LowPoly";
+import { NotificationBell } from "@/components/NotificationBell";
 import { Splash } from "@/components/Splash";
 import { Badge, Button, cx } from "@/components/ui";
 import {
@@ -75,6 +76,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     // proctoring, exams) plus what can honestly be exported today.
     section: "Reports",
     items: [
+      { href: "/dashboard/reports",                       label: "Result Reports",      roles: ["admin", "examiner"], icon: IconResults, needsApproval: true },
       { href: "/dashboard/admin/reports?tab=exams",       label: "Exam Reports",        roles: ["admin"], icon: IconExam },
       { href: "/dashboard/admin/reports?tab=candidates",  label: "Candidate Reports",   roles: ["admin"], icon: IconUsers },
       { href: "/dashboard/admin/reports?tab=proctoring",  label: "Proctoring Reports",  roles: ["admin"], icon: IconShield },
@@ -104,9 +106,10 @@ const ROLE_LABEL_KEY: Record<UserRole, string> = {
   candidate: "role_candidate",
 };
 
-// Only the items with a stable (query-string-free) href are translated in this pass -
-// the rest (e.g. "Examiners", "Create Exam", per-tab report links) keep their English
-// label for now, translatable later by adding a row here plus the matching message key.
+// Every NAV item is keyed here by its full href (query string included where the link has
+// one - those hrefs are fixed, so they are as stable as the rest). An href with no row
+// falls back to the English literal in NAV, which is what used to happen for Create Exam,
+// AI Tools, Live Sessions, Examiners, Account and the five per-tab report links.
 const NAV_LABEL_KEY: Record<string, { ns: "dashboard" | "common"; key: string }> = {
   "/dashboard/admin": { ns: "common", key: "dashboard" },
   "/dashboard/examiner": { ns: "common", key: "dashboard" },
@@ -115,12 +118,21 @@ const NAV_LABEL_KEY: Record<string, { ns: "dashboard" | "common"; key: string }>
   "/dashboard/results": { ns: "dashboard", key: "nav_results" },
   "/dashboard/candidate/performance": { ns: "dashboard", key: "nav_performance" },
   "/dashboard/exams": { ns: "dashboard", key: "nav_exams" },
+  "/dashboard/exams/create": { ns: "dashboard", key: "nav_create_exam" },
   "/dashboard/questions": { ns: "dashboard", key: "nav_questions" },
+  "/dashboard/questions/ai-generate": { ns: "dashboard", key: "nav_ai_tools" },
   "/dashboard/grading": { ns: "dashboard", key: "nav_grading" },
   "/dashboard/proctoring": { ns: "dashboard", key: "nav_proctoring" },
+  "/dashboard/live": { ns: "dashboard", key: "nav_live" },
   "/dashboard/candidates": { ns: "dashboard", key: "nav_candidates" },
   "/dashboard/admin/users": { ns: "dashboard", key: "nav_users" },
+  "/dashboard/admin/users?role=examiner": { ns: "dashboard", key: "nav_examiners" },
   "/dashboard/login-requests": { ns: "dashboard", key: "nav_login_requests" },
+  "/dashboard/admin/reports?tab=exams": { ns: "dashboard", key: "nav_exam_reports" },
+  "/dashboard/admin/reports?tab=candidates": { ns: "dashboard", key: "nav_candidate_reports" },
+  "/dashboard/admin/reports?tab=proctoring": { ns: "dashboard", key: "nav_proctoring_reports" },
+  "/dashboard/admin/reports?tab=performance": { ns: "dashboard", key: "nav_performance_reports" },
+  "/dashboard/admin/reports?tab=export": { ns: "dashboard", key: "nav_export_reports" },
   "/dashboard/admin/audit": { ns: "dashboard", key: "nav_audit" },
   "/dashboard/admin/system-health": { ns: "dashboard", key: "nav_system_health" },
   "/dashboard/settings": { ns: "common", key: "settings" },
@@ -132,6 +144,7 @@ const SECTION_LABEL_KEY: Record<string, string> = {
   People: "section_people",
   Reports: "section_reports",
   System: "section_system",
+  Account: "section_account",
 };
 
 const ROLE_GRADIENT: Record<UserRole, string> = {
@@ -158,6 +171,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
+  // Which top-nav item is currently hovered, if any - drives the dock-style scale
+  // effect. Reset per header row implicitly: a key only ever matches items in the row
+  // the pointer is actually over, so admin/examiner/candidate rows never cross-affect.
+  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
 
   // Which examiner header dropdown is open, if any. Only one at a time.
   const [openMenu, setOpenMenu] = useState<
@@ -257,7 +274,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 return (
                   <span
                     key={item.href}
-                    title="Awaiting administrator approval"
+                    title={t("awaiting_approval")}
                     className="flex cursor-not-allowed items-center gap-3 rounded-[9px] px-3 py-2.5 text-[13px] opacity-35"
                     style={{ color: "var(--color-sidebar-text)" }}
                   >
@@ -363,8 +380,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const dropdownPanel = (items: NavItem[], onNavigate: () => void) => (
     <div
       role="menu"
-      className="animate-scale-in absolute left-0 top-full z-40 mt-1.5 w-60 origin-top overflow-hidden rounded-[10px] py-1.5 shadow-xl"
-      style={{ background: "var(--color-sidebar)", border: "1px solid var(--color-sidebar-border)" }}
+      className="animate-scale-in absolute left-0 top-full z-40 mt-2 w-60 origin-top overflow-hidden rounded-2xl py-1.5 shadow-2xl"
+      style={{
+        background: "var(--color-sidebar)",
+        border: "1px solid var(--color-sidebar-border)",
+        backdropFilter: "blur(20px) saturate(160%)",
+        WebkitBackdropFilter: "blur(20px) saturate(160%)",
+      }}
     >
       {items.map((item) => {
         const Icon = item.icon;
@@ -374,8 +396,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           return (
             <span
               key={item.href}
-              title="Awaiting administrator approval"
-              className="flex cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-[13px] opacity-35"
+              title={t("awaiting_approval")}
+              className="mx-1.5 flex cursor-not-allowed items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] opacity-35"
               style={{ color: "var(--color-sidebar-text)" }}
             >
               <Icon size={14} />
@@ -391,7 +413,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             role="menuitem"
             onClick={onNavigate}
             className={cx(
-              "flex items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium transition-colors",
+              "mx-1.5 flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
               active ? "bg-white/10 text-white" : "hover:bg-white/5",
             )}
             style={{ color: active ? "white" : "var(--color-sidebar-text)" }}
@@ -419,9 +441,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const triggerClass = (active: boolean) =>
     cx(
-      "flex items-center gap-1.5 rounded-[9px] px-4 py-2.5 text-[14.5px] font-medium transition-colors",
+      "flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[14.5px] font-medium transition-all duration-200 ease-out",
       active ? "bg-white/10 text-white" : "hover:bg-white/5",
     );
+
+  // Dock-style hover magnification for the top nav row: the item under the pointer
+  // scales up, every sibling in the same row eases back slightly, so the row reads as
+  // one connected control rather than a strip of independent buttons.
+  const navScale = (key: string) =>
+    hoveredNav === null ? "" : hoveredNav === key ? "scale-110" : "scale-95 opacity-70";
+  const navHover = (key: string) => ({
+    onMouseEnter: () => setHoveredNav(key),
+    onMouseLeave: () => setHoveredNav(null),
+  });
 
   if (isCandidate) {
     return (
@@ -452,9 +484,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link
                     key={item.href}
                     href={item.href}
+                    {...navHover(item.href)}
                     className={cx(
-                      "flex shrink-0 items-center gap-2 rounded-[9px] px-3 py-2 text-[13px] font-medium transition-all whitespace-nowrap",
-                      active ? "bg-accent text-white shadow-sm" : "text-ink-soft hover:bg-sunken hover:text-ink"
+                      "flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-[13px] font-medium transition-all duration-200 ease-out whitespace-nowrap",
+                      active ? "bg-accent text-white shadow-sm" : "text-ink-soft hover:bg-sunken hover:text-ink",
+                      navScale(item.href),
                     )}
                   >
                     <Icon size={14} />
@@ -467,12 +501,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LanguageSelector />
               {!approved && (
                 <Badge tone={user.access_status === "pending" ? "amber" : "rose"} size="xs">
-                  {user.access_status === "pending" ? "Pending approval" : "Access revoked"}
+                  {user.access_status === "pending" ? t("pending_approval") : t("access_revoked")}
                 </Badge>
               )}
               <Link
                 href="/dashboard/profile"
-                title={approved ? "Your profile — Active" : "Your profile"}
+                title={approved ? t("view_profile_active") : t("view_profile")}
                 className={cx(
                   "hidden h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-sm transition-transform hover:scale-105 sm:flex",
                   `bg-gradient-to-br ${ROLE_GRADIENT[user.role]}`,
@@ -521,20 +555,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <nav className="hidden shrink-0 items-center gap-2 lg:flex">
               <Link
                 href="/dashboard/examiner"
-                className={triggerClass(isActive("/dashboard/examiner", true))}
+                {...navHover("dashboard")}
+                className={cx(triggerClass(isActive("/dashboard/examiner", true)), navScale("dashboard"))}
                 style={{ color: isActive("/dashboard/examiner", true) ? "white" : "var(--color-sidebar-text)" }}
               >
                 {tc("dashboard")}
               </Link>
 
-              <div className="relative">
+              <div className="relative" {...navHover("assessment")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "assessment"}
                   onClick={() => setOpenMenu((m) => (m === "assessment" ? null : "assessment"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("assessment"); } }}
-                  className={triggerClass(assessmentActive)}
+                  className={cx(triggerClass(assessmentActive), navScale("assessment"))}
                   style={{ color: assessmentActive || openMenu === "assessment" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
@@ -542,14 +577,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {openMenu === "assessment" && dropdownPanel(assessmentItems, () => setOpenMenu(null))}
               </div>
 
-              <div className="relative">
+              <div className="relative" {...navHover("people")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "people"}
                   onClick={() => setOpenMenu((m) => (m === "people" ? null : "people"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("people"); } }}
-                  className={triggerClass(peopleActive)}
+                  className={cx(triggerClass(peopleActive), navScale("people"))}
                   style={{ color: peopleActive || openMenu === "people" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_people")} <ChevronIcon open={openMenu === "people"} />
@@ -563,30 +598,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/5 lg:hidden"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Open navigation"
+                aria-label={t("open_navigation")}
               >
                 <HamburgerIcon />
               </button>
 
               <LanguageSelector className="hidden lg:block" variant="dark" />
 
-              {/* Notifications */}
-              <Link
-                href="/dashboard/login-requests"
-                title={t("nav_login_requests")}
-                className="hidden h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:flex"
-                style={{ color: "var(--color-sidebar-text)" }}
-              >
-                <BellIcon size={16} />
-              </Link>
+              <NotificationBell />
 
               {/* Profile: the avatar itself is a direct link, no dropdown needed. */}
               <Link
                 href="/dashboard/profile"
-                title="View profile"
-                className="ml-1 hidden items-center gap-2.5 rounded-[9px] px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
+                title={t("view_profile")}
+                className="ml-1 hidden items-center gap-2.5 rounded-full px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
               >
                 <Avatar name={user.full_name} src={user.avatar_url} size={34} shape="circle" />
                 <span className="text-left">
@@ -603,7 +630,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 type="button"
                 onClick={signOut}
                 title={tc("logout")}
-                className="ml-1 hidden items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[12.5px] font-medium text-rose-300 transition-colors hover:bg-rose-500/10 lg:flex"
+                className="ml-1 hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-medium text-rose-300 transition-colors hover:bg-rose-500/10 lg:flex"
               >
                 <IconSignOut size={14} />
                 {tc("logout")}
@@ -628,7 +655,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setMobileOpen(false)}
                   className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                   style={{ color: "var(--color-sidebar-text)" }}
-                  aria-label="Close navigation"
+                  aria-label={t("close_navigation")}
                 >
                   <CloseIcon />
                 </button>
@@ -668,20 +695,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <nav className="hidden shrink-0 items-center gap-1.5 lg:flex">
               <Link
                 href="/dashboard/admin"
-                className={triggerClass(isActive("/dashboard/admin", true))}
+                {...navHover("dashboard")}
+                className={cx(triggerClass(isActive("/dashboard/admin", true)), navScale("dashboard"))}
                 style={{ color: isActive("/dashboard/admin", true) ? "white" : "var(--color-sidebar-text)" }}
               >
                 {tc("dashboard")}
               </Link>
 
-              <div className="relative">
+              <div className="relative" {...navHover("assessment")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "assessment"}
                   onClick={() => setOpenMenu((m) => (m === "assessment" ? null : "assessment"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("assessment"); } }}
-                  className={triggerClass(adminAssessmentActive)}
+                  className={cx(triggerClass(adminAssessmentActive), navScale("assessment"))}
                   style={{ color: adminAssessmentActive || openMenu === "assessment" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_assessment")} <ChevronIcon open={openMenu === "assessment"} />
@@ -689,14 +717,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {openMenu === "assessment" && dropdownPanel(adminAssessmentItems, () => setOpenMenu(null))}
               </div>
 
-              <div className="relative">
+              <div className="relative" {...navHover("monitoring")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "monitoring"}
                   onClick={() => setOpenMenu((m) => (m === "monitoring" ? null : "monitoring"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("monitoring"); } }}
-                  className={triggerClass(monitoringActive)}
+                  className={cx(triggerClass(monitoringActive), navScale("monitoring"))}
                   style={{ color: monitoringActive || openMenu === "monitoring" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_monitoring")} <ChevronIcon open={openMenu === "monitoring"} />
@@ -704,14 +732,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {openMenu === "monitoring" && dropdownPanel(monitoringItems, () => setOpenMenu(null))}
               </div>
 
-              <div className="relative">
+              <div className="relative" {...navHover("people")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "people"}
                   onClick={() => setOpenMenu((m) => (m === "people" ? null : "people"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("people"); } }}
-                  className={triggerClass(peopleActive)}
+                  className={cx(triggerClass(peopleActive), navScale("people"))}
                   style={{ color: peopleActive || openMenu === "people" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_people")} <ChevronIcon open={openMenu === "people"} />
@@ -719,14 +747,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {openMenu === "people" && dropdownPanel(peopleItems, () => setOpenMenu(null))}
               </div>
 
-              <div className="relative">
+              <div className="relative" {...navHover("reports")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "reports"}
                   onClick={() => setOpenMenu((m) => (m === "reports" ? null : "reports"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("reports"); } }}
-                  className={triggerClass(reportsActive)}
+                  className={cx(triggerClass(reportsActive), navScale("reports"))}
                   style={{ color: reportsActive || openMenu === "reports" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_reports")} <ChevronIcon open={openMenu === "reports"} />
@@ -734,14 +762,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {openMenu === "reports" && dropdownPanel(reportsItems, () => setOpenMenu(null))}
               </div>
 
-              <div className="relative">
+              <div className="relative" {...navHover("system")}>
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={openMenu === "system"}
                   onClick={() => setOpenMenu((m) => (m === "system" ? null : "system"))}
                   onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setOpenMenu("system"); } }}
-                  className={triggerClass(systemActive)}
+                  className={cx(triggerClass(systemActive), navScale("system"))}
                   style={{ color: systemActive || openMenu === "system" ? "white" : "var(--color-sidebar-text)" }}
                 >
                   {t("section_system")} <ChevronIcon open={openMenu === "system"} />
@@ -755,30 +783,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white/5 lg:hidden"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Open navigation"
+                aria-label={t("open_navigation")}
               >
                 <HamburgerIcon />
               </button>
 
               <LanguageSelector className="hidden lg:block" variant="dark" />
 
-              {/* Notifications */}
-              <Link
-                href="/dashboard/login-requests"
-                title={t("nav_login_requests")}
-                className="hidden h-9 w-9 items-center justify-center rounded-[8px] transition hover:bg-white/5 lg:flex"
-                style={{ color: "var(--color-sidebar-text)" }}
-              >
-                <BellIcon size={16} />
-              </Link>
+              <NotificationBell />
 
               {/* Profile: the avatar itself is a direct link, no dropdown needed. */}
               <Link
                 href="/dashboard/profile"
-                title="View profile"
-                className="ml-1 hidden items-center gap-2.5 rounded-[9px] px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
+                title={t("view_profile")}
+                className="ml-1 hidden items-center gap-2.5 rounded-full px-2 py-1.5 transition-colors hover:bg-white/5 lg:flex"
               >
                 <Avatar name={user.full_name} src={user.avatar_url} size={34} shape="circle" />
                 <span className="text-left">
@@ -795,7 +815,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 type="button"
                 onClick={signOut}
                 title={tc("logout")}
-                className="ml-1 hidden items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[12.5px] font-medium text-rose-300 transition-colors hover:bg-rose-500/10 lg:flex"
+                className="ml-1 hidden items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px] font-medium text-rose-300 transition-colors hover:bg-rose-500/10 lg:flex"
               >
                 <IconSignOut size={14} />
                 {tc("logout")}
@@ -820,7 +840,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setMobileOpen(false)}
                   className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                   style={{ color: "var(--color-sidebar-text)" }}
-                  aria-label="Close navigation"
+                  aria-label={t("close_navigation")}
                 >
                   <CloseIcon />
                 </button>
@@ -885,7 +905,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setMobileOpen(false)}
                 className="ml-auto rounded-[7px] p-1.5 transition hover:bg-white/10"
                 style={{ color: "var(--color-sidebar-text)" }}
-                aria-label="Close navigation"
+                aria-label={t("close_navigation")}
               >
                 <CloseIcon />
               </button>
@@ -915,17 +935,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-line text-ink-soft hover:bg-sunken hover:border-accent/30 transition lg:hidden"
-              aria-label="Open navigation"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-ink-soft hover:bg-sunken hover:border-accent/30 transition lg:hidden"
+              aria-label={t("open_navigation")}
             >
               <HamburgerIcon />
             </button>
             {/* Greeting */}
             <div className="hidden sm:block">
               <p className="text-[13.5px] font-bold text-ink">
-                {greeting()},{" "}
+                {t(greetingKey())},{" "}
                 <span style={{
-                  background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                  backgroundImage: "linear-gradient(135deg, #4f46e5, #7c3aed)",
                   WebkitBackgroundClip: "text",
                   backgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -943,11 +963,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Access status badge */}
             {user.role !== "admin" && !approved && (
               <Badge tone={user.access_status === "pending" ? "amber" : "rose"} size="xs">
-                {user.access_status === "pending" ? "Pending approval" : "Access revoked"}
+                {user.access_status === "pending" ? t("pending_approval") : t("access_revoked")}
               </Badge>
             )}
             {user.role !== "admin" && approved && (
-              <Badge tone="green" size="xs">Active</Badge>
+              <Badge tone="green" size="xs">{t("active_status")}</Badge>
             )}
             {/* User avatar with gradient */}
             <div className={cx(
@@ -974,11 +994,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function greeting() {
+function greetingKey() {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "greeting_morning";
+  if (hour < 18) return "greeting_afternoon";
+  return "greeting_evening";
 }
 
 /* ─── Inline icon components ────────────────────────────────────── */

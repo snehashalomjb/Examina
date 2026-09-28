@@ -16,6 +16,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { LanguageSelect } from "@/components/LanguageSelect";
+
 import {
   Alert,
   Badge,
@@ -29,7 +31,7 @@ import {
   toast,
 } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
-import { LOCALE_NAMES, SUPPORTED_LOCALES, type Locale } from "@/lib/locale";
+import { LOCALE_NAMES, SUPPORTED_LOCALES, useLocale, type Locale } from "@/lib/locale";
 import {
   CATEGORY_LABEL,
   CONTAINER_TYPES,
@@ -97,6 +99,10 @@ export interface QuestionEditorProps {
   seed?: Partial<Question> | null;
   /** Pre-selected difficulty, e.g. the section rule this question is being written for. */
   initialDifficulty?: Difficulty;
+  /** Current content language. Subject labels and the translation panel follow it. */
+  language?: Locale;
+  /** Called when the examiner changes the language from inside the composer. */
+  onLanguageChange?: (locale: Locale) => void;
   onSaved?: (question: Question) => void;
   onCancel?: () => void;
   /** Keep the form open and cleared after a save, for authoring several in a row. */
@@ -143,15 +149,26 @@ export function QuestionEditor({
   initialType,
   seed = null,
   initialDifficulty,
+  language,
+  onLanguageChange,
   onSaved,
   onCancel,
   stayOpen = false,
 }: QuestionEditorProps) {
   const t = useTranslations("question");
+  const { locale: appLocale, setLocale: setAppLocale } = useLocale();
+  const activeLanguage = language ?? appLocale;
+  const changeLanguage = onLanguageChange ?? setAppLocale;
   const editing = question !== null;
   /** What the form starts from. Only `question` decides whether the save is an edit. */
   const source = question ?? seed;
   const spec = (source?.spec ?? {}) as Record<string, unknown>;
+  //: The bank this question belongs to - fixed at creation, never changed by editing.
+  //: A brand-new question is written directly in `activeLanguage`; it is not an
+  //: English master waiting for a translation, so the translations panel below (which
+  //: assumes an English source) only makes sense for English questions.
+  const questionLanguage = source?.language ?? activeLanguage;
+  const showTranslations = questionLanguage === "en";
 
   const [chosenSubjectId, setChosenSubjectId] = useState(source?.subject_id ?? "");
   const subjectId = lockedSubjectId || chosenSubjectId || subjects[0]?.id || "";
@@ -594,6 +611,8 @@ export function QuestionEditor({
 
     const payload: Record<string, unknown> = {
       subject_id: subjectId,
+      // Fixed at creation; an edit never moves a question to a different bank.
+      ...(editing ? {} : { language: activeLanguage }),
       question_type: type,
       category,
       topic: topic.trim() || null,
@@ -670,6 +689,25 @@ export function QuestionEditor({
       }}
     >
       {/* ---------------------------------------------------------- classification */}
+        {language !== undefined && onLanguageChange && (
+          <div className="flex flex-wrap items-end justify-between gap-3 rounded-[12px] border border-line bg-sunken/40 p-3">
+            <div>
+              <p className="text-[13px] font-semibold text-ink">Question language</p>
+              <p className="text-[12px] text-ink-muted">
+                {editing
+                  ? "This question's bank. Fixed once written."
+                  : "This question is saved to that language's own Question Bank, separate from every other language's."}
+              </p>
+            </div>
+            <LanguageSelect
+              value={activeLanguage}
+              onChange={changeLanguage}
+              className="min-w-[170px]"
+              ariaLabel="Question language"
+              disabled={editing}
+            />
+          </div>
+        )}
       <div className="grid gap-4 sm:grid-cols-4">
         <Field label="Subject" required>
           <Select
@@ -1117,25 +1155,27 @@ export function QuestionEditor({
       </Field>
 
       {/* -------------------------------------------------------------- translations */}
-      <TranslationsPanel
-        selectedLocales={selectedLocales}
-        onToggleLocale={toggleLocale}
-        qTranslations={qTranslations}
-        onChangeQuestionField={(locale, field, value) =>
-          setQTranslations((current) => ({
-            ...current,
-            [locale]: { ...current[locale], [field]: value },
-          }))
-        }
-        options={options}
-        onChangeOptionTranslation={setOptionTranslation}
-        objective={objective}
-        canGenerate={editing}
-        generating={generating}
-        onGenerate={() => void generateTranslations()}
-        generateError={generateError}
-        generateNotice={generateNotice}
-      />
+      {showTranslations && (
+        <TranslationsPanel
+          selectedLocales={selectedLocales}
+          onToggleLocale={toggleLocale}
+          qTranslations={qTranslations}
+          onChangeQuestionField={(locale, field, value) =>
+            setQTranslations((current) => ({
+              ...current,
+              [locale]: { ...current[locale], [field]: value },
+            }))
+          }
+          options={options}
+          onChangeOptionTranslation={setOptionTranslation}
+          objective={objective}
+          canGenerate={editing}
+          generating={generating}
+          onGenerate={() => void generateTranslations()}
+          generateError={generateError}
+          generateNotice={generateNotice}
+        />
+      )}
 
       {/* --------------------------------------------------------------- save block */}
       {problems.length > 0 && (

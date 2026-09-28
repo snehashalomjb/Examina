@@ -15,6 +15,7 @@ import random
 import uuid
 from dataclasses import dataclass, field
 from hashlib import blake2b
+from types import SimpleNamespace
 from typing import Any
 
 from app.db.models import Exam, ExamQuestion, QuestionType
@@ -60,11 +61,16 @@ def _matches(eq: ExamQuestion, rule: dict) -> bool:
         return False
     topic = rule.get("topic")
     if topic:
-        if not question.topic:
+        # The exam builder's "subject" dropdown saved the subject's *name* into the
+        # rule's topic, so a rule reading topic="DBMS" means "the DBMS subject" and
+        # matched none of DBMS's questions (whose topics are "Normalization", "Joins",
+        # ...). A topic therefore matches the question's topic or its subject's name.
+        wanted = topic.strip().casefold()
+        own_topic = (question.topic or "").strip().casefold()
+        subject_name = (question.subject.name if question.subject else "").strip().casefold()
+        if wanted not in (own_topic, subject_name):
             return False
-        if question.topic.strip().casefold() != topic.strip().casefold():
-            return False
-    if rule.get("subject_id") and str(question.subject_id) != rule["subject_id"]:
+    if rule.get("subject_id") and str(question.subject_id).lower() != rule["subject_id"].lower():
         return False
     tags = rule.get("tags")
     if tags and not (set(question.tags or []) & set(tags)):
@@ -137,6 +143,65 @@ def _draw(
     return taken
 
 
+def _mismatch(eq: ExamQuestion, rule: dict) -> str | None:
+    """The first reason a question fails a rule, in words, or None if it matches."""
+    q = eq.question
+    if not q.is_active:
+        return "is archived"
+    if q.question_type.value != rule["question_type"]:
+        return f"is {q.question_type.value}, the rule asks for {rule['question_type']}"
+    if rule.get("difficulty") and q.difficulty.value != rule["difficulty"]:
+        return f"is {q.difficulty.value}, the rule asks for {rule['difficulty']}"
+    if rule.get("category") and q.category.value != rule["category"]:
+        return f"is filed as {q.category.value}, the rule asks for {rule['category']}"
+    if rule.get("subject_id") and str(q.subject_id).lower() != rule["subject_id"].lower():
+        return "belongs to a different subject than the rule asks for"
+    if not _matches(eq, rule):
+        return "does not match the rule's subject, topic or tags"
+    return None
+
+
+def unfit_for_rules(question: Any, rules: list[dict]) -> str | None:
+    """Why a question can be drawn by none of these rules, or None if one can draw it.
+
+    Used when a question is chosen for a section: choosing one that the section's rules
+    can never draw only surfaces later, at publish, as "pool only has 0 left".
+    """
+    if not rules:
+        return None
+    # A plain stand-in, not an ExamQuestion: building an ORM row here could be swept into
+    # the session through the relationship and flushed as a half-filled pool entry.
+    probe = SimpleNamespace(question=question)
+    if any(_matches(probe, rule) for rule in rules):
+        return None
+    return _mismatch(probe, rules[0]) if len(rules) == 1 else "fits none of its rules"
+
+
+def _why_chosen_do_not_count(
+    exam_questions: list[ExamQuestion], rules: list[dict], section_id: uuid.UUID | None
+) -> str:
+    """Explain chosen questions that no rule of their section can use.
+
+    Without this, ten questions chosen for a section whose rule they fail read as
+    "pool only has 0 left" - true, and no help in finding out what to change.
+    """
+    if section_id is None:
+        return ""
+    unusable = [
+        eq
+        for eq in exam_questions
+        if eq.section_id == section_id and not any(_matches(eq, r) for r in rules)
+    ]
+    if not unusable:
+        return ""
+    reason = _mismatch(unusable[0], rules[0]) if len(rules) == 1 else None
+    detail = f" - e.g. one {reason}" if reason else ""
+    return (
+        f". {len(unusable)} question(s) chosen for this section do not fit its "
+        f"rule{'s' if len(rules) > 1 else ''}{detail}"
+    )
+
+
 def _rule_label(rule: dict) -> str:
     label = rule["question_type"]
     if rule.get("difficulty"):
@@ -150,7 +215,9 @@ def _rule_label(rule: dict) -> str:
 
 def _specificity(rule: dict) -> int:
     """How many narrowings a rule declares. More specific rules draw first."""
-    return sum(1 for key in ("difficulty", "category", "topic") if rule.get(key))
+    return sum(
+        1 for key in ("difficulty", "category", "topic", "subject_id", "tags") if rule.get(key)
+    )
 
 
 def _ordered_rules(rules: list[dict]) -> list[dict]:
@@ -192,6 +259,7 @@ def check_pool_satisfies_rules(exam: Exam) -> list[str]:
                 problems.append(
                     f"Need {rule['count']} {_rule_label(rule)} question(s){where}, "
                     f"pool only has {len(available)} left"
+                    + _why_chosen_do_not_count(exam.exam_questions, rules, section_id)
                 )
                 continue
             # Reserve deterministically so the next rule sees a realistic remainder.

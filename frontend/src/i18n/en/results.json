@@ -83,5 +83,6 @@
   "accuracy_weak": "Under half of your attempted answers are correct. Accuracy, not coverage, is the thing to work on.",
   "one_result_note": "One published result — a trend needs at least two.",
   "detail_button": "Detail",
-  "left_blank": "Left blank"
+  "left_blank": "Left blank",
+  "reportsPageTitle": "Exam Results / Reports"
 }

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert, Badge, Button, Card, EmptyState, Skeleton, cx, toast } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
+import { entryMatchesRule, ruleSubjectId } from "@/lib/selectionRules";
 import {
   CATEGORY_LABEL,
   QUESTION_TYPE_LABEL,
@@ -58,6 +59,11 @@ export interface GuidedSectionPickerProps {
   sections: SectionDraft[];
   subjects: Subject[];
   examSubjectId: string;
+  /**
+   * The exam's language. Each language is its own standalone question bank, so this is
+   * a hard filter - a rule only ever matches questions authored in this language.
+   */
+  language?: string;
   pool: ExamPool | null;
   onAdd: (sIdx: number, questionIds: string[]) => Promise<void> | void;
   onRemove: (questionId: string) => Promise<void> | void;
@@ -74,16 +80,15 @@ function taskKey(t: Task): string {
 }
 
 function buildTasks(sections: SectionDraft[], subjects: Subject[], examSubjectId: string): Task[] {
-  const bySubjectName = new Map(subjects.map((s) => [s.name, s]));
   const out: Task[] = [];
   sections.forEach((sec, sIdx) => {
     sec.rules.forEach((rule, rIdx) => {
       let subjectId: string | undefined;
       let subjectLabel: string;
-      if (rule.topic) {
-        const match = bySubjectName.get(rule.topic);
-        subjectId = match?.id;
-        subjectLabel = rule.topic;
+      const ruleSubject = ruleSubjectId(rule, subjects);
+      if (ruleSubject) {
+        subjectId = ruleSubject;
+        subjectLabel = subjects.find((s) => s.id === ruleSubject)?.name ?? rule.topic ?? "Subject";
       } else if (rule.category) {
         subjectId = undefined;
         subjectLabel = `Any subject — ${CATEGORY_LABEL[rule.category]}`;
@@ -97,21 +102,26 @@ function buildTasks(sections: SectionDraft[], subjects: Subject[], examSubjectId
   return out;
 }
 
-/** Question ids already committed to this exact (section, rule) - pre-checked, editable. */
-function existingForTask(pool: ExamPool | null, task: Task): string[] {
+/** Question ids already committed to this exact (section, rule) - pre-checked, editable.
+ *
+ * Matched on everything the backend validator checks (type, difficulty, category,
+ * subject, topic), so "10 chosen of 10" here means the publish check agrees. Matching on
+ * type and difficulty alone let a question count as chosen that the rule could not draw. */
+function existingForTask(pool: ExamPool | null, task: Task, subjects: Subject[]): string[] {
   if (!pool || !task.sectionId) return [];
+  // The rule itself, not task.subjectId: an "Any subject" rule searches the exam's
+  // subject for convenience, but must not count as narrowed to it.
   return pool.entries
-    .filter(
-      (e) =>
-        e.section_id === task.sectionId &&
-        e.question_type === task.rule.question_type &&
-        (task.rule.difficulty ? e.difficulty === task.rule.difficulty : true),
-    )
+    .filter((e) => e.section_id === task.sectionId && entryMatchesRule(e, task.rule, subjects))
     .map((e) => e.question_id);
 }
 
-function taskStatus(pool: ExamPool | null, task: Task): "complete" | "partial" | "empty" {
-  const have = existingForTask(pool, task).length;
+function taskStatus(
+  pool: ExamPool | null,
+  task: Task,
+  subjects: Subject[],
+): "complete" | "partial" | "empty" {
+  const have = existingForTask(pool, task, subjects).length;
   if (have >= task.rule.count) return "complete";
   if (have > 0) return "partial";
   return "empty";
@@ -121,6 +131,7 @@ export function GuidedSectionPicker({
   sections,
   subjects,
   examSubjectId,
+  language,
   pool,
   onAdd,
   onRemove,
@@ -138,7 +149,7 @@ export function GuidedSectionPicker({
 
   const task = tasks[taskIndex] as Task | undefined;
 
-  const allDone = tasks.length > 0 && tasks.every((t) => taskStatus(pool, t) === "complete");
+  const allDone = tasks.length > 0 && tasks.every((t) => taskStatus(pool, t, subjects) === "complete");
   useEffect(() => {
     onAllComplete?.(allDone);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -150,6 +161,7 @@ export function GuidedSectionPicker({
     setError(null);
     try {
       const params = new URLSearchParams();
+      if (language) params.set("language", language);
       if (task.subjectId) params.set("subject_id", task.subjectId);
       if (task.rule.category) params.set("category", task.rule.category);
       params.set("question_type", task.rule.question_type);
@@ -157,7 +169,7 @@ export function GuidedSectionPicker({
       params.set("limit", "200");
       const data = await api.get<Question[]>(`/questions?${params.toString()}`);
       setAvailable(data);
-      setSelected(existingForTask(pool, task));
+      setSelected(existingForTask(pool, task, subjects));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not load matching questions.");
       setAvailable([]);
@@ -167,7 +179,7 @@ export function GuidedSectionPicker({
     // pool is read only for the pre-check; re-running on every pool change would fight
     // the user's in-progress checkbox clicks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.sIdx, task?.rIdx, task?.subjectId, task?.rule.category, task?.rule.question_type, task?.rule.difficulty, reloadToken]);
+  }, [language, task?.sIdx, task?.rIdx, task?.subjectId, task?.rule.category, task?.rule.question_type, task?.rule.difficulty, reloadToken]);
 
   useEffect(() => {
     void load();
@@ -186,7 +198,7 @@ export function GuidedSectionPicker({
 
   const already = new Set(
     (pool?.entries ?? [])
-      .filter((e) => !existingForTask(pool, task).includes(e.question_id))
+      .filter((e) => !existingForTask(pool, task, subjects).includes(e.question_id))
       .map((e) => e.question_id),
   );
   const pickable = available.filter((q) => !already.has(q.id));
@@ -196,21 +208,18 @@ export function GuidedSectionPicker({
   const shortfall = pickable.length < requiredCount;
 
   function toggle(id: string) {
-    setSelected((cur) => {
-      if (cur.includes(id)) return cur.filter((x) => x !== id);
-      if (cur.length >= requiredCount) {
-        toast(`Already selected ${requiredCount} of ${requiredCount} - deselect one first`, "amber");
-        return cur;
-      }
-      return [...cur, id];
-    });
+    if (!selected.includes(id) && selected.length >= requiredCount) {
+      toast(`Already selected ${requiredCount} of ${requiredCount} - deselect one first`, "amber");
+      return;
+    }
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   }
 
   async function confirmAndContinue() {
     if (!task || !canContinue) return;
     setSaving(true);
     try {
-      const before = new Set(existingForTask(pool, task));
+      const before = new Set(existingForTask(pool, task, subjects));
       const toAdd = selected.filter((id) => !before.has(id));
       const toRemove = [...before].filter((id) => !selected.includes(id));
       if (toAdd.length) await onAdd(task.sIdx, toAdd);
@@ -229,8 +238,8 @@ export function GuidedSectionPicker({
       {/* progress rail */}
       <div className="space-y-1.5">
         {tasks.map((t, i) => {
-          const status = taskStatus(pool, t);
-          const have = existingForTask(pool, t).length;
+          const status = taskStatus(pool, t, subjects);
+          const have = existingForTask(pool, t, subjects).length;
           return (
             <button
               key={taskKey(t)}

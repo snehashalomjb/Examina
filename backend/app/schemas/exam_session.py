@@ -191,6 +191,17 @@ class ResultDetail(BaseModel):
     cohort_size: int = 0
     time_taken_seconds: int | None = None
 
+    # --- report/PDF fields: candidate identity, timing, proctoring ruling -------
+    candidate_id: uuid.UUID
+    started_at: datetime | None = None
+    exam_language: str | None = None
+    is_flagged: bool = False
+    suspicion_score: float = 0.0
+    integrity_verdict: str = "pending"
+    integrity_reviewed_by_name: str | None = None
+    integrity_reviewed_at: datetime | None = None
+    proctor_event_count: int = 0
+
 
 class CandidateExamCard(BaseModel):
     """A row in the candidate's "my exams" list."""
@@ -220,6 +231,11 @@ class CandidateExamCard(BaseModel):
 
     can_start: bool = False
     reason: str | None = None
+    #: Machine-readable twin of ``reason``: one of "in_progress", "already_attempted",
+    #: "not_published", "opens_later", "window_closed", or null when the exam can start.
+    #: ``reason`` is a fixed English sentence, so a translated UI renders this instead -
+    #: and it stops the client from having to match on English prose.
+    reason_code: str | None = None
     exam_type: ExamType = ExamType.ACADEMIC
     course: str | None = None
     department: str | None = None

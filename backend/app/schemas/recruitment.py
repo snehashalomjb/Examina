@@ -58,6 +58,8 @@ class RankingRow(BaseModel):
     shortlist_status: ShortlistStatus | None = None
     suspicion_score: float = 0.0
     is_flagged: bool = False
+    #: Raw proctor-event count for this sitting - the "Flags" column on the mark list.
+    flag_count: int = 0
     result_id: uuid.UUID | None = None
     session_id: uuid.UUID | None = None
     published: bool = False

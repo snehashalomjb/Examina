@@ -91,6 +91,8 @@ uv venv --python 3.12
 uv pip install -e ".[dev]"
 uv run alembic upgrade head
 uv run python -m app.seed          # sample subjects, questions and exams
+# Existing databases: add the five-language subject labels without reseeding questions
+uv run python -m app.subject_translation_catalog
 uv run uvicorn app.main:app --reload --port 8000
 
 # 4. Frontend

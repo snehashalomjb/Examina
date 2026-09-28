@@ -61,14 +61,19 @@ export function SubjectCombobox({
     () =>
       needle
         ? subjects.filter(
-            (s) => s.name.toLowerCase().includes(needle) || s.code.toLowerCase().includes(needle),
+            (s) =>
+              s.name.toLowerCase().includes(needle) ||
+              (s.base_name ?? "").toLowerCase().includes(needle) ||
+              s.code.toLowerCase().includes(needle),
           )
         : subjects,
     [subjects, needle],
   );
   // Case-insensitive exact match - typing what already exists selects it, never
   // duplicates it, whichever case the examiner happens to use.
-  const exactMatch = subjects.find((s) => s.name.toLowerCase() === needle);
+  const exactMatch = subjects.find(
+    (s) => s.name.toLowerCase() === needle || (s.base_name ?? "").toLowerCase() === needle,
+  );
   const canCreate = needle.length >= 2 && !exactMatch;
 
   function pick(subject: Subject) {
@@ -143,7 +148,9 @@ export function SubjectCombobox({
               </li>
             ))}
             {!filtered.length && !canCreate && (
-              <li className="px-3 py-2 text-[12.5px] text-ink-muted">No subjects match.</li>
+              <li className="px-3 py-2 text-[12.5px] text-ink-muted">
+                {subjects.length ? "No subjects match." : "No subjects available for this language."}
+              </li>
             )}
             {canCreate && (
               <li>

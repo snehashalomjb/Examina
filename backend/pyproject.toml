@@ -35,6 +35,9 @@ dev = [
 openai = [
     "openai>=1.60.0",
 ]
+gemini = [
+    "google-genai>=0.3.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
@@ -63,6 +66,10 @@ ignore = ["B008", "UP042"]
 # question text or papering over it with implicit concatenation. Neither improves a file
 # that is read as content.
 "app/seed.py" = ["E501"]
+"app/seed_question_data.py" = ["E501"]
+"app/seed_question_data_ai.py" = ["E501"]
+"app/seed_question_data_hiring.py" = ["E501"]
+"app/seed_question_data_legacy.py" = ["E501"]
 # Same reasoning, same kind of file: the stub generator's canned questions. Split out of
 # ai_generator.py so that module keeps the full lint and only the prose is exempt.
 "app/services/ai_stub_templates.py" = ["E501"]

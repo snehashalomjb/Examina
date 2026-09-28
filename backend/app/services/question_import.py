@@ -63,7 +63,8 @@ TYPE_ALIASES: dict[str, QuestionType] = {
     "single": QuestionType.MCQ,
     "single choice": QuestionType.MCQ,
     "single select": QuestionType.MCQ,
-    "multiple choice": QuestionType.MCQ,
+    "multiple choice": QuestionType.MULTI_SELECT,
+    "multiple choice question": QuestionType.MULTI_SELECT,
     "multi select": QuestionType.MULTI_SELECT,
     "multiple select": QuestionType.MULTI_SELECT,
     "multi": QuestionType.MULTI_SELECT,
@@ -130,11 +131,11 @@ class ParsedRow:
     #: text named a subject that does not exist - see ``problems`` for that case.
     subject_id: Any | None = None
     subject_name: str | None = None
-    question_type: QuestionType = QuestionType.MCQ
-    difficulty: Difficulty = Difficulty.MEDIUM
+    question_type: QuestionType | None = None
+    difficulty: Difficulty | None = Difficulty.MEDIUM
     category: QuestionCategory = QuestionCategory.ACADEMIC
     topic: str | None = None
-    marks: float = 1.0
+    marks: float | None = 1.0
     negative_marks: float = 0.0
     model_answer: str | None = None
     explanation: str | None = None
@@ -157,8 +158,8 @@ class ParsedRow:
         """The row as a ``QuestionCreate`` body."""
         return {
             "subject_id": subject_id,
-            "question_type": self.question_type.value,
-            "difficulty": self.difficulty.value,
+            "question_type": self.question_type.value if self.question_type is not None else None,
+            "difficulty": self.difficulty.value if self.difficulty is not None else None,
             "category": self.category.value,
             "topic": self.topic,
             "body": self.body,
@@ -230,21 +231,85 @@ def _parse_type(text: str) -> QuestionType | None:
 
 
 def _parse_correct_letters(text: str) -> list[str]:
-    """ "B", "b", "A,C", "A and C", "2" all name options.
+    """Return only answer labels, never letters that happen to occur in prose.
 
-    Numbers are accepted because plenty of question banks are written with 1-based
-    option numbers, and rejecting those would fail files that are perfectly clear.
+    Papers commonly write ``Answer: B. To enforce a relationship...``.  Splitting
+    that whole sentence on whitespace makes the article "a" look like option A,
+    which silently turns a single-choice question into a multi-select one.  A key is
+    therefore accepted when it is a label-only expression, or when it starts with an
+    explicit option label such as ``B.``/``(B)``.  Full option text is handled by
+    :func:`_match_answer_letters` below.
     """
-    found: list[str] = []
-    for token in re.split(r"[,;/&]|\band\b|\s+", text.strip()):
-        token = token.strip().upper().rstrip(".)")
-        if not token:
-            continue
-        if re.fullmatch(r"[A-F]", token):
-            found.append(token)
-        elif re.fullmatch(r"[1-6]", token):
-            found.append(chr(ord("A") + int(token) - 1))
-    return list(dict.fromkeys(found))
+    value = (text or "").strip()
+    if not value:
+        return []
+
+    # The unambiguous forms: "B", "A,C", "A and C", "1/3", and so on.  Restricting
+    # the whole expression to labels is what keeps ordinary answer prose out.
+    key_only = re.fullmatch(
+        r"(?:[A-Fa-f]|[1-6])"
+        r"(?:\s*(?:,|;|/|\||&|\band\b)\s*(?:[A-Fa-f]|[1-6]))*",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if key_only:
+        found: list[str] = []
+        for token in re.split(r"[,;/|]|\band\b|&", value, flags=re.IGNORECASE):
+            token = token.strip().upper()
+            if not token:
+                continue
+            if re.fullmatch(r"[1-6]", token):
+                token = chr(ord("A") + int(token) - 1)
+            if re.fullmatch(r"[A-F]", token) and token not in found:
+                found.append(token)
+        return found
+
+    # A leading explicit label is common when the answer repeats the option text:
+    # "B. To enforce a relationship..." or "(C) SELECT ...".  Stop after that
+    # label; do not scan the explanation for isolated A-F words.
+    leading = re.match(
+        r"^\s*\(?([A-Fa-f])\)?\s*(?:[.):\-]|(?=\s|,|;|/|$))",
+        value,
+    )
+    if leading:
+        return [leading.group(1).upper()]
+    return []
+
+
+def _difficulty_from_text(text: str) -> str | None:
+    match = re.search(r"\b(easy|medium|hard)\b", text or "", re.IGNORECASE)
+    return match.group(1).lower() if match else None
+
+
+def _header_metadata(text: str) -> tuple[str | None, QuestionType | None, str]:
+    """Return ``(difficulty, type, stem)`` from a question header descriptor."""
+    value = (text or "").strip(" \t:;-–—()[]")
+    if not value:
+        return None, None, ""
+
+    difficulty = _difficulty_from_text(value)
+    remainder = value
+    if difficulty:
+        remainder = re.sub(r"\b(?:easy|medium|hard)\b", "", remainder, flags=re.I)
+
+    found_type: QuestionType | None = None
+    # Longest aliases first: "multiple select" must win over "select".
+    aliases = sorted(TYPE_ALIASES, key=len, reverse=True)
+    for alias in aliases:
+        phrase = re.escape(alias).replace(r"\ ", r"[\s_-]+")
+        pattern = rf"(?<!\w){phrase}(?!\w)"
+        if re.search(pattern, remainder, flags=re.I):
+            found_type = TYPE_ALIASES[alias]
+            remainder = re.sub(pattern, "", remainder, flags=re.I)
+            break
+
+    remainder = re.sub(
+        r"\b(?:difficulty|level|type|question)\b\s*[:=]?\s*", "", remainder, flags=re.I
+    )
+    remainder = re.sub(r"^[\s,;:\-–—]+|[\s,;:\-–—]+$", "", remainder)
+    if not difficulty and found_type is None:
+        return None, None, value
+    return difficulty, found_type, remainder
 
 
 def _match_answer_letters(answer_text: str, cells: list[str]) -> list[str]:
@@ -399,8 +464,10 @@ def _row_to_question(
         if not parsed.model_answer:
             parsed.problems.append("A written question needs a model answer to grade against.")
 
-    # --- the same rules the authoring form and the API apply
-    if parsed.ok:
+    # The same validation is used for every source, but only after all source-specific
+    # fields have been interpreted.  A missing type is already a problem, so do not
+    # call validate_question with None and turn a useful preview message into a 500.
+    if parsed.ok and parsed.question_type is not None and parsed.marks is not None:
         try:
             parsed.spec = validate_question(
                 question_type=parsed.question_type,
@@ -573,9 +640,16 @@ def _rows_from_docx(data: bytes) -> list[list[str]]:
 _BULLET_PREFIX = re.compile(r"^[\s•●○◦‣▪✓✔☑☒☐➤►\-–—\*]+")
 
 #: "1. What is X?" / "Q3) What is X?" - the numbering examiners actually type.
-QUESTION_START = re.compile(r"^\s*(?:q(?:uestion)?\s*)?(\d{1,3})\s*[\.\):]\s*(.+)$", re.IGNORECASE)
+QUESTION_START = re.compile(
+    r"^\s*(?:q(?:uestion)?\s*)?(\d{1,3})\s*"
+    r"(?:\(([^)]*)\)|[\.\):\-\u2013\u2014]\s*)(.*)$", re.IGNORECASE
+)
 #: "A. Learning from data" / "(b) Removing data" / "C) ..." - optionally starred correct.
-OPTION_LINE = re.compile(r"^\s*\(?([a-fA-F])\)?\s*[\.\):]?\s*(.+?)\s*(\*)?\s*$")
+#: A delimiter after the letter is required.  Without it, a wrapped stem beginning
+#: with a capital word such as "BY department_id;" is read as option B.
+OPTION_LINE = re.compile(
+    r"^\s*(?:\(([a-fA-F])\)|([a-fA-F])\s*[.):\-])\s*(.+?)\s*(\*)?\s*$"
+)
 #: A True/False option written without a letter at all - just the word on its own line,
 #: which is how a True/False question is commonly laid out ("True" / "False", one per
 #: line) rather than "A. True" / "B. False".
@@ -656,6 +730,9 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
         nonlocal body, options, answer, meta, saw_bare_true, saw_bare_false
         if body is None:
             return
+        # A page break can leave an option or stem unfinished.  Joining the pages is
+        # normally enough, but a repeated page header/footer can otherwise be swallowed
+        # as a continuation.  These are the only lines we deliberately discard.
         cells = [""] * 6
         starred: list[str] = []
         for letter, text, is_correct in options:
@@ -721,7 +798,23 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
         start = QUESTION_START.match(text)
         if start:
             flush()
-            body = start.group(2).strip()
+            header_meta = (start.group(2) or "").strip()
+            body = (start.group(3) or "").strip()
+            # "Question 4 (Easy)" and "Question 4: Easy" are metadata headers,
+            # not question text. Explicit type/difficulty always wins over a section.
+            parsed_difficulty, parsed_type, parsed_body = _header_metadata(
+                header_meta or body
+            )
+            if parsed_difficulty is not None:
+                meta["Difficulty"] = parsed_difficulty
+            if parsed_type is not None:
+                meta["Type"] = parsed_type.value
+            if parsed_body:
+                body = parsed_body
+            elif parsed_difficulty is not None or parsed_type is not None:
+                # Metadata-only forms such as "Question 7: Easy" have no stem on
+                # the header line; the next prose line supplies it.
+                body = ""
             active_section_type, active_section_difficulty = section_type, section_difficulty
             continue
 
@@ -769,12 +862,19 @@ def _rows_from_prose(lines: list[str]) -> list[list[str]]:
 
         option = OPTION_LINE.match(text)
         if option and len(text) < 400:
-            options.append((option.group(1), option.group(2).strip(), bool(option.group(3))))
+            letter = option.group(1) or option.group(2)
+            options.append((letter, option.group(3).strip(), bool(option.group(4))))
             continue
 
-        # A continuation line - part of the question, wrapped. Kept from the raw,
-        # un-stripped text so a body that genuinely starts with a dash is not mangled.
-        body = f"{body} {raw}".strip()
+        # A wrapped line after an option belongs to that option, not to the stem.
+        if answer:
+            answer = f"{answer} {raw}".strip()
+        elif options:
+            letter, option_text, marked = options[-1]
+            options[-1] = (letter, f"{option_text} {raw}".strip(), marked)
+        else:
+            # A continuation before options is part of the question stem.
+            body = f"{body} {raw}".strip()
 
     flush()
     return rows
@@ -797,9 +897,23 @@ def _rows_from_pdf(data: bytes) -> list[list[str]]:
     except Exception as exc:
         raise ImportError_("That file could not be opened as a PDF.") from exc
 
-    lines: list[str] = []
+    page_texts: list[str] = []
     for page in reader.pages:
-        lines.extend((page.extract_text() or "").splitlines())
+        try:
+            # Layout mode preserves the visual order of numbered banks better than
+            # pypdf's default stream order, especially around page breaks.
+            page_text = page.extract_text(extraction_mode="layout") or ""
+        except Exception:
+            page_text = page.extract_text() or ""
+        page_texts.append(page_text)
+
+    def score(value: str) -> int:
+        return len(re.findall(r"(?im)^\s*(?:q(?:uestion)?\s*)?\d{1,3}\b", value))
+
+    text = "\n\n".join(page_texts)
+    if score(text) == 0:
+        text = "\n\n".join((page.extract_text() or "") for page in reader.pages)
+    lines = text.splitlines()
 
     rows = _rows_from_prose(lines)
     if len(rows) < 2:
@@ -856,7 +970,8 @@ def parse_questions(
 
     parsed: list[ParsedRow] = []
     seen: dict[str, int] = {}
-    for offset, row in enumerate(rows[1:], start=2):
+    start_row = 1 if extension == "pdf" else 2
+    for offset, row in enumerate(rows[1:], start=start_row):
         if not any(str(cell or "").strip() for cell in row):
             continue
         item = _row_to_question(offset, list(row), fields, options)

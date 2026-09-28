@@ -30,6 +30,15 @@ def _validate_languages(value: list[str]) -> list[str]:
     return ["en", *dict.fromkeys(ordered)]
 
 
+def _validate_language(value: str | None) -> str | None:
+    """A single exam language, checked against the same six codes as the list form."""
+    if value is None:
+        return None
+    if value not in SUPPORTED_LOCALES:
+        raise ValueError(f"Unsupported language code: {value}")
+    return value
+
+
 class SelectionRule(BaseModel):
     question_type: QuestionType
     difficulty: Difficulty | None = None
@@ -165,10 +174,21 @@ class ExamCreate(BaseModel):
     #: ["en", "hi", "ta"]. "en" is always included even if omitted here.
     enabled_languages: list[str] = Field(default_factory=lambda: ["en"])
 
+    #: The exam's own language - the one the paper is written and sat in, chosen by the
+    #: examiner in Exam Details. A candidate is shown this on first load and may still
+    #: switch to any supported language mid-exam. Separate from ``enabled_languages``,
+    #: which is the switchable set and is normalised to always lead with "en".
+    primary_language: str = "en"
+
     @field_validator("enabled_languages")
     @classmethod
     def _check_languages(cls, value: list[str]) -> list[str]:
         return _validate_languages(value)
+
+    @field_validator("primary_language")
+    @classmethod
+    def _check_primary_language(cls, value: str) -> str:
+        return _validate_language(value) or "en"
 
     @model_validator(mode="after")
     def window_is_sane(self) -> ExamCreate:
@@ -184,6 +204,11 @@ class ExamCreate(BaseModel):
 
 
 class ExamUpdate(BaseModel):
+    #: A saved draft may be rebound to another subject before questions are added.
+    #: Keeping this out of the schema made Pydantic silently discard the field, so the
+    #: wizard appeared to save the selection while the server kept the old subject.
+    subject_id: uuid.UUID | None = None
+
     title: str | None = Field(default=None, min_length=3, max_length=200)
     description: str | None = None
     instructions: str | None = None
@@ -213,11 +238,19 @@ class ExamUpdate(BaseModel):
     job_role: str | None = Field(default=None, max_length=200)
     translations: dict[str, dict[str, str]] | None = None
     enabled_languages: list[str] | None = None
+    #: Changing an exam's language after questions are pooled is allowed - the pool is
+    #: language-agnostic, and the paper re-renders from the exam's language on load.
+    primary_language: str | None = None
 
     @field_validator("enabled_languages")
     @classmethod
     def _check_languages(cls, value: list[str] | None) -> list[str] | None:
         return _validate_languages(value) if value is not None else None
+
+    @field_validator("primary_language")
+    @classmethod
+    def _check_primary_language(cls, value: str | None) -> str | None:
+        return _validate_language(value)
 
 
 class ExamOut(ORMModel):
@@ -261,6 +294,9 @@ class ExamOut(ORMModel):
     #: Language codes the candidate's selector offers for this exam. Always leads with
     #: "en". Read from ``Exam.languages`` (derived from ``enabled_languages``).
     languages: list[str] = Field(default_factory=lambda: ["en"])
+    #: The exam's own language, as chosen in Exam Details. This is what the paper is
+    #: rendered in when the candidate has not switched away from it.
+    primary_language: str = "en"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

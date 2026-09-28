@@ -1,0 +1,1709 @@
+2026-09-25 16:10:44 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-25 16:10:45 | INFO     | exam.app                     | Starting AI-Based Intelligent Examination Platform (development)
+2026-09-25 16:10:45 | INFO     | exam.app                     | Object storage ready: bucket exam-media
+2026-09-25 16:10:45 | INFO     | exam.app                     | Session sweeper started (every 60s)
+INFO:     127.0.0.1:63584 - "POST /api/v1/sessions/890a9d87-4b7f-40c3-8090-ea8a2bff4439/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63586 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /health HTTP/1.1" 200 OK
+2026-09-25 16:11:12 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:63596 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63597 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63598 - "POST /api/v1/exams HTTP/1.1" 422 Unprocessable Entity
+2026-09-25 16:11:18 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:63603 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63604 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63605 - "POST /api/v1/exams HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:61525 - "POST /api/v1/sessions/890a9d87-4b7f-40c3-8090-ea8a2bff4439/heartbeat HTTP/1.1" 200 OK
+2026-09-25 16:11:32 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:61533 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61534 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:11:32 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam c4abfb1a'
+INFO:     127.0.0.1:61535 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:11:32 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:61536 - "POST /api/v1/questions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:61537 - "POST /api/v1/exams/3b989a91-79ef-438b-95f0-dd42fe8e74c5/questions HTTP/1.1" 422 Unprocessable Entity
+2026-09-25 16:11:32 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:61538 - "POST /api/v1/questions HTTP/1.1" 201 Created
+INFO:     127.0.0.1:61539 - "POST /api/v1/exams/3b989a91-79ef-438b-95f0-dd42fe8e74c5/questions HTTP/1.1" 422 Unprocessable Entity
+2026-09-25 16:11:32 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:61540 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:11:32 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:61541 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:11:32 | INFO     | exam.auth                    | Login: candidate2@exam.edu (candidate/revoked, login=rejected)
+INFO:     127.0.0.1:61542 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61543 - "GET /api/v1/candidates HTTP/1.1" 404 Not Found
+2026-09-25 16:11:39 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:61552 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61553 - "GET /api/v1/candidates HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:61558 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61566 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50420 - "POST /api/v1/sessions/890a9d87-4b7f-40c3-8090-ea8a2bff4439/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50431 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50432 - "GET /openapi.json HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:50445 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50446 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam c2203fc0'
+INFO:     127.0.0.1:50447 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:12:15 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:50449 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:12:15 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 8c4c3687-5813-4c2a-b64f-245517d56326
+INFO:     127.0.0.1:50450 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/questions HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:50451 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:12:15 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 8c4c3687-5813-4c2a-b64f-245517d56326
+INFO:     127.0.0.1:50453 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/questions HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:50454 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:12:15 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:50455 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.auth                    | Login: candidate2@exam.edu (candidate/revoked, login=rejected)
+INFO:     127.0.0.1:50456 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50457 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam c2203fc0'
+INFO:     127.0.0.1:50458 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.exams                   | examiner@exam.edu published exam 8c4c3687-5813-4c2a-b64f-245517d56326 ('Multilingual Audit Exam c2203fc0')
+INFO:     127.0.0.1:50459 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/publish HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | INFO     | exam.exam                    | Session d2087ecb-fcbc-4f7d-aca4-2da4bba95668 started: exam='Multilingual Audit Exam c2203fc0' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:42:15.763655+00:00
+INFO:     127.0.0.1:50460 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50461 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50462 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+2026-09-25 16:12:15 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:50463 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50464 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+2026-09-25 16:12:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:50465 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50466 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+2026-09-25 16:12:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:50467 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50468 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+2026-09-25 16:12:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:50469 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50470 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+2026-09-25 16:12:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:50471 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:12:16 | WARNING  | exam.auth                    | Access gate blocked candidate2@exam.edu (candidate, status=revoked)
+INFO:     127.0.0.1:50472 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:12:16 | WARNING  | exam.auth                    | Access gate blocked candidate2@exam.edu (candidate, status=revoked)
+INFO:     127.0.0.1:50473 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:12:16 | WARNING  | exam.auth                    | Access gate blocked candidate2@exam.edu (candidate, status=revoked)
+INFO:     127.0.0.1:50474 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:50475 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:50476 - "GET /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50477 - "GET /api/v1/questions?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50478 - "POST /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50479 - "PUT /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/answers/ee538e1a-2366-468a-96af-28b053e8fa1c HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50480 - "POST /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/submit HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50481 - "POST /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/result/publish HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:50482 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50483 - "DELETE /api/v1/exams/8c4c3687-5813-4c2a-b64f-245517d56326 HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:53250 - "POST /api/v1/sessions/890a9d87-4b7f-40c3-8090-ea8a2bff4439/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57613 - "POST /api/v1/sessions/890a9d87-4b7f-40c3-8090-ea8a2bff4439/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61349 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58452 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61349 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61349 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58452 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61349 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58452 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63090 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58452 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61349 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63090 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58452 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:13:32 | INFO     | exam.auth                    | Profile updated for snehashalomjb@gmail.com
+INFO:     127.0.0.1:57990 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:13:34 | INFO     | exam.auth                    | Profile updated for snehashalomjb@gmail.com
+INFO:     127.0.0.1:57990 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "OPTIONS /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "OPTIONS /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "OPTIONS /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "OPTIONS /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57990 - "GET /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60711 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51710 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+2026-09-25 16:13:44 | INFO     | exam.auth                    | Profile updated for snehashalomjb@gmail.com
+INFO:     127.0.0.1:52457 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52979 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52979 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54600 - "GET /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56128 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52457 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:54726 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54727 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 2ba5a2ce'
+INFO:     127.0.0.1:54728 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:14:45 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:54729 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:14:45 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 6f5d7ef9-59d4-41e0-8a45-9b0481c169b8
+INFO:     127.0.0.1:54730 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/questions HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:54731 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:14:45 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 6f5d7ef9-59d4-41e0-8a45-9b0481c169b8
+INFO:     127.0.0.1:54732 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/questions HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:54733 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:14:45 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:54734 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | INFO     | exam.auth                    | Login: candidate3@exam.edu (candidate/approved, login=rejected)
+INFO:     127.0.0.1:54735 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54736 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:14:45 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 2ba5a2ce'
+INFO:     127.0.0.1:54737 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:14:46 | INFO     | exam.exams                   | examiner@exam.edu published exam 6f5d7ef9-59d4-41e0-8a45-9b0481c169b8 ('Multilingual Audit Exam 2ba5a2ce')
+INFO:     127.0.0.1:54738 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54739 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54740 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54741 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54742 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54743 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:14:46 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54744 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54745 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54746 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:14:46 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54747 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54748 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54749 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:14:46 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54750 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54751 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54752 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:14:47 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54753 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54754 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:54755 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:14:47 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54756 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:14:47 | WARNING  | exam.auth                    | Login-approval gate blocked candidate3@exam.edu (status=rejected)
+INFO:     127.0.0.1:54758 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:14:47 | WARNING  | exam.auth                    | Login-approval gate blocked candidate3@exam.edu (status=rejected)
+INFO:     127.0.0.1:54759 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:14:47 | WARNING  | exam.auth                    | Login-approval gate blocked candidate3@exam.edu (status=rejected)
+INFO:     127.0.0.1:54760 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:54761 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:54762 - "GET /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54763 - "GET /api/v1/questions/c29752fe-558b-439f-964f-1c8e022a609a HTTP/1.1" 200 OK
+2026-09-25 16:14:47 | WARNING  | exam.auth                    | Login-approval gate blocked candidate3@exam.edu (status=rejected)
+INFO:     127.0.0.1:54764 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:54765 - "POST /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8/start HTTP/1.1" 409 Conflict
+2026-09-25 16:14:47 | WARNING  | exam.exams                   | examiner@exam.edu deleted exam 'Multilingual Audit Exam 2ba5a2ce'
+INFO:     127.0.0.1:54766 - "DELETE /api/v1/exams/6f5d7ef9-59d4-41e0-8a45-9b0481c169b8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58086 - "GET /openapi.json HTTP/1.1" 200 OK
+2026-09-25 16:16:29 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:58105 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58106 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:16:29 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 7d4fb072'
+INFO:     127.0.0.1:58107 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:16:29 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58108 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:16:29 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam fd4057b7-b916-4bfe-8063-11034dc7142b
+INFO:     127.0.0.1:58109 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/questions HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58110 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:16:30 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam fd4057b7-b916-4bfe-8063-11034dc7142b
+INFO:     127.0.0.1:58111 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/questions HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:58112 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:16:30 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:58113 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58114 - "POST /api/v1/auth/register HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:58115 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 7d4fb072'
+INFO:     127.0.0.1:58116 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | INFO     | exam.exams                   | examiner@exam.edu published exam fd4057b7-b916-4bfe-8063-11034dc7142b ('Multilingual Audit Exam 7d4fb072')
+INFO:     127.0.0.1:58117 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58118 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58119 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58120 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58121 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58122 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58123 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58124 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58125 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58126 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58127 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58128 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:30 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58129 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58130 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58131 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:31 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58132 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58133 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:58134 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:31 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58135 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58136 - "GET /api/v1/my/exams HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58137 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58138 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:58139 - "GET /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58140 - "GET /api/v1/questions/54a0f125-1073-4274-b051-a6acfa5a6ed1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58141 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58142 - "POST /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b/start HTTP/1.1" 409 Conflict
+2026-09-25 16:16:31 | WARNING  | exam.exams                   | examiner@exam.edu deleted exam 'Multilingual Audit Exam 7d4fb072'
+INFO:     127.0.0.1:58143 - "DELETE /api/v1/exams/fd4057b7-b916-4bfe-8063-11034dc7142b HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:58157 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58158 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 504f24a9'
+INFO:     127.0.0.1:58159 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:16:54 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58160 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:16:54 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 966c6577-7583-49db-828d-d16fff88e93b
+INFO:     127.0.0.1:58161 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/questions HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58162 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:16:54 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 966c6577-7583-49db-828d-d16fff88e93b
+INFO:     127.0.0.1:58163 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/questions HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:58164 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:16:54 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:58165 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | INFO     | exam.auth                    | Registered mlprobe-504f24a9@test.edu as candidate (account approved)
+INFO:     127.0.0.1:58166 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:16:54 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:58167 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58168 - "PATCH /api/v1/admin/users/d8606125-7f05-423e-bdd3-abe957684d80/access HTTP/1.1" 422 Unprocessable Entity
+2026-09-25 16:16:54 | INFO     | exam.login-access            | Login approval requested for mlprobe-504f24a9@test.edu (d8606125-7f05-423e-bdd3-abe957684d80) - awaiting review
+2026-09-25 16:16:54 | INFO     | exam.auth                    | Login: mlprobe-504f24a9@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:58169 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58170 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58171 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/enrollments HTTP/1.1" 422 Unprocessable Entity
+2026-09-25 16:16:54 | INFO     | exam.exams                   | examiner@exam.edu published exam 966c6577-7583-49db-828d-d16fff88e93b ('Multilingual Audit Exam 504f24a9')
+INFO:     127.0.0.1:58172 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/publish HTTP/1.1" 200 OK
+2026-09-25 16:16:54 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58173 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58174 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58175 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=en HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58176 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58177 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58178 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=te HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58179 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58180 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58181 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=hi HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58182 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58183 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58184 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ta HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58185 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58186 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58187 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=ml HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58188 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58189 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58190 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-504f24a9@test.edu (status=pending)
+INFO:     127.0.0.1:58191 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:16:55 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-504f24a9@test.edu (status=pending)
+INFO:     127.0.0.1:58192 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:16:55 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-504f24a9@test.edu (status=pending)
+INFO:     127.0.0.1:58193 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58194 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:58195 - "GET /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58196 - "GET /api/v1/questions/4191c34d-b3e8-47ce-b287-c888337e8d15 HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-504f24a9@test.edu (status=pending)
+INFO:     127.0.0.1:58197 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:16:55 | WARNING  | exam.exam                    | Candidate 2e4e8b71-06a3-424d-af98-e3eb9740706c tried to start exam 966c6577-7583-49db-828d-d16fff88e93b without an enrolment
+INFO:     127.0.0.1:58198 - "POST /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58199 - "GET /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58200 - "PUT /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/answers/ee538e1a-2366-468a-96af-28b053e8fa1c HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | INFO     | exam.exam                    | Session d2087ecb-fcbc-4f7d-aca4-2da4bba95668 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:58201 - "POST /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/submit HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam c2203fc0'
+INFO:     127.0.0.1:58202 - "POST /api/v1/sessions/d2087ecb-fcbc-4f7d-aca4-2da4bba95668/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58203 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+2026-09-25 16:16:55 | WARNING  | exam.exams                   | examiner@exam.edu deleted exam 'Multilingual Audit Exam 504f24a9'
+INFO:     127.0.0.1:58204 - "DELETE /api/v1/exams/966c6577-7583-49db-828d-d16fff88e93b HTTP/1.1" 200 OK
+2026-09-25 16:17:15 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:58215 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58216 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:17:15 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 8c3a6723'
+INFO:     127.0.0.1:58217 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:17:15 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58218 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:17:15 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 5a450d76-6569-4694-b93f-e06631bed440
+INFO:     127.0.0.1:58219 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/questions HTTP/1.1" 200 OK
+2026-09-25 16:17:15 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:58220 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:17:15 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 5a450d76-6569-4694-b93f-e06631bed440
+INFO:     127.0.0.1:58221 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/questions HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:58222 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:16 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:58223 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.auth                    | Registered mlprobe-8c3a6723@test.edu as candidate (account approved)
+INFO:     127.0.0.1:58224 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:17:16 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:58225 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.admin                   | Admin admin@exam.edu changed access for mlprobe-8c3a6723@test.edu: approved -> approved (no note)
+INFO:     127.0.0.1:58226 - "PATCH /api/v1/admin/users/325bf57a-43d3-41f5-94d8-a37601ddec16/access HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.login-access            | Login approval requested for mlprobe-8c3a6723@test.edu (325bf57a-43d3-41f5-94d8-a37601ddec16) - awaiting review
+2026-09-25 16:17:16 | INFO     | exam.auth                    | Login: mlprobe-8c3a6723@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:58227 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58228 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 8c3a6723'
+INFO:     127.0.0.1:58229 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.exams                   | examiner@exam.edu published exam 5a450d76-6569-4694-b93f-e06631bed440 ('Multilingual Audit Exam 8c3a6723')
+INFO:     127.0.0.1:58230 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/publish HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | INFO     | exam.exam                    | Session e4783f39-7ed3-46e0-b736-c2d490604051 started: exam='Multilingual Audit Exam 8c3a6723' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:47:16.469043+00:00
+INFO:     127.0.0.1:58231 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58232 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58233 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58234 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58235 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58236 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58237 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58238 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58239 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+2026-09-25 16:17:16 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58240 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58241 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+2026-09-25 16:17:17 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58242 - "GET /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:17:17 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-8c3a6723@test.edu (status=pending)
+INFO:     127.0.0.1:58243 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:17 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-8c3a6723@test.edu (status=pending)
+INFO:     127.0.0.1:58244 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:17 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-8c3a6723@test.edu (status=pending)
+INFO:     127.0.0.1:58245 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58246 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:58247 - "GET /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58248 - "GET /api/v1/questions/a9f96b32-140d-4927-954c-67245793e03e HTTP/1.1" 200 OK
+2026-09-25 16:17:17 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-8c3a6723@test.edu (status=pending)
+INFO:     127.0.0.1:58249 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:58250 - "POST /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58251 - "PUT /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051/answers/bf3a5d7f-ea8f-4aec-8662-a870cb08b148 HTTP/1.1" 200 OK
+2026-09-25 16:17:17 | INFO     | exam.exam                    | Session e4783f39-7ed3-46e0-b736-c2d490604051 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:58252 - "POST /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051/submit HTTP/1.1" 200 OK
+2026-09-25 16:17:17 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam 8c3a6723'
+INFO:     127.0.0.1:58253 - "POST /api/v1/sessions/e4783f39-7ed3-46e0-b736-c2d490604051/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58254 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58255 - "DELETE /api/v1/exams/5a450d76-6569-4694-b93f-e06631bed440 HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:60665 - "GET /openapi.json HTTP/1.1" 200 OK
+2026-09-25 16:17:35 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:55439 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55440 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:17:35 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 1b6b1db4'
+INFO:     127.0.0.1:55441 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:17:36 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:55442 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:17:36 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 297acd5c-0de8-4f9e-92e2-d49574773cc4
+INFO:     127.0.0.1:55443 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/questions HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:55444 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:17:36 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 297acd5c-0de8-4f9e-92e2-d49574773cc4
+INFO:     127.0.0.1:55445 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/questions HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:55446 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:36 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:55447 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.auth                    | Registered mlprobe-1b6b1db4@test.edu as candidate (account approved)
+INFO:     127.0.0.1:55448 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:17:36 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:55449 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.admin                   | Admin admin@exam.edu changed access for mlprobe-1b6b1db4@test.edu: approved -> approved (no note)
+INFO:     127.0.0.1:55450 - "PATCH /api/v1/admin/users/eaf152c8-e5cf-4f7c-8a7b-0934e47e7fdd/access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55451 - "GET /api/v1/login-requests HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.login-access            | Login approval requested for mlprobe-1b6b1db4@test.edu (eaf152c8-e5cf-4f7c-8a7b-0934e47e7fdd) - awaiting review
+2026-09-25 16:17:36 | INFO     | exam.auth                    | Login: mlprobe-1b6b1db4@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:55452 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55453 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 1b6b1db4'
+INFO:     127.0.0.1:55454 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.exams                   | examiner@exam.edu published exam 297acd5c-0de8-4f9e-92e2-d49574773cc4 ('Multilingual Audit Exam 1b6b1db4')
+INFO:     127.0.0.1:55455 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/publish HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | INFO     | exam.exam                    | Session bf7b63a7-c685-434c-9788-c148c0ce0097 started: exam='Multilingual Audit Exam 1b6b1db4' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:47:36.673297+00:00
+INFO:     127.0.0.1:55456 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55457 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55458 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55459 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55460 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+2026-09-25 16:17:36 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55461 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55462 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55463 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55464 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55465 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55466 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55467 - "GET /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-1b6b1db4@test.edu (status=pending)
+INFO:     127.0.0.1:55468 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:37 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-1b6b1db4@test.edu (status=pending)
+INFO:     127.0.0.1:55469 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:17:37 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-1b6b1db4@test.edu (status=pending)
+INFO:     127.0.0.1:55470 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:55471 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:55472 - "GET /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55473 - "GET /api/v1/questions/e2979efc-7288-45e0-becc-3dbc94a880b7 HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-1b6b1db4@test.edu (status=pending)
+INFO:     127.0.0.1:55474 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:55475 - "POST /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55476 - "PUT /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097/answers/4d65f836-2c29-4e43-b811-37b5bf84635c HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | INFO     | exam.exam                    | Session bf7b63a7-c685-434c-9788-c148c0ce0097 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:55477 - "POST /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097/submit HTTP/1.1" 200 OK
+2026-09-25 16:17:37 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam 1b6b1db4'
+INFO:     127.0.0.1:55478 - "POST /api/v1/sessions/bf7b63a7-c685-434c-9788-c148c0ce0097/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55479 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55480 - "DELETE /api/v1/exams/297acd5c-0de8-4f9e-92e2-d49574773cc4 HTTP/1.1" 409 Conflict
+2026-09-25 16:18:08 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:55497 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55498 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:18:08 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 77f6437f'
+INFO:     127.0.0.1:55499 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:18:08 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:55500 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:18:09 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 692b9f31-6e9d-46da-9003-4a355f420fe4
+INFO:     127.0.0.1:55501 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/questions HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:55502 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:18:09 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 692b9f31-6e9d-46da-9003-4a355f420fe4
+INFO:     127.0.0.1:55503 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/questions HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:55504 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:18:09 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:55505 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.auth                    | Registered mlprobe-77f6437f@test.edu as candidate (account approved)
+INFO:     127.0.0.1:55506 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:18:09 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:55507 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.admin                   | Admin admin@exam.edu changed access for mlprobe-77f6437f@test.edu: approved -> approved (no note)
+INFO:     127.0.0.1:55508 - "PATCH /api/v1/admin/users/30d42d9f-018e-4b19-96f1-fd3704b3a740/access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55509 - "GET /api/v1/login-requests HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.login-access            | Login approval requested for mlprobe-77f6437f@test.edu (30d42d9f-018e-4b19-96f1-fd3704b3a740) - awaiting review
+2026-09-25 16:18:09 | INFO     | exam.auth                    | Login: mlprobe-77f6437f@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:55510 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55511 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 77f6437f'
+INFO:     127.0.0.1:55512 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/enrollments HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.exams                   | examiner@exam.edu published exam 692b9f31-6e9d-46da-9003-4a355f420fe4 ('Multilingual Audit Exam 77f6437f')
+INFO:     127.0.0.1:55513 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/publish HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | INFO     | exam.exam                    | Session 6140bed6-4aef-4d55-9c11-48423ec20db5 started: exam='Multilingual Audit Exam 77f6437f' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:48:09.823457+00:00
+INFO:     127.0.0.1:55514 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55515 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55516 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+2026-09-25 16:18:09 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55517 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55518 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55519 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55520 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55521 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55522 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55523 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55524 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:55525 - "GET /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-77f6437f@test.edu (status=pending)
+INFO:     127.0.0.1:55526 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 403 Forbidden
+2026-09-25 16:18:10 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-77f6437f@test.edu (status=pending)
+INFO:     127.0.0.1:55527 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:18:10 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-77f6437f@test.edu (status=pending)
+INFO:     127.0.0.1:55528 - "GET /api/v1/sessions/None?lang=te HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:55529 - "GET /api/v1/sessions/None HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:55530 - "GET /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55531 - "GET /api/v1/questions/86c77b21-8493-4cc3-ad9d-e99e7ed749e5 HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | WARNING  | exam.auth                    | Login-approval gate blocked mlprobe-77f6437f@test.edu (status=pending)
+INFO:     127.0.0.1:55532 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:55533 - "POST /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55534 - "PUT /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5/answers/86c77b21-8493-4cc3-ad9d-e99e7ed749e5 HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | INFO     | exam.exam                    | Session 6140bed6-4aef-4d55-9c11-48423ec20db5 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:55535 - "POST /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5/submit HTTP/1.1" 200 OK
+2026-09-25 16:18:10 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam 77f6437f'
+INFO:     127.0.0.1:55536 - "POST /api/v1/sessions/6140bed6-4aef-4d55-9c11-48423ec20db5/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55537 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55538 - "DELETE /api/v1/exams/692b9f31-6e9d-46da-9003-4a355f420fe4 HTTP/1.1" 409 Conflict
+2026-09-25 16:18:17 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:55550 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55551 - "GET /api/v1/login-requests HTTP/1.1" 200 OK
+2026-09-25 16:18:43 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:54030 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54031 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:18:43 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam ad8b7971'
+INFO:     127.0.0.1:54032 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:18:43 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:54033 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:18:43 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6
+INFO:     127.0.0.1:54034 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/questions HTTP/1.1" 200 OK
+2026-09-25 16:18:43 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:54035 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:18:43 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam 3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6
+INFO:     127.0.0.1:54036 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/questions HTTP/1.1" 200 OK
+2026-09-25 16:18:43 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:54037 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:18:43 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:54038 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.auth                    | Registered mlprobe-ad8b7971@test.edu as candidate (account approved)
+INFO:     127.0.0.1:54039 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:18:44 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:54040 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.admin                   | Admin admin@exam.edu changed access for mlprobe-ad8b7971@test.edu: approved -> approved (no note)
+INFO:     127.0.0.1:54041 - "PATCH /api/v1/admin/users/197cde23-9ef4-4ce6-b68e-01b9babfe486/access HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.login-access            | Login approval requested for mlprobe-ad8b7971@test.edu (197cde23-9ef4-4ce6-b68e-01b9babfe486) - awaiting review
+2026-09-25 16:18:44 | INFO     | exam.auth                    | Login: mlprobe-ad8b7971@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:54042 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:54043 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54044 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam ad8b7971'
+INFO:     127.0.0.1:54045 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/enrollments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54046 - "GET /api/v1/login-requests HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.login-access            | admin@exam.edu (admin) set login access for mlprobe-ad8b7971@test.edu: pending -> approved (no note)
+INFO:     127.0.0.1:54047 - "POST /api/v1/login-requests/75ddb083-c5c5-4a3d-9568-5e5d3a2c260b/approve HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.auth                    | Login: mlprobe-ad8b7971@test.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:54048 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.exams                   | examiner@exam.edu published exam 3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6 ('Multilingual Audit Exam ad8b7971')
+INFO:     127.0.0.1:54049 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/publish HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | INFO     | exam.exam                    | Session 6208f316-4a4c-4676-b370-706263446ca9 started: exam='Multilingual Audit Exam ad8b7971' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:48:44.675996+00:00
+INFO:     127.0.0.1:54050 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54051 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54052 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54053 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54054 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:44 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54055 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54056 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54057 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54058 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54059 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54060 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54061 - "GET /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | INFO     | exam.exam                    | Session f93319d5-ec25-4ea2-93f8-0f927509810e started: exam='Multilingual Audit Exam ad8b7971' candidate=197cde23-9ef4-4ce6-b68e-01b9babfe486 questions=2 expires=2026-09-25T11:48:45.296002+00:00
+INFO:     127.0.0.1:54062 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:54063 - "GET /api/v1/sessions/f93319d5-ec25-4ea2-93f8-0f927509810e?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54064 - "GET /api/v1/sessions/f93319d5-ec25-4ea2-93f8-0f927509810e HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54065 - "GET /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54066 - "GET /api/v1/questions/9c6a19d7-215c-423b-a426-6a4b794be113 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54067 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | INFO     | exam.exam                    | Session f93319d5-ec25-4ea2-93f8-0f927509810e finalised as submitted: 0 auto-scored, 0 queued for review
+INFO:     127.0.0.1:54068 - "POST /api/v1/sessions/f93319d5-ec25-4ea2-93f8-0f927509810e/submit HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54069 - "POST /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54070 - "PUT /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9/answers/144fa82f-9385-4515-b7ba-89973fcf43f7 HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | INFO     | exam.exam                    | Session 6208f316-4a4c-4676-b370-706263446ca9 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:54071 - "POST /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9/submit HTTP/1.1" 200 OK
+2026-09-25 16:18:45 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam ad8b7971'
+INFO:     127.0.0.1:54072 - "POST /api/v1/sessions/6208f316-4a4c-4676-b370-706263446ca9/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54073 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54074 - "DELETE /api/v1/exams/3ba0df5f-bf7e-4b6f-a8bd-d3e0c68707d6 HTTP/1.1" 409 Conflict
+2026-09-25 16:19:31 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:63785 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63786 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+2026-09-25 16:19:31 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Multilingual Audit Exam 2dd06faa'
+INFO:     127.0.0.1:63787 - "POST /api/v1/exams HTTP/1.1" 201 Created
+2026-09-25 16:19:31 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:63788 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:19:31 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam a05d0f77-5d20-4a57-b92b-48dbcb11a080
+INFO:     127.0.0.1:63789 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/questions HTTP/1.1" 200 OK
+2026-09-25 16:19:31 | INFO     | exam.questions               | examiner@exam.edu added a mcq question (bank)
+INFO:     127.0.0.1:63790 - "POST /api/v1/questions HTTP/1.1" 201 Created
+2026-09-25 16:19:31 | INFO     | exam.exams                   | examiner@exam.edu added 1 question(s) to exam a05d0f77-5d20-4a57-b92b-48dbcb11a080
+INFO:     127.0.0.1:63791 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/questions HTTP/1.1" 200 OK
+2026-09-25 16:19:31 | WARNING  | exam.auth                    | Role denied: examiner@exam.edu (examiner) tried a candidate-only route
+INFO:     127.0.0.1:63792 - "GET /api/v1/my/exams HTTP/1.1" 403 Forbidden
+2026-09-25 16:19:31 | INFO     | exam.auth                    | Login: candidate1@exam.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:63793 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:19:31 | INFO     | exam.auth                    | Registered mlprobe-2dd06faa@test.edu as candidate (account approved)
+INFO:     127.0.0.1:63794 - "POST /api/v1/auth/register HTTP/1.1" 201 Created
+2026-09-25 16:19:31 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:63795 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:19:31 | INFO     | exam.admin                   | Admin admin@exam.edu changed access for mlprobe-2dd06faa@test.edu: approved -> approved (no note)
+INFO:     127.0.0.1:63796 - "PATCH /api/v1/admin/users/c5efe216-9fe2-4a73-a625-8fbaff063198/access HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.login-access            | Login approval requested for mlprobe-2dd06faa@test.edu (c5efe216-9fe2-4a73-a625-8fbaff063198) - awaiting review
+2026-09-25 16:19:32 | INFO     | exam.auth                    | Login: mlprobe-2dd06faa@test.edu (candidate/approved, login=pending)
+INFO:     127.0.0.1:63797 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+INFO:     127.0.0.1:63798 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63799 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.login-access            | examiner@exam.edu enrolled 2 candidate(s) in 'Multilingual Audit Exam 2dd06faa'
+INFO:     127.0.0.1:63800 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/enrollments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63801 - "GET /api/v1/login-requests HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.login-access            | admin@exam.edu (admin) set login access for mlprobe-2dd06faa@test.edu: pending -> approved (no note)
+INFO:     127.0.0.1:63802 - "POST /api/v1/login-requests/792bc23f-bb22-4c66-a5ad-4aa9276c0d21/approve HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.auth                    | Login: mlprobe-2dd06faa@test.edu (candidate/approved, login=approved)
+INFO:     127.0.0.1:63803 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.exams                   | examiner@exam.edu published exam a05d0f77-5d20-4a57-b92b-48dbcb11a080 ('Multilingual Audit Exam 2dd06faa')
+INFO:     127.0.0.1:63804 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/publish HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | INFO     | exam.exam                    | Session 5795e198-d29d-49b1-a063-daf559d079b0 started: exam='Multilingual Audit Exam 2dd06faa' candidate=2e4e8b71-06a3-424d-af98-e3eb9740706c questions=2 expires=2026-09-25T11:49:32.402642+00:00
+INFO:     127.0.0.1:63805 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63806 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63807 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63808 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63809 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63810 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63811 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63812 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=ta HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63813 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63814 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63815 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:32 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63816 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=kn HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | INFO     | exam.exam                    | Session 0118fd90-ad2b-4173-9b68-2f69ef7b6a41 started: exam='Multilingual Audit Exam 2dd06faa' candidate=c5efe216-9fe2-4a73-a625-8fbaff063198 questions=2 expires=2026-09-25T11:49:33.005808+00:00
+INFO:     127.0.0.1:63817 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63819 - "GET /api/v1/sessions/0118fd90-ad2b-4173-9b68-2f69ef7b6a41?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63820 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63821 - "GET /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63822 - "GET /api/v1/questions/90c407f5-ff9d-4567-bdaa-f880cf9e63f0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63823 - "POST /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080/start HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | INFO     | exam.exam                    | Session 0118fd90-ad2b-4173-9b68-2f69ef7b6a41 finalised as submitted: 0 auto-scored, 0 queued for review
+INFO:     127.0.0.1:63825 - "POST /api/v1/sessions/0118fd90-ad2b-4173-9b68-2f69ef7b6a41/submit HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:63826 - "GET /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63827 - "PUT /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0/answers/8f7ae726-d538-42d7-9d5f-9926f0c7669c HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | INFO     | exam.exam                    | Session 5795e198-d29d-49b1-a063-daf559d079b0 finalised as submitted: 1 auto-scored, 0 queued for review
+INFO:     127.0.0.1:63828 - "POST /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0/submit HTTP/1.1" 200 OK
+2026-09-25 16:19:33 | INFO     | exam.grading                 | examiner@exam.edu published the result for candidate1@exam.edu on 'Multilingual Audit Exam 2dd06faa'
+INFO:     127.0.0.1:63829 - "POST /api/v1/sessions/5795e198-d29d-49b1-a063-daf559d079b0/result/publish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63830 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63831 - "DELETE /api/v1/exams/a05d0f77-5d20-4a57-b92b-48dbcb11a080 HTTP/1.1" 409 Conflict
+INFO:     127.0.0.1:57382 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50784 - "GET /health HTTP/1.1" 200 OK
+2026-09-25 16:49:39 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:63905 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63906 - "GET /api/v1/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63907 - "GET /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63908 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63909 - "GET /api/v1/grading/queue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63910 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63911 - "GET /api/v1/languages HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49921 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54527 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54527 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "OPTIONS /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "OPTIONS /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56090 - "OPTIONS /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53034 - "OPTIONS /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53304 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53672 - "OPTIONS /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56090 - "GET /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58548 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54527 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52500 - "GET /api/v1/my/performance-analysis HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56090 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58548 - "GET /api/v1/my/results HTTP/1.1" 200 OK
+2026-09-25 16:54:45 | INFO     | exam.exam                    | Session 890a9d87-4b7f-40c3-8090-ea8a2bff4439 finalised as auto_submitted: 0 auto-scored, 0 queued for review
+2026-09-25 16:54:45 | INFO     | exam.exam                    | Sweeper auto-submitted 1 expired session(s)
+INFO:     127.0.0.1:64203 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60230 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 17:02:36 | INFO     | exam.auth                    | Login: jenslinmano@gmail.com (candidate/approved, login=approved)
+INFO:     127.0.0.1:60230 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60230 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63124 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58304 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60230 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63124 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58304 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64746 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60180 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54187 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62754 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61066 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58904 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60109 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61066 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54597 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55667 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+2026-09-25 17:03:30 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:61078 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61078 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58494 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56137 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61078 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61090 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58494 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64001 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63695 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56137 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61078 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64001 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63695 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56137 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61090 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61078 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64001 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63695 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56137 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58494 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56137 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "OPTIONS /api/v1/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "OPTIONS /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51090 - "OPTIONS /api/v1/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "OPTIONS /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51090 - "GET /api/v1/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51090 - "OPTIONS /api/v1/exams/9ad0b6a7-e10b-4ae1-b1e9-b893b495ea4a/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63916 - "OPTIONS /api/v1/exams/31f0285f-d9bd-4eaf-998a-899777f72edc/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60191 - "OPTIONS /api/v1/exams/eea83a5a-8d27-498e-a4ab-62d20ff479f4/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51090 - "OPTIONS /api/v1/exams/e9660ef9-4b32-47ad-a4d3-af35f45aa988/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60910 - "OPTIONS /api/v1/exams/84da9468-fe32-46f1-b075-40636d2fdb02/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63916 - "OPTIONS /api/v1/exams/1d0dff65-35e7-4a70-aacd-65559d7e1770/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51090 - "OPTIONS /api/v1/exams/1ee6b1b4-4f8c-4858-8503-63964db2284f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59212 - "OPTIONS /api/v1/exams/00456346-927e-401f-8caf-5c412ef9e6fe/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53293 - "OPTIONS /api/v1/exams/40807dd3-de43-4c73-9466-aa7b2e01fd1f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60866 - "OPTIONS /api/v1/exams/d9a43098-37ed-4f31-86a8-f6d238c50c67/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "GET /api/v1/exams/9ad0b6a7-e10b-4ae1-b1e9-b893b495ea4a/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/exams/eea83a5a-8d27-498e-a4ab-62d20ff479f4/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/exams/1d0dff65-35e7-4a70-aacd-65559d7e1770/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51631 - "GET /api/v1/exams/31f0285f-d9bd-4eaf-998a-899777f72edc/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53988 - "GET /api/v1/exams/e9660ef9-4b32-47ad-a4d3-af35f45aa988/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /api/v1/exams/84da9468-fe32-46f1-b075-40636d2fdb02/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "GET /api/v1/exams/1ee6b1b4-4f8c-4858-8503-63964db2284f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /api/v1/exams/eea83a5a-8d27-498e-a4ab-62d20ff479f4/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/exams/40807dd3-de43-4c73-9466-aa7b2e01fd1f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/exams/00456346-927e-401f-8caf-5c412ef9e6fe/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51631 - "GET /api/v1/exams/d9a43098-37ed-4f31-86a8-f6d238c50c67/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53988 - "GET /api/v1/exams/9ad0b6a7-e10b-4ae1-b1e9-b893b495ea4a/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/exams/e9660ef9-4b32-47ad-a4d3-af35f45aa988/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "GET /api/v1/exams/1d0dff65-35e7-4a70-aacd-65559d7e1770/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64270 - "GET /api/v1/exams/31f0285f-d9bd-4eaf-998a-899777f72edc/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51631 - "GET /api/v1/exams/1ee6b1b4-4f8c-4858-8503-63964db2284f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/exams/84da9468-fe32-46f1-b075-40636d2fdb02/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53988 - "GET /api/v1/exams/40807dd3-de43-4c73-9466-aa7b2e01fd1f/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61916 - "GET /api/v1/exams/d9a43098-37ed-4f31-86a8-f6d238c50c67/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60486 - "GET /api/v1/exams/00456346-927e-401f-8caf-5c412ef9e6fe/pool-check HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63405 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 17:24:54 | INFO     | exam.auth                    | Login: snehashalomjb@gmail.com (candidate/approved, login=approved)
+INFO:     127.0.0.1:63405 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63405 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50890 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63405 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49336 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59203 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50890 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49336 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59203 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49177 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54824 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56957 - "OPTIONS /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56957 - "GET /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56957 - "OPTIONS /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56957 - "GET /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62957 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60479 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62957 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62957 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+2026-09-25 17:25:36 | INFO     | exam.auth                    | Profile updated for snehashalomjb@gmail.com
+INFO:     127.0.0.1:62957 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52244 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "OPTIONS /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60479 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52244 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60479 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52244 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52244 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "OPTIONS /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "OPTIONS /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57327 - "GET /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58022 - "OPTIONS /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58022 - "GET /api/v1/system/speed-test-payload HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58010 - "OPTIONS /api/v1/exams/171ef6cd-d72c-409c-869b-d2931c005d63/start HTTP/1.1" 200 OK
+2026-09-25 17:25:56 | INFO     | exam.exam                    | Session 824270ba-79a3-4d63-99bc-83fa6240e533 started: exam='Unit Topic Assessment' candidate=bebc7969-b7e6-4edf-82dd-590a44f8044d questions=8 expires=2026-09-25T12:40:56.291192+00:00
+2026-09-25 17:25:56 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58010 - "POST /api/v1/exams/171ef6cd-d72c-409c-869b-d2931c005d63/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58010 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:25:56 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58010 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:25:56 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+2026-09-25 17:25:56 | INFO     | exam.proctor                 | Proctor socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:49674 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:25:56 | INFO     | exam.proctor                 | Proctor socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:25:56 | INFO     | exam.proctor                 | Proctor socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:25:56 | INFO     | exam.live_signal             | Live broadcast socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:25:57 | INFO     | exam.live_signal             | Live broadcast socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:65228 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65228 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53558 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/f134da61-4961-4d6c-8d57-aded490b09c5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60255 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/f134da61-4961-4d6c-8d57-aded490b09c5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60255 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/f134da61-4961-4d6c-8d57-aded490b09c5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53558 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/f134da61-4961-4d6c-8d57-aded490b09c5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53558 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53558 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+2026-09-25 17:26:27 | INFO     | exam.live_signal             | Live broadcast socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:26:27 | INFO     | exam.proctor                 | Proctor socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:27:47 | INFO     | exam.live_signal             | Live broadcast socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:65049 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59128 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65049 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65049 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61187 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+2026-09-25 17:27:48 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:65049 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59128 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:27:48 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:65049 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:27:48 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:59128 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55520 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57252 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57252 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57252 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55520 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+2026-09-25 17:28:23 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:57252 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56534 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:28:23 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:57252 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51611 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61575 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65261 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52686 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+2026-09-25 17:30:43 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:58410 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:30:43 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+2026-09-25 17:30:43 | INFO     | exam.proctor                 | Proctor socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:59129 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:30:43 | INFO     | exam.proctor                 | Proctor socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:30:43 | INFO     | exam.proctor                 | Proctor socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:30:46 | INFO     | exam.live_signal             | Live broadcast socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:30:49 | INFO     | exam.live_signal             | Live broadcast socket open for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:59268 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59268 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53961 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63870 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/9504bda1-cac9-4716-af7b-c7c0879084ed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59322 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/9504bda1-cac9-4716-af7b-c7c0879084ed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63870 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/9504bda1-cac9-4716-af7b-c7c0879084ed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59322 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/9504bda1-cac9-4716-af7b-c7c0879084ed HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50669 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/c3115c41-fff5-43f1-aa1d-84c0e67930e8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57182 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/c3115c41-fff5-43f1-aa1d-84c0e67930e8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57182 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/c3115c41-fff5-43f1-aa1d-84c0e67930e8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50669 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/c3115c41-fff5-43f1-aa1d-84c0e67930e8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57626 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5f05a191-6456-40ad-baae-631ea9629b08 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57626 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5f05a191-6456-40ad-baae-631ea9629b08 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57626 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/b3796bfe-b240-4059-9ebf-a3ec0f043105 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/b3796bfe-b240-4059-9ebf-a3ec0f043105 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/b3796bfe-b240-4059-9ebf-a3ec0f043105 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/b3796bfe-b240-4059-9ebf-a3ec0f043105 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5fdc8150-a2f8-46d1-a630-1bd4a59c3b1b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5fdc8150-a2f8-46d1-a630-1bd4a59c3b1b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5fdc8150-a2f8-46d1-a630-1bd4a59c3b1b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/5fdc8150-a2f8-46d1-a630-1bd4a59c3b1b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52349 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55603 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57362 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/heartbeat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55466 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "PUT /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/answers/6d90deb7-698a-4a54-a1ad-f5a082acc02a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/proctor/snapshot HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "OPTIONS /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/submit HTTP/1.1" 200 OK
+2026-09-25 17:32:36 | INFO     | exam.exam                    | Session 824270ba-79a3-4d63-99bc-83fa6240e533 finalised as submitted: 6 auto-scored, 0 queued for review
+INFO:     127.0.0.1:59151 - "POST /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533/submit HTTP/1.1" 200 OK
+2026-09-25 17:32:38 | INFO     | exam.proctor                 | Proctor socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:32:38 | INFO     | exam.live_signal             | Live broadcast socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+2026-09-25 17:32:40 | INFO     | exam.live_signal             | Live broadcast socket closed for session 824270ba-79a3-4d63-99bc-83fa6240e533
+INFO:     127.0.0.1:59151 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49918 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59151 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+2026-09-25 17:32:41 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:49282 - "GET /api/v1/auth/login-access HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49918 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:32:41 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:49282 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+2026-09-25 17:32:41 | WARNING  | exam.translation             | Unknown translation provider 'google' - using the stub translator
+INFO:     127.0.0.1:49918 - "GET /api/v1/sessions/824270ba-79a3-4d63-99bc-83fa6240e533 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49284 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59077 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58577 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65025 - "OPTIONS /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59077 - "OPTIONS /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55616 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50810 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65025 - "GET /api/v1/my/stats/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55616 - "GET /api/v1/my/exams HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54525 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-25 17:45:22 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:54525 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54525 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59324 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54525 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57046 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64598 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54525 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63491 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62518 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63914 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50524 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59324 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62518 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63914 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50524 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57698 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50524 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50524 - "OPTIONS /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50524 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57698 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "OPTIONS /api/v1/exams HTTP/1.1" 200 OK
+2026-09-25 17:47:31 | INFO     | exam.exams                   | examiner@exam.edu created academic exam 'Assessment'
+INFO:     127.0.0.1:64319 - "POST /api/v1/exams HTTP/1.1" 201 Created
+INFO:     127.0.0.1:64319 - "OPTIONS /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/pool HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "GET /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/pool HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "OPTIONS /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60224 - "OPTIONS /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60224 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy&limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60224 - "OPTIONS /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "OPTIONS /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60224 - "OPTIONS /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64319 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59666 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60224 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65440 - "OPTIONS /api/v1/questions/import/parse HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65440 - "POST /api/v1/questions/import/parse HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:62917 - "OPTIONS /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "OPTIONS /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/enrollments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "GET /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/enrollments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58093 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58093 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58093 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58093 - "OPTIONS /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "OPTIONS /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63554 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58093 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65033 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65275 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57567 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57567 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57567 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57567 - "GET /api/v1/questions/topics?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "OPTIONS /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "OPTIONS /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63589 - "GET /api/v1/questions?subject_id=62de1780-04c0-4ea6-9530-16d7ecfa77f3&question_type=mcq&difficulty=easy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49260 - "OPTIONS /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60115 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&difficulty=easy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49260 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60115 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&difficulty=easy HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55563 - "OPTIONS /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55563 - "POST /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/questions HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:52305 - "POST /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/questions HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:57567 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54918 - "GET /api/v1/questions/tags HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63655 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54545 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52955 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&status=archived&include_inactive=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&status=archived&include_inactive=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&source=imported HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50705 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&source=imported HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&source=ai_generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&source=ai_generated HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59808 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&topic=Computer+Networks&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&topic=Computer+Networks&mine=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "OPTIONS /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&topic=Computer+Networks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55755 - "GET /api/v1/questions?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&question_type=mcq&category=academic&difficulty=easy&topic=Computer+Networks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50258 - "POST /api/v1/exams/bb518a93-7696-4e75-8268-06308fdf3fbf/questions HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:64681 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64871 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50635 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50635 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50635 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50635 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61131 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61131 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50635 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50635 - "OPTIONS /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61131 - "OPTIONS /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61131 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50635 - "GET /api/v1/subjects HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59814 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65168 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+2026-09-25 20:03:19 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
+INFO:     127.0.0.1:65168 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59814 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61397 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60689 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+2026-09-25 20:03:33 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
+INFO:     127.0.0.1:61397 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60689 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60689 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64732 - "OPTIONS /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51169 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:61795 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50855 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52754 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65382 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63593 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59141 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52754 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63593 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65473 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65382 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63575 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63593 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65473 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61795 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51169 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61053 - "OPTIONS /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61053 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56384 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63896 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49830 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57599 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56384 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63896 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52039 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63896 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51486 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+2026-09-26 00:03:55 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:51486 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60143 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50412 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51486 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53378 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60143 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50412 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49688 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49688 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56148 - "GET /api/v1 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56148 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65279 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52050 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65279 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52050 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58099 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58099 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63376 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58099 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57097 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57097 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57097 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63979 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61893 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51732 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51992 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:51992 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55328 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55328 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51992 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55328 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52292 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53496 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53496 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52292 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49676 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57321 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57321 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57321 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57321 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57321 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57321 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57321 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56479 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54873 - "OPTIONS /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54873 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54873 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51248 - "OPTIONS /api/v1/subjects?lang=te HTTP/1.1" 200 OK
+2026-09-26 02:15:03 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
+INFO:     127.0.0.1:54873 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54873 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51248 - "GET /api/v1/subjects?lang=te HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58985 - "OPTIONS /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51440 - "OPTIONS /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58985 - "OPTIONS /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51440 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64751 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58985 - "GET /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58370 - "GET /api/v1/admin/candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58549 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57392 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64321 - "GET /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54104 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62773 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62773 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54104 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50783 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54725 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+2026-09-26 02:29:31 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
+INFO:     127.0.0.1:50783 - "PATCH /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50783 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50783 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55984 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54892 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54892 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55984 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50913 - "OPTIONS /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53186 - "OPTIONS /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50913 - "OPTIONS /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60499 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53186 - "GET /api/v1/questions/topics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50913 - "GET /api/v1/questions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58149 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64629 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64629 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58149 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50900 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50900 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55457 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57683 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50906 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52392 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58129 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64478 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62833 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52109 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54970 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61628 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55397 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59046 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52109 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54970 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61628 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50167 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61628 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61628 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50167 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49695 - "GET /api/v1/health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49697 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52975 - "GET /api/v1/subjects HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52977 - "GET /api/v1/subjects HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55585 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55585 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55585 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:60218 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55585 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55585 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51616 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59846 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52169 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55585 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52169 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59846 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55585 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52169 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59132 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60218 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51616 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51616 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61592 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54731 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54539 - "OPTIONS /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54539 - "GET /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62628 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60662 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62463 - "OPTIONS /api/v1/questions?language=hi&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62628 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62628 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62463 - "GET /api/v1/questions?language=hi&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63808 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55717 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56351 - "OPTIONS /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56351 - "GET /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50844 - "OPTIONS /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59393 - "OPTIONS /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50844 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59393 - "OPTIONS /api/v1/questions?language=ml&subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50844 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59393 - "GET /api/v1/questions?language=ml&subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52043 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59234 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59234 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59234 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58776 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59234 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56118 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58776 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58776 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58776 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58776 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56118 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56118 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56118 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64272 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52043 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64272 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61561 - "OPTIONS /api/v1/questions/topics?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62551 - "OPTIONS /api/v1/questions/topics?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62551 - "OPTIONS /api/v1/questions?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61561 - "GET /api/v1/questions/topics?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61561 - "GET /api/v1/questions/topics?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62551 - "GET /api/v1/questions?language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56246 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56246 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60909 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60909 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56246 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60909 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56246 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58740 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60593 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57965 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58740 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60593 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58740 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57965 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55237 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58740 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60593 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57212 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55237 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55237 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51999 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60644 - "OPTIONS /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60644 - "GET /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53281 - "OPTIONS /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49910 - "OPTIONS /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49910 - "OPTIONS /api/v1/questions?language=hi&subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53281 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53281 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49910 - "GET /api/v1/questions?language=hi&subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54526 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52886 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57697 - "GET /api/v1/questions?language=hi&subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62350 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62350 - "GET /api/v1/questions/topics?subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51842 - "GET /api/v1/questions?language=hi&subject_id=75b7a406-f143-48f5-809f-7bcdca3d1f27 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57132 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57132 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:56827 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57132 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:56827 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57132 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56827 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56827 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56827 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57132 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56827 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56827 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "OPTIONS /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64767 - "GET /api/v1/subjects?lang=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63423 - "OPTIONS /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53201 - "OPTIONS /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53201 - "OPTIONS /api/v1/questions?language=hi&subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63423 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63423 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53201 - "GET /api/v1/questions?language=hi&subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58310 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58310 - "GET /api/v1/questions/topics?subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59883 - "GET /api/v1/questions?language=hi&subject_id=a3d473a8-ca93-4506-9d38-cd23bf9fbde3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57735 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58905 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57735 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53606 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59656 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58905 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57735 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58905 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53606 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57735 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58905 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60104 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51091 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59656 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59656 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:53066 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:53066 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54556 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54534 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54556 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65125 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53066 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65125 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54294 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54534 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54534 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+2026-09-26 20:58:46 | WARNING  | exam.app                     | SLOW GET /api/v1/examiner/stats took 1818ms
+INFO:     127.0.0.1:54556 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54556 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59147 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52998 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59147 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59147 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63142 - "OPTIONS /api/v1/subjects?lang=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63142 - "GET /api/v1/subjects?lang=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51079 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57556 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57556 - "OPTIONS /api/v1/questions?language=kn&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51079 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51079 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57556 - "GET /api/v1/questions?language=kn&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64447 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64025 - "OPTIONS /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64025 - "GET /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64642 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54775 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54775 - "OPTIONS /api/v1/questions?language=ml&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64642 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64642 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54775 - "GET /api/v1/questions?language=ml&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54142 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55492 - "OPTIONS /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55492 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55492 - "OPTIONS /api/v1/questions?language=ml&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54142 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51229 - "GET /api/v1/questions?language=ml&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:55492 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:54142 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55492 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51229 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54142 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54142 - "GET /api/v1/questions/topics?subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f&language=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51229 - "GET /api/v1/questions?language=ml&subject_id=9365cea3-9d2a-46bc-bd67-623510115c7f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:52714 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52900 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52900 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52714 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63426 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63426 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63426 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53278 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56430 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54453 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54453 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56430 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "OPTIONS /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53245 - "OPTIONS /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59712 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59712 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59712 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59712 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53245 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59712 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55518 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53245 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55518 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53245 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53956 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53968 - "GET /api/v1/health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53969 - "POST /api/v1/auth/login HTTP/1.1" 422 Unprocessable Entity
+INFO:     127.0.0.1:53968 - "GET /health HTTP/1.1" 200 OK
+2026-09-27 02:16:50 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+INFO:     127.0.0.1:53977 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64422 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:64422 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64859 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55554 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55554 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64859 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51774 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55628 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64859 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55554 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52181 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64859 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55628 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51774 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51774 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:50770 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:59434 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59434 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57606 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53942 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63429 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53942 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57606 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51476 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57606 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63501 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55972 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50770 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64854 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57606 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63501 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55972 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55972 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55972 - "OPTIONS /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "OPTIONS /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55972 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57873 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60394 - "OPTIONS /api/v1/subjects?lang=kn&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60394 - "GET /api/v1/subjects?lang=kn&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60951 - "OPTIONS /api/v1/questions/topics?subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61382 - "OPTIONS /api/v1/questions/topics?subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61382 - "GET /api/v1/questions/topics?subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60951 - "GET /api/v1/questions/topics?subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60951 - "OPTIONS /api/v1/questions?language=kn&subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60951 - "GET /api/v1/questions?language=kn&subject_id=d80665a8-72d0-4f26-ab8c-36f03201c3ad HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "OPTIONS /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63904 - "OPTIONS /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51938 - "OPTIONS /api/v1/questions?language=en&subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49674 - "GET /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63904 - "GET /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51938 - "GET /api/v1/questions?language=en&subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63360 - "GET /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58048 - "GET /api/v1/questions/topics?subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9&language=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54246 - "GET /api/v1/questions?language=en&subject_id=c62dccb2-8793-4432-afbc-3069d59f3df9 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54567 - "OPTIONS /api/v1/subjects?lang=hi&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54567 - "GET /api/v1/subjects?lang=hi&language=hi HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54567 - "OPTIONS /api/v1/subjects?lang=kn&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54567 - "GET /api/v1/subjects?lang=kn&language=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63151 - "GET /api/v1/auth/me HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:63151 - "OPTIONS /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "POST /api/v1/auth/refresh HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63151 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57376 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "OPTIONS /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "GET /api/v1/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "OPTIONS /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65400 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63028 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61316 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60794 - "OPTIONS /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "OPTIONS /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65400 - "OPTIONS /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63028 - "OPTIONS /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61316 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65400 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64799 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63028 - "GET /api/v1/login-requests?status=pending HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61316 - "GET /api/v1/proctoring/sessions?flagged_only=true&limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57577 - "GET /api/v1/exams?limit=6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65400 - "GET /api/v1/examiner/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60794 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60794 - "GET /api/v1/grading/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61579 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58658 - "OPTIONS /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61579 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61579 - "GET /api/v1/subjects?lang=en HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62698 - "OPTIONS /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62698 - "GET /api/v1/subjects?lang=ml HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60137 - "OPTIONS /api/v1/subjects?lang=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60137 - "GET /api/v1/subjects?lang=kn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63624 - "GET /health HTTP/1.1" 200 OK

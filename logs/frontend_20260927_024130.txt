@@ -1,0 +1,24 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://172.17.32.1:3000
+- Environments: .env.local
+✓ Ready in 5.6s
+✓ Running next.config.ts took 41ms
+
+○ Compiling / ...
+ GET / 200 in 2.0s (next.js: 1700ms, application-code: 348ms)
+ GET /dashboard/exams/create 200 in 6.2s (next.js: 5.7s, application-code: 471ms)
+ GET /dashboard/exams/create 200 in 6.2s (next.js: 5.8s, application-code: 441ms)
+ GET /dashboard/exams/create 200 in 6.2s (next.js: 5.8s, application-code: 436ms)
+ GET /manifest.webmanifest 200 in 292ms (next.js: 261ms, application-code: 30ms)
+ GET /manifest.webmanifest 200 in 328ms (next.js: 313ms, application-code: 15ms)
+ GET /dashboard/exams/create 200 in 544ms (next.js: 406ms, application-code: 138ms)
+ GET /manifest.webmanifest 200 in 26ms (next.js: 11ms, application-code: 15ms)
+ GET / 200 in 116ms (next.js: 60ms, application-code: 56ms)
+ GET /manifest.webmanifest 200 in 13ms (next.js: 7ms, application-code: 7ms)
+ GET /dashboard/examiner 200 in 62ms (next.js: 39ms, application-code: 23ms)
+ GET /dashboard/exams/create 200 in 40ms (next.js: 23ms, application-code: 17ms)

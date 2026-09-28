@@ -272,7 +272,7 @@ export default function LoginPage() {
                 <h1 className="text-[30px] font-bold leading-[1.2] tracking-tight text-white max-w-xs">
                   Assessments that hold up to{" "}
                   <span style={{
-                    background: "linear-gradient(135deg, #818cf8, #a5b4fc)",
+                    backgroundImage: "linear-gradient(135deg, #818cf8, #a5b4fc)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",

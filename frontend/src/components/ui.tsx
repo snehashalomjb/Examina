@@ -8,7 +8,8 @@
  * Features: gradient buttons, glowing stat cards, glassmorphism surfaces, premium toasts.
  */
 
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 /* ═══════════════════════════════════════════════════════════════════
    UTILITIES
@@ -506,6 +507,15 @@ export function Modal({
     xl: "max-w-4xl",
   };
 
+  // A portal needs a real document, which does not exist while server-rendering.
+  // useSyncExternalStore is React's hydration flag - false on the server, true on the
+  // client - and avoids the setState-in-effect round trip a mounted flag would need.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -517,25 +527,33 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || !hydrated) return null;
+
+  // Rendered onto document.body deliberately. Any ancestor carrying a transform,
+  // filter or backdrop-filter - the dashboard's `animate-rise` page wrapper has one -
+  // becomes the containing block for `position: fixed` descendants. The modal was then
+  // laid out and clipped inside that wrapper while its backdrop still covered the whole
+  // viewport: the screen dimmed and blurred and the dialog's buttons were nowhere to be
+  // found or clicked. A portal pins the overlay to the viewport, so the panel always
+  // paints above the backdrop and every control inside it stays clickable.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="absolute inset-0 bg-ink/60 backdrop-blur-[3px] animate-fade"
+        className="absolute inset-0 bg-ink/50 backdrop-blur-[2px] animate-fade"
         onClick={onClose}
       />
       <div
         className={cx(
-          "relative z-10 w-full rounded-[18px] bg-surface shadow-[var(--shadow-lift)] animate-scale-in overflow-hidden",
+          "relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-[18px] bg-surface shadow-[var(--shadow-lift)] animate-scale-in",
           sizeClasses[size],
         )}
       >
         {/* Top gradient line */}
-        <div className="h-[2px] bg-gradient-to-r from-accent via-purple-400 to-cyan-400" />
+        <div className="sticky top-0 z-10 h-[2px] bg-gradient-to-r from-accent via-purple-400 to-cyan-400" />
         {title && (
           <div className="flex items-center justify-between border-b border-line px-6 py-4">
             <h2 className="text-[15px] font-bold text-ink">{title}</h2>
@@ -550,7 +568,8 @@ export function Modal({
         )}
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -6,6 +6,7 @@ API alike. Every rule here has a matching test in app/tests/test_validators.py.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -146,6 +147,28 @@ def validate_exam_window(*, starts_at: datetime, ends_at: datetime, duration_min
         )
 
 
+#: Spellings of a question type that mean the same thing to an examiner. Stored rules
+#: and API payloads have used all of these; compared after lower-casing and turning
+#: spaces and hyphens into underscores.
+_QTYPE_ALIASES = {
+    "single_choice": "mcq",
+    "single_select": "mcq",
+    "multiple_choice": "multi_select",
+    "multiple_select": "multi_select",
+    "multiselect": "multi_select",
+    "truefalse": "true_false",
+    "fill_in_the_blank": "fill_blank",
+    "fill_in_blank": "fill_blank",
+}
+
+#: Values a rule's subject/topic field holds when it means "no narrowing".
+_ANY_VALUES = {"", "any", "any subject", "any topic", "all", "null", "none"}
+
+
+def _enum_key(value: object) -> str:
+    return re.sub(r"[\s\-]+", "_", str(value).strip().lower())
+
+
 def normalise_selection_rules(raw: dict | None) -> list[dict]:
     """Validate and normalise the ``selection_rules`` JSON blob.
 
@@ -161,7 +184,8 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
         if not isinstance(rule, dict):
             raise ValidationError(f"Rule #{index + 1} is not an object")
         try:
-            qtype = QuestionType(rule["question_type"])
+            qkey = _enum_key(rule["question_type"])
+            qtype = QuestionType(_QTYPE_ALIASES.get(qkey, qkey))
         except (KeyError, ValueError) as exc:
             raise ValidationError(f"Rule #{index + 1} has an unknown question_type") from exc
 
@@ -169,7 +193,7 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
         difficulty = None
         if difficulty_raw:
             try:
-                difficulty = Difficulty(difficulty_raw)
+                difficulty = Difficulty(_enum_key(difficulty_raw))
             except ValueError as exc:
                 raise ValidationError(
                     f"Rule #{index + 1} has an unknown difficulty '{difficulty_raw}'"
@@ -187,7 +211,7 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
         category = None
         if category_raw:
             try:
-                category = QuestionCategory(category_raw)
+                category = QuestionCategory(_enum_key(category_raw))
             except ValueError as exc:
                 raise ValidationError(
                     f"Rule #{index + 1} has an unknown category '{category_raw}'"
@@ -198,10 +222,15 @@ def normalise_selection_rules(raw: dict | None) -> list[dict]:
             if not isinstance(topic, str):
                 raise ValidationError(f"Rule #{index + 1} has a non-string topic")
             topic = topic.strip() or None
+            if topic and topic.casefold() in _ANY_VALUES:
+                topic = None
 
         subject_id = rule.get("subject_id")
-        if subject_id is not None and not isinstance(subject_id, str):
-            raise ValidationError(f"Rule #{index + 1} has a non-string subject_id")
+        if subject_id is not None:
+            if not isinstance(subject_id, str):
+                raise ValidationError(f"Rule #{index + 1} has a non-string subject_id")
+            # Compared as text against str(question.subject_id), which is lower-case.
+            subject_id = subject_id.strip().lower() or None
 
         tags_raw = rule.get("tags")
         tags: list[str] | None = None

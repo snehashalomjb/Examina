@@ -24,7 +24,7 @@ from app.db.models import (
     QuestionSource,
     Subject,
 )
-from app.db.models.enums import UserRole
+from app.db.models.enums import DEFAULT_LOCALE, UserRole
 from app.schemas.question_import import (
     ImportCommit,
     ImportedRow,
@@ -40,6 +40,8 @@ from app.services.question_import import (
     xlsx_active_sheet_name,
     xlsx_sheet_names,
 )
+from app.services.language_purity import check_language_purity
+from app.services.public_url_import import UrlImportError, parse_public_url
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
 router = APIRouter(tags=["question-import"])
@@ -61,6 +63,91 @@ def _resolve_exam(db, staff, exam_id: uuid.UUID | None) -> Exam | None:
             detail="You can only add questions to an exam you created",
         )
     return exam
+
+
+#: Shared conversion for both file and URL previews.  Keeping subject resolution and
+#: bank-duplicate checks here means the two entry points cannot drift.
+def _preview_response(
+    db,
+    rows,
+    *,
+    filename: str,
+    staff_email: str,
+    subject_id: uuid.UUID | None = None,
+    sheet_names: list[str] | None = None,
+    sheet_name: str | None = None,
+) -> ImportParseOut:
+    subjects_by_key = {
+        key: subject
+        for subject in db.scalars(select(Subject))
+        for key in (subject.code.strip().casefold(), subject.name.strip().casefold())
+    }
+    default_subject = db.get(Subject, subject_id) if subject_id else None
+    for row in rows:
+        text = row.subject_text.strip()
+        if text:
+            match = subjects_by_key.get(text.casefold())
+            if match is None:
+                row.problems.append(f"Unknown subject '{text}'.")
+            else:
+                row.subject_id = match.id
+                row.subject_name = match.name
+        elif default_subject is not None:
+            row.subject_id = default_subject.id
+            row.subject_name = default_subject.name
+
+    subject_ids = {row.subject_id for row in rows if row.subject_id is not None}
+    existing_by_subject = {
+        sid: {
+            fingerprint(body)
+            for body in db.scalars(
+                select(Question.body).where(
+                    Question.subject_id == sid, Question.origin_exam_id.is_(None)
+                )
+            )
+        }
+        for sid in subject_ids
+    }
+    for row in rows:
+        if row.duplicate_of is None and row.subject_id is not None:
+            if fingerprint(row.body) in existing_by_subject.get(row.subject_id, set()):
+                row.duplicate_of = "the question bank"
+
+    out_rows = [
+        ImportedRow(
+            row_number=row.row_number,
+            body=row.body,
+            subject_id=row.subject_id,
+            subject_name=row.subject_name,
+            question_type=row.question_type,
+            difficulty=row.difficulty,
+            category=row.category,
+            topic=row.topic,
+            marks=row.marks,
+            negative_marks=row.negative_marks,
+            model_answer=row.model_answer,
+            explanation=row.explanation,
+            tags=row.tags,
+            min_words=row.min_words,
+            max_words=row.max_words,
+            spec=row.spec,
+            options=[{"text": option.text, "is_correct": option.is_correct} for option in row.options],
+            problems=row.problems,
+            duplicate_of=row.duplicate_of,
+        )
+        for row in rows
+    ]
+    logger.info("%s parsed %s: %d row(s), %d with problems", staff_email, filename, len(out_rows), sum(bool(r.problems) for r in out_rows))
+    return ImportParseOut(
+        filename=filename,
+        total=len(out_rows),
+        valid=sum(not row.problems for row in out_rows),
+        invalid=sum(bool(row.problems) for row in out_rows),
+        duplicates=sum(bool(row.duplicate_of) for row in out_rows),
+        rows=out_rows,
+        sheet_names=sheet_names or [],
+        sheet_name=sheet_name,
+    )
 
 
 @router.get("/questions/import/template")
@@ -186,24 +273,50 @@ async def parse_import(
         len(out_rows),
         sum(1 for r in out_rows if r.problems),
     )
-    return ImportParseOut(
-        filename=file.filename or "upload",
-        total=len(out_rows),
-        valid=sum(1 for r in out_rows if not r.problems),
-        invalid=sum(1 for r in out_rows if r.problems),
-        duplicates=sum(1 for r in out_rows if r.duplicate_of),
-        rows=out_rows,
+    return _preview_response(
+        db,
+        rows,
+        filename=filename,
+        staff_email=staff.email,
+        subject_id=subject_id,
         sheet_names=sheet_names,
-        # The sheet actually read: the one the examiner picked, or - the first time,
-        # before they have picked anything - whichever tab was active when the
-        # workbook was saved. Echoing back the request's own (possibly null) value
-        # here would tell the picker nothing about what it is looking at.
         sheet_name=(sheet_name or xlsx_active_sheet_name(data)) if sheet_names else None,
     )
 
 
-def _build_question(row: ImportRowIn, subject_id: uuid.UUID, staff, exam: Exam | None) -> Question:
+@router.post("/questions/import/parse-url", response_model=ImportParseOut)
+async def parse_import_url(
+    staff: CurrentStaff,
+    db: DbSession,
+    url: str = Form(...),
+    subject_id: uuid.UUID | None = Form(default=None),
+) -> ImportParseOut:
+    """Parse a public form/page into the same review-only preview contract."""
+    try:
+        rows = parse_public_url(url)
+    except UrlImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return _preview_response(
+        db,
+        rows,
+        filename=url[:200],
+        staff_email=staff.email,
+        subject_id=subject_id,
+    )
+
+
+def _build_question(
+    row: ImportRowIn, subject_id: uuid.UUID, language: str, staff, exam: Exam | None
+) -> Question:
     """Re-validate a row the client may have edited, then turn it into a question."""
+    if row.question_type is None:
+        raise ValidationError("Choose a question type before importing this row.")
+    if row.difficulty is None:
+        raise ValidationError("Choose a difficulty before importing this row.")
+    if row.marks is None:
+        raise ValidationError("Choose the marks before importing this row.")
     spec = validate_question(
         question_type=row.question_type,
         body=row.body,
@@ -216,8 +329,18 @@ def _build_question(row: ImportRowIn, subject_id: uuid.UUID, staff, exam: Exam |
         spec=row.spec,
         image_key=None,
     )
+    check_language_purity(
+        language=language,
+        fields={
+            "question": row.body,
+            "model answer": row.model_answer,
+            "explanation": row.explanation,
+            **{f"option {chr(65 + i)}": o.text for i, o in enumerate(row.options)},
+        },
+    )
     question = Question(
         subject_id=subject_id,
+        language=language,
         question_type=row.question_type,
         category=row.category,
         topic=row.topic,
@@ -266,6 +389,11 @@ def commit_import(payload: ImportCommit, staff: CurrentStaff, db: DbSession) -> 
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The import's subject must match the exam's subject",
         )
+    if payload.language != DEFAULT_LOCALE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The question bank is English-only; imports are stored in English.",
+        )
 
     row_subject_ids = {row.subject_id for row in payload.rows if row.subject_id is not None}
     if row_subject_ids:
@@ -292,7 +420,9 @@ def commit_import(payload: ImportCommit, staff: CurrentStaff, db: DbSession) -> 
 
     for row in payload.rows:
         try:
-            question = _build_question(row, row.subject_id or payload.subject_id, staff, exam)
+            question = _build_question(
+                row, row.subject_id or payload.subject_id, payload.language, staff, exam
+            )
         except ValidationError as exc:
             errors.append({"row_number": row.row_number, "error": str(exc)})
             continue

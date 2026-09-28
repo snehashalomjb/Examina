@@ -104,6 +104,52 @@ class TestPoolOrdering:
 
 
 class TestPoolAppend:
+    def test_a_draft_can_be_rebound_before_questions_are_added(
+        self, client: TestClient, db: Session
+    ):
+        """The wizard showed the new subject, but PATCH silently discarded it."""
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        former, current = make_subject(db), make_subject(db)
+        question = make_question(db, current)
+        exam = make_exam(db, former, examiner, questions=[], status=ExamStatus.DRAFT)
+        headers = auth_headers(client, examiner)
+
+        updated = client.patch(
+            f"/api/v1/exams/{exam.id}",
+            json={"subject_id": str(current.id)},
+            headers=headers,
+        )
+        assert updated.status_code == 200, updated.text
+        assert updated.json()["subject_id"] == str(current.id)
+
+        added = client.post(
+            f"/api/v1/exams/{exam.id}/questions",
+            json={"question_ids": [str(question.id)]},
+            headers=headers,
+        )
+        assert added.status_code == 200, added.text
+        assert added.json()["entries"][0]["subject_id"] == str(current.id)
+
+    def test_an_academic_draft_cannot_be_rebound_around_existing_questions(
+        self, client: TestClient, db: Session
+    ):
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        former, current = make_subject(db), make_subject(db)
+        question = make_question(db, former)
+        exam = make_exam(db, former, examiner, questions=[question], status=ExamStatus.DRAFT)
+        headers = auth_headers(client, examiner)
+
+        response = client.patch(
+            f"/api/v1/exams/{exam.id}",
+            json={"subject_id": str(current.id)},
+            headers=headers,
+        )
+
+        assert response.status_code == 422, response.text
+        assert "questions from another subject" in response.json()["detail"]
+        unchanged = client.get(f"/api/v1/exams/{exam.id}", headers=headers).json()
+        assert unchanged["subject_id"] == str(former.id)
+
     def test_adding_keeps_what_is_already_there(self, client: TestClient, db: Session):
         examiner = make_user(db, role=UserRole.EXAMINER)
         subject = make_subject(db)
@@ -311,6 +357,55 @@ class TestAuthoringIntoAnExam:
             headers=auth_headers(client, examiner),
         )
         assert response.status_code == 422
+
+    def test_english_questions_are_valid_for_any_exam_language(
+        self, client: TestClient, db: Session
+    ):
+        """The bank is English-only: a declared-language exam draws from English rows,
+        so English questions author into and join a Telugu exam's pool, while a
+        non-English question is refused at the schema (see schemas/question.py)."""
+        examiner = make_user(db, role=UserRole.EXAMINER)
+        subject = make_subject(db)
+        exam = make_exam(db, subject, examiner, questions=[], status=ExamStatus.DRAFT)
+        exam.primary_language = "te"
+        db.flush()
+        headers = auth_headers(client, examiner)
+
+        # An English question may be authored straight into the Telugu exam.
+        response = client.post(
+            "/api/v1/questions",
+            json=self._mcq_payload(subject.id, exam_id=str(exam.id)),
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+
+        # A non-English question cannot be created at all: the bank is English-only.
+        response = client.post(
+            "/api/v1/questions",
+            json=self._mcq_payload(
+                subject.id,
+                language="te",
+                body="పర్యవేక్షిత అభ్యాసం అంటే ఏమిటి?",
+                options=[
+                    {"text": "డేటా లేకుండా నేర్చుకోవడం", "is_correct": False, "order_index": 0},
+                    {"text": "లేబుల్ చేసిన డేటా నుండి నేర్చుకోవడం", "is_correct": True, "order_index": 1},
+                    {"text": "శిక్షణ డేటాను తొలగించడం", "is_correct": False, "order_index": 2},
+                    {"text": "డేటాను గుప్తీకరించడం", "is_correct": False, "order_index": 3},
+                ],
+            ),
+            headers=headers,
+        )
+        assert response.status_code == 422
+        assert "english-only" in response.json()["detail"].lower()
+
+        # An English bank question can be added to the Telugu exam's pool afterwards.
+        english_question = make_question(db, subject, created_by=examiner)
+        response = client.post(
+            f"/api/v1/exams/{exam.id}/questions",
+            json={"question_ids": [str(english_question.id)]},
+            headers=headers,
+        )
+        assert response.status_code in (200, 201), response.text
 
 
 class TestProvenanceAndOwnership:

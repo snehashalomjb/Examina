@@ -22,7 +22,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.db.models.enums import Difficulty, ExamStatus, ExamType
+from app.db.models.enums import DEFAULT_LOCALE, Difficulty, ExamStatus, ExamType
 
 if TYPE_CHECKING:
     from app.db.models.enrollment import ExamEnrollment
@@ -170,6 +170,18 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     #: column existed.
     enabled_languages: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=lambda: ["en"], server_default='["en"]'
+    )
+
+    #: The language this exam is *written and sat in*: the one code the examiner picks
+    #: in Exam Details, and what a candidate is shown on first load unless they switch.
+    #:
+    #: Deliberately separate from ``enabled_languages``. That column is the candidate's
+    #: switchable set and is normalised to always lead with "en" (see ``languages``), so
+    #: it cannot express "this paper is a Tamil paper" - the examiner's choice would be
+    #: re-ordered away. This column keeps that choice verbatim. Defaults to English,
+    #: which is exactly how every exam behaved before it existed.
+    primary_language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default=DEFAULT_LOCALE, server_default=DEFAULT_LOCALE
     )
 
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(

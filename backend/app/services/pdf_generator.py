@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
@@ -26,6 +26,7 @@ from reportlab.platypus import (
 
 if TYPE_CHECKING:
     from app.schemas.exam_session import ResultDetail
+    from app.schemas.recruitment import RankingRow
 
 
 #: Verdict colours. The third case is the one worth having: an exam with no declared
@@ -48,6 +49,17 @@ def _verdict_markup(passed: bool | None) -> str:
     if passed:
         return "<font color='#10b981'><b>PASSED / QUALIFIED</b></font>"
     return "<font color='#ef4444'><b>NOT QUALIFIED</b></font>"
+
+
+def _proctoring_status(detail: ResultDetail) -> tuple[str, str]:
+    """(headline, colour) for the proctoring tile - the real ruling, never a fixed label."""
+    if detail.integrity_verdict == "malpractice":
+        return "MALPRACTICE", "#dc2626"
+    if not detail.is_flagged:
+        return "CLEARED ✓", "#059669"
+    if detail.integrity_verdict == "cleared":
+        return "FLAGGED — CLEARED", "#059669"
+    return "FLAGGED — PENDING", "#d97706"
 
 
 def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None) -> bytes:
@@ -195,6 +207,10 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
         else detail.result.percentage >= detail.passing_percentage
     )
 
+    start_str = (
+        detail.started_at.strftime("%b %d, %Y at %H:%M UTC") if detail.started_at else "N/A"
+    )
+
     meta_data = [
         [
             Paragraph("CANDIDATE NAME", cell_label),
@@ -203,16 +219,22 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
             Paragraph(detail.exam_title, cell_val_bold),
         ],
         [
-            Paragraph("CANDIDATE EMAIL", cell_label),
-            Paragraph(candidate_email or "Enrolled Student", cell_val),
+            Paragraph("CANDIDATE ID", cell_label),
+            Paragraph(str(detail.candidate_id), cell_val),
             Paragraph("SUBJECT / DOMAIN", cell_label),
             Paragraph(detail.subject_name, cell_val),
         ],
         [
-            Paragraph("SUBMISSION DATE", cell_label),
+            Paragraph("START TIME", cell_label),
+            Paragraph(start_str, cell_val),
+            Paragraph("SUBMISSION TIME", cell_label),
             Paragraph(sub_date, cell_val),
+        ],
+        [
             Paragraph("DURATION TAKEN", cell_label),
             Paragraph(duration_str, cell_val),
+            Paragraph("EXAM LANGUAGE", cell_label),
+            Paragraph((detail.exam_language or "en").upper(), cell_val),
         ],
         [
             Paragraph("EXAM MODE", cell_label),
@@ -264,9 +286,10 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
                 styles["Normal"],
             ),
             Paragraph(
-                "<font size=7 color='#64748b'>PROCTORING STATUS</font><br/>"
-                "<font size=12 color='#059669'><b>CLEARED ✓</b></font><br/>"
-                "<font size=7 color='#64748b'>AI Integrity Verified</font>",
+                f"<font size=7 color='#64748b'>PROCTORING STATUS</font><br/>"
+                f"<font size=12 color='{_proctoring_status(detail)[1]}'>"
+                f"<b>{_proctoring_status(detail)[0]}</b></font><br/>"
+                f"<font size=7 color='#64748b'>{detail.proctor_event_count} flag(s) logged</font>",
                 styles["Normal"],
             ),
         ]
@@ -337,6 +360,53 @@ def generate_result_pdf(detail: ResultDetail, candidate_email: str | None = None
         )
         story.append(sec_table)
         story.append(Spacer(1, 14))
+
+    # 4b. Proctoring Review
+    story.append(Paragraph("Proctoring Review", section_heading))
+    story.append(Spacer(1, 5))
+    review_rows = [
+        [
+            Paragraph("<b>Genuine / Approved</b>", cell_label),
+            Paragraph(
+                "Yes" if detail.integrity_verdict != "malpractice" else "No", cell_val
+            ),
+            Paragraph("<b>Review Status</b>", cell_label),
+            Paragraph(detail.integrity_verdict.capitalize(), cell_val),
+        ],
+        [
+            Paragraph("<b>Number of Flags</b>", cell_label),
+            Paragraph(str(detail.proctor_event_count), cell_val),
+            Paragraph("<b>Reviewed By</b>", cell_label),
+            Paragraph(detail.integrity_reviewed_by_name or "—", cell_val),
+        ],
+        [
+            Paragraph("<b>Approval Date</b>", cell_label),
+            Paragraph(
+                detail.integrity_reviewed_at.strftime("%b %d, %Y at %H:%M UTC")
+                if detail.integrity_reviewed_at
+                else "—",
+                cell_val,
+            ),
+            Paragraph("", cell_label),
+            Paragraph("", cell_val),
+        ],
+    ]
+    review_table = Table(review_rows, colWidths=[1.4 * inch, 2.25 * inch, 1.4 * inch, 2.25 * inch])
+    review_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    story.append(review_table)
+    story.append(Spacer(1, 14))
 
     # 5. Question-Level Feedback Summary
     story.append(Paragraph("Detailed Question Breakdown & Evaluation", section_heading))
@@ -570,6 +640,244 @@ def generate_candidate_report_pdf(detail: ResultDetail) -> bytes:
             )
         )
         story.append(sec_table)
+
+    doc.build(story)
+    return buffer.getvalue()
+
+
+def generate_exam_mark_list_pdf(
+    *,
+    exam_title: str,
+    subject_name: str | None,
+    exam_date: datetime,
+    generated_by: str,
+    rows: list[RankingRow],
+    passing_percentage: float | None,
+) -> bytes:
+    """The professional mark list / result sheet for one exam - approved candidates only.
+
+    ``rows`` is exactly what ``exam_ranking`` (recruitment.py) already computes - marks,
+    accuracy, proctoring flags, integrity ruling. This never recalculates a score; it only
+    lays the same numbers out as a printable sheet, already filtered to published rows and
+    sorted by the caller.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36,
+    )
+
+    styles = getSampleStyleSheet()
+    header_title = ParagraphStyle(
+        "MarkListHeaderTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        textColor=colors.HexColor("#0f172a"),
+    )
+    header_subtitle = ParagraphStyle(
+        "MarkListHeaderSub",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#64748b"),
+    )
+    doc_badge = ParagraphStyle(
+        "MarkListDocBadge",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=10,
+        leading=13,
+        alignment=2,
+        textColor=colors.HexColor("#4f46e5"),
+    )
+    meta_label = ParagraphStyle(
+        "MarkListMetaLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#64748b"),
+    )
+    meta_val = ParagraphStyle(
+        "MarkListMetaVal",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#0f172a"),
+    )
+    head_cell = ParagraphStyle(
+        "MarkListHeadCell",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor("#1e293b"),
+    )
+    body_cell = ParagraphStyle(
+        "MarkListBodyCell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor("#0f172a"),
+    )
+    footer_text = ParagraphStyle(
+        "MarkListFooterText",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7.5,
+        leading=10,
+        alignment=1,
+        textColor=colors.HexColor("#94a3b8"),
+    )
+
+    story = []
+
+    header_data = [
+        [
+            Paragraph("EXAMINA <b>Platform</b>", header_title),
+            Paragraph("EXAM RESULT REPORT<br/><b>EXAM MARK LIST</b>", doc_badge),
+        ],
+        [
+            Paragraph("AI Examination Platform", header_subtitle),
+            Paragraph(f"Generated: {datetime.now().strftime('%b %d, %Y %H:%M')}", header_subtitle),
+        ],
+    ]
+    header_table = Table(header_data, colWidths=[5.0 * inch, 4.7 * inch])
+    header_table.setStyle(
+        TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("PADDING", (0, 0), (-1, -1), 0)])
+    )
+    story.append(header_table)
+    story.append(Spacer(1, 8))
+    story.append(
+        HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#4f46e5"), spaceAfter=12)
+    )
+
+    meta_data = [
+        [
+            Paragraph("EXAM NAME", meta_label),
+            Paragraph(exam_title, meta_val),
+            Paragraph("SUBJECT", meta_label),
+            Paragraph(subject_name or "—", meta_val),
+        ],
+        [
+            Paragraph("EXAM DATE", meta_label),
+            Paragraph(exam_date.strftime("%b %d, %Y"), meta_val),
+            Paragraph("GENERATED BY", meta_label),
+            Paragraph(generated_by, meta_val),
+        ],
+    ]
+    meta_table = Table(meta_data, colWidths=[1.3 * inch, 3.2 * inch, 1.3 * inch, 3.9 * inch])
+    meta_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    story.append(meta_table)
+    story.append(Spacer(1, 14))
+
+    header_row = [
+        Paragraph(h, head_cell)
+        for h in (
+            "S.No",
+            "Candidate Name",
+            "Candidate ID",
+            "Exam Date",
+            "Total Marks",
+            "Marks Obtained",
+            "Percentage",
+            "Pass/Fail",
+            "Proctoring Status",
+            "Flags",
+            "Approval Status",
+        )
+    ]
+    table_rows: list[list] = [header_row]
+    for idx, row in enumerate(rows, 1):
+        passed = (
+            row.overall_percentage >= passing_percentage
+            if passing_percentage is not None
+            else None
+        )
+        if row.integrity_verdict == "malpractice":
+            proctor_label = "Malpractice"
+        elif row.is_flagged:
+            proctor_label = "Reviewed" if row.integrity_verdict == "cleared" else "Flagged"
+        else:
+            proctor_label = "Genuine"
+        table_rows.append(
+            [
+                Paragraph(str(idx), body_cell),
+                Paragraph(row.full_name, body_cell),
+                Paragraph(str(row.candidate_id), body_cell),
+                Paragraph(exam_date.strftime("%b %d, %Y"), body_cell),
+                Paragraph(f"{row.total_marks:g}", body_cell),
+                Paragraph(f"{row.obtained_marks:g}", body_cell),
+                Paragraph(f"{row.overall_percentage:.1f}%", body_cell),
+                Paragraph(
+                    "Pass" if passed else "Fail" if passed is not None else "—", body_cell
+                ),
+                Paragraph(proctor_label, body_cell),
+                Paragraph(str(row.flag_count), body_cell),
+                Paragraph("Approved", body_cell),
+            ]
+        )
+
+    col_widths = [
+        0.45 * inch,
+        1.7 * inch,
+        1.5 * inch,
+        0.95 * inch,
+        0.85 * inch,
+        1.0 * inch,
+        0.85 * inch,
+        0.7 * inch,
+        1.15 * inch,
+        0.55 * inch,
+        1.0 * inch,
+    ]
+    mark_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+    mark_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(mark_table)
+    story.append(Spacer(1, 14))
+    story.append(
+        HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cbd5e1"), spaceAfter=8)
+    )
+    story.append(
+        Paragraph(
+            f"Generated {datetime.now().strftime('%b %d, %Y %H:%M')} by {generated_by}. "
+            "Includes only approved (examiner-reviewed, published) candidates for this exam.<br/>"
+            "© ExamAI Examination Systems • All Rights Reserved",
+            footer_text,
+        )
+    )
 
     doc.build(story)
     return buffer.getvalue()

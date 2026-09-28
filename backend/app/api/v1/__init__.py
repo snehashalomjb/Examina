@@ -12,10 +12,12 @@ from app.api.v1 import (
     grading,
     live_signal,
     login_requests,
+    notifications,
     proctor,
     question_import,
     questions,
     recruitment,
+    reports,
     results,
     sections,
 )
@@ -43,9 +45,11 @@ api_router.include_router(login_requests.router)
 api_router.include_router(exam_sessions.router)
 api_router.include_router(proctor.router)
 api_router.include_router(live_signal.router)
+api_router.include_router(notifications.router)
 api_router.include_router(grading.router)
 api_router.include_router(results.router)
 api_router.include_router(recruitment.router)
+api_router.include_router(reports.router)
 api_router.include_router(analytics.router)
 
 __all__ = ["api_router"]

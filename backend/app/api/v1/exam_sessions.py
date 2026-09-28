@@ -38,6 +38,7 @@ from app.db.models import (
     SessionStatus,
     Subject,
 )
+from app.db.models.enums import DEFAULT_LOCALE, SUPPORTED_LOCALES
 from app.db.session import SessionLocal
 from app.schemas.exam_session import (
     AnswerSave,
@@ -50,7 +51,7 @@ from app.schemas.exam_session import (
     SubmitOut,
 )
 from app.schemas.question import OptionOut
-from app.services import answer_media, exam_engine, login_access
+from app.services import answer_media, exam_engine, login_access, notifications
 from app.services.i18n import resolve_locale, translated_field
 from app.services.question_spec import candidate_spec
 from app.services.text_metrics import WordCountError
@@ -64,20 +65,42 @@ def _candidate_locale(
     candidate: CurrentCandidate,
     accept_language: str | None = Header(default=None),
     lang: str | None = None,
+    exam: Exam | None = None,
 ) -> str:
-    """Explicit ``?lang=`` wins over the candidate's saved preference over the browser's
-    header - see ``resolve_locale``. The override is per-request only: switching
-    language mid-exam never touches ``candidate.preferred_locale``, so it can't surprise
-    them anywhere else in the app."""
+    """Which language this paper is rendered in.
+
+    When ``exam`` is given, the examiner's declared language is the *only* source of
+    truth - a candidate cannot override it via ``?lang=``, a saved preference, or the
+    browser's ``Accept-Language``. "The examiner chose Telugu" means the candidate gets
+    Telugu, full stop; there is no in-exam language selector any more, and the backend
+    must not honour one smuggled in by hand. ``lang``/``accept_language`` are accepted
+    here only so existing callers/URLs keep working - they are silently ignored
+    whenever an exam is in scope.
+
+    Without an ``exam`` (e.g. the dashboard's exam list, which is UI chrome rather than
+    exam content), the ordinary preference chain still applies.
+    """
+    if exam is not None:
+        return exam.primary_language or DEFAULT_LOCALE
     return resolve_locale(
-        query_lang=lang, user_locale=candidate.preferred_locale, accept_language=accept_language
+        query_lang=lang,
+        user_locale=candidate.preferred_locale,
+        accept_language=accept_language,
     )
 
 
 def _within_exam_languages(exam: Exam, locale: str) -> str:
-    """Fall back to English when the candidate asks for a language this exam never
-    enabled - never a 4xx, since a stale selector choice must never block the paper."""
-    return locale if locale in exam.languages else "en"
+    """Keep a supported language, fall back to English only for an unsupported one.
+
+    This used to clamp to ``exam.languages``, which meant an English-authored exam
+    (the common case) silently forced every Telugu/Tamil/Kannada/Malayalam candidate
+    back to English no matter what they had selected - the exact failure this whole
+    system exists to prevent. ``enabled_languages`` records what an *examiner* offered
+    the paper in; it is not a limit on what a candidate may read it in. The question
+    bank itself is English-only (see ``Question.language``), so paper *content* is
+    always English while exam/section labels still follow this locale.
+    """
+    return locale if locale in SUPPORTED_LOCALES else DEFAULT_LOCALE
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -85,9 +108,9 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # ------------------------------------------------------------------ helpers
 def _localized_option(option: QuestionOption, locale: str) -> OptionOut:
-    out = OptionOut.model_validate(option)
-    out.text = translated_field(option.text, option.translations, locale, "text")
-    return out
+    # The bank is English-only: the option's own text is the text. ``locale`` is kept
+    # in the signature because callers already thread it through for exam labels.
+    return OptionOut.model_validate(option)
 
 
 def _build_paper(
@@ -95,10 +118,10 @@ def _build_paper(
 ) -> ExamSessionOut:
     """Render the candidate's frozen paper, merged with whatever they have saved.
 
-    Question/option text is resolved to ``locale`` with fallback to English (see
-    ``app.services.i18n``) - the frozen ``question_order``/answer-key data underneath is
-    entirely language-independent, so translating display text here never touches
-    grading.
+    ``locale`` is always the exam's own declared language (see ``_candidate_locale``)
+    and resolves the exam/section labels. The question bank is English-only, so the
+    question content itself is always the English base column - there is no
+    translated variant of a question to fetch or render.
     """
     locale = _within_exam_languages(session.exam, locale)
     question_ids = [uuid.UUID(e["question_id"]) for e in session.question_order]
@@ -107,10 +130,7 @@ def _build_paper(
         for q in db.scalars(
             select(Question)
             .where(Question.id.in_(question_ids))
-            .options(
-                selectinload(Question.options).selectinload(QuestionOption.translations),
-                selectinload(Question.translations),
-            )
+            .options(selectinload(Question.options))
         )
     }
     answers = {a.question_id: a for a in session.answers}
@@ -152,7 +172,7 @@ def _build_paper(
                 question_id=qid,
                 question_type=question.question_type,
                 difficulty=question.difficulty,
-                body=translated_field(question.body, question.translations, locale, "body"),
+                body=question.body,
                 marks=entry.get("marks", question.marks),
                 negative_marks=question.negative_marks,
                 category=question.category,
@@ -220,7 +240,12 @@ def _build_paper(
         exam_token=token,
         sections=built_sections,
         locale=locale,
-        available_languages=session.exam.languages,
+        # Every supported language is servable now (translated on demand + cached), so the
+        # in-exam selector offers them all rather than only what the examiner declared.
+        available_languages=[
+            DEFAULT_LOCALE,
+            *[loc for loc in SUPPORTED_LOCALES if loc != DEFAULT_LOCALE],
+        ],
     )
 
 
@@ -303,19 +328,20 @@ def my_exams(
 
         can_start = False
         reason: str | None = None
+        reason_code: str | None = None
         if session is not None:
-            reason = (
-                "Attempt in progress"
-                if session.status is SessionStatus.IN_PROGRESS
-                else "Already attempted"
-            )
-            can_start = session.status is SessionStatus.IN_PROGRESS
+            if session.status is SessionStatus.IN_PROGRESS:
+                reason, reason_code = "Attempt in progress", "in_progress"
+                can_start = True
+            else:
+                reason, reason_code = "Already attempted", "already_attempted"
         elif exam.status is not ExamStatus.PUBLISHED:
-            reason = "This exam is closed"
+            reason, reason_code = "This exam is closed", "not_published"
         elif now < starts:
             reason = f"Opens {starts.strftime('%d %b %Y, %H:%M UTC')}"
+            reason_code = "opens_later"
         elif now > ends:
-            reason = "The exam window has closed"
+            reason, reason_code = "The exam window has closed", "window_closed"
         else:
             can_start = True
 
@@ -362,6 +388,7 @@ def my_exams(
                 submitted_at=session.submitted_at if session else None,
                 can_start=can_start,
                 reason=reason,
+                reason_code=reason_code,
                 exam_type=exam.exam_type,
                 course=translated_field(exam.course, exam.translations, locale, "course"),
                 department=translated_field(
@@ -375,7 +402,14 @@ def my_exams(
                 sections_count=len(exam.sections or []),
                 has_coding=has_coding,
                 proctor_config=exam.proctor_config,
-                available_languages=exam.languages,
+                # The exam's own language is always offered, even when the examiner left
+                # `enabled_languages` alone - otherwise the pre-exam selector could not
+                # offer the very language they declared for this paper.
+                available_languages=list(
+                    dict.fromkeys(
+                        [*(exam.languages or []), exam.primary_language or DEFAULT_LOCALE]
+                    )
+                ),
             )
         )
     return cards
@@ -409,10 +443,12 @@ def start_exam(
     accept_language: str | None = Header(default=None),
     lang: str | None = None,
 ) -> ExamSessionOut:
-    locale = _candidate_locale(candidate, accept_language, lang)
     exam = exam_engine.load_exam_with_pool(db, exam_id)
     if exam is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exam not found")
+    # Resolved after the exam is loaded: an exam that declares its own language decides
+    # the paper's language. See `_candidate_locale`.
+    locale = _candidate_locale(candidate, accept_language, lang, exam=exam)
 
     # Enrolment is checked server-side on every start: knowing an exam id is not access.
     if not login_access.is_enrolled(db, exam_id=exam_id, candidate_id=candidate.id):
@@ -506,15 +542,15 @@ def get_session(
 ) -> ExamSessionOut:
     """Rehydrate after a refresh or a crash. Deliberately does not need the exam token.
 
-    Also what the in-exam language selector calls: passing ``?lang=`` re-renders the
-    paper's text in that locale without touching the session, the answers, the timer or
-    the token - see ``_build_paper``, which merges saved answers back in unchanged.
+    ``lang`` is accepted but ignored - the paper always renders in the exam's own
+    declared language (see ``_candidate_locale``), never in whatever the caller asks
+    for.
     """
     session = exam_engine.load_session(db, session_id)
     if session is None or session.candidate_id != candidate.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     exam_engine.expire_if_due(db, session)
-    locale = _candidate_locale(candidate, accept_language, lang)
+    locale = _candidate_locale(candidate, accept_language, lang, exam=session.exam)
     return _build_paper(db, session, include_token=True, locale=locale)
 
 
@@ -688,6 +724,10 @@ def submit(
         )
 
     auto_scored, pending = exam_engine.finalize_session(db, session)
+
+    created_notifications = notifications.notify_submission(db, session)
+    if created_notifications:
+        background.add_task(notifications.push_to_recipients, created_notifications)
 
     if pending:
         background.add_task(_grade_in_background, session.id)

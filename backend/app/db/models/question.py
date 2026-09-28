@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.db.models.enums import (
+    DEFAULT_LOCALE,
     Difficulty,
     QuestionCategory,
     QuestionSource,
@@ -45,8 +46,21 @@ class Question(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_questions_pool_lookup", "subject_id", "question_type", "difficulty"),
         # The bank browser filters on these three together far more often than singly.
         Index("ix_questions_bank_filter", "category", "topic", "status"),
+        # Every language-scoped bank browse (the whole point of the "Exam Language"
+        # dropdown) starts from this pair - a Tamil paper's pool builder never wants to
+        # see the English or Hindi rows for the same subject.
+        Index("ix_questions_language_subject", "language", "subject_id"),
     )
 
+    #: Which language this question's own text (``body``, options, ``model_answer``,
+    #: ``explanation``) is written in. Unlike ``QuestionTranslation``, this is not a
+    #: fallback layer over an English master - a Tamil question is its own row, never a
+    #: translation of an English one, so a Tamil exam's pool never surfaces English or
+    #: Hindi material for the same subject. Defaults to English so every question
+    #: authored before this column existed keeps its meaning.
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default=DEFAULT_LOCALE, server_default=DEFAULT_LOCALE
+    )
     subject_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("subjects.id", ondelete="RESTRICT"), nullable=False
     )

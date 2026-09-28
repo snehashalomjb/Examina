@@ -1,0 +1,29 @@
+﻿probe exams=7 probe questions=20
+  removed 6 results
+  removed 12 answers
+  removed 6 exam_sessions
+  removed 12 exam_questions
+  removed 7 exam_translations
+  removed 7 exams
+  removed 80 option_translations
+  removed 20 question_translations
+  removed 20 questions
+
+after cleanup:
+  probe exams    : 0
+  probe questions: 0
+  total questions: 31361
+  total exams    : 45
+probe exams left    : 0
+probe questions left: 0
+probe users left    : 0
+probe sessions left : 0
+
+non-English question translations (te/ta/ml/kn): 0
+translation coverage by locale:
+    ('en', 886)
+    ('hi', 237)
+
+total questions: 31361
+total exams    : 45
+total users    : 17

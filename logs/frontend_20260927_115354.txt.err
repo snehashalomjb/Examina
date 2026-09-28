@@ -1,0 +1,1495 @@
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Cannot update a component (`ToastHost`) while rendering a different component (`GuidedSectionPicker`). To locate the bad setState() call inside `GuidedSectionPicker`, follow the stack trace as described in https://react.dev/link/setstate-in-render 
+    at ToastHost.useEffect (src/components/ui.tsx:665:7)
+    at toast (src/components/ui.tsx:656:3)
+    at <unknown> (src/components/GuidedSectionPicker.tsx:214:14)
+    at GuidedSectionPicker (src/components/GuidedSectionPicker.tsx:147:43)
+  663 |     pushToast = (message, tone = "neutral") => {
+  664 |       const id = Date.now() + Math.random();
+> 665 |       setItems((current) => [...current, { id, message, tone }]);
+      |       ^
+  666 |       setTimeout(() => setItems((current) => current.filter((t) => t.id !== id)), 4500);
+  667 |     };
+  668 |     return () => { pushToast = null; }; (src/components/ui.tsx:665:7)
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Each child in a list should have a unique "key" prop.
+
+Check the render method of `RankingPage`. See https://react.dev/link/warning-keys for more information. 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+[browser] ./src/app/dashboard/exams/[id]/ranking/page.tsx:503:21
+Error: Expression expected
+  501 |                       </tr>
+  502 |                     )}
+> 503 |                   </>
+      |                     ^
+  504 |                 ))}
+  505 |               </tbody>
+  506 |             </table>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component Browser]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Client Component SSR]
+    ./src/app/dashboard/exams/[id]/ranking/page.tsx [Server Component] 
+⚠ Fast Refresh had to perform a full reload when ./src/i18n/en/results.json.[json].cjs changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/i18n/en/results.json.[json].cjs changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+⚠ Fast Refresh had to perform a full reload when ./src/i18n/ml/results.json.[json].cjs changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./src/i18n/ml/results.json.[json].cjs changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `Mid-Term / Unit Topic Assessment`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.
+[browser] Uncaught Error: Internal Next.js error: Router action dispatched before initialization.

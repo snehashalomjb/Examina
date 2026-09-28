@@ -18,7 +18,6 @@ import {
 import { ApiError, api } from "@/lib/api";
 import { useRequireAuth } from "@/lib/auth";
 import { LiveBroadcaster } from "@/lib/liveBroadcast";
-import { LOCALE_NAMES, type Locale } from "@/lib/locale";
 import { ProctorEngine, type ProctorStatus } from "@/lib/proctor";
 import type { ExamSession, HeartbeatOut, PaperQuestion, SessionSection } from "@/lib/types";
 import { QUESTION_TYPE_LABEL as TYPE_LABEL } from "@/lib/types";
@@ -60,8 +59,6 @@ export default function ExamRunner() {
   /** False until the candidate has entered fullscreen once, so the gate can differ. */
   const [fullscreenEverEntered, setFullscreenEverEntered] = useState(false);
   const [clearTarget, setClearTarget] = useState<PaperQuestion | null>(null);
-  const [switchingLocale, setSwitchingLocale] = useState(false);
-  const [localeNotice, setLocaleNotice] = useState<string | null>(null);
 
   const examToken = useRef<string | null>(null);
   const engine = useRef<ProctorEngine | null>(null);
@@ -112,35 +109,6 @@ export default function ExamRunner() {
       }
     })();
   }, [user, sessionId]);
-
-  /**
-   * Switch the displayed language mid-exam. Re-fetches the same frozen paper rendered
-   * in a different locale - question/option ids, marks, the timer, the session, and
-   * every saved answer are untouched: `answers` state (keyed by question_id) never gets
-   * cleared here, and the server's `_build_paper` merges the candidate's real answers
-   * back in regardless of locale. Only the displayed text changes.
-   */
-  const changeExamLocale = useCallback(
-    async (locale: string) => {
-      if (!sessionId || switchingLocale) return;
-      setSwitchingLocale(true);
-      try {
-        const data = await api.get<ExamSession>(`/sessions/${sessionId}?lang=${locale}`);
-        examToken.current = data.exam_token ?? examToken.current;
-        setSession(data);
-        setLocaleNotice(
-          data.locale !== locale
-            ? "Translation unavailable for this exam. Showing English."
-            : null,
-        );
-      } catch (err) {
-        toast(err instanceof ApiError ? err.message : "Could not switch language.", "rose");
-      } finally {
-        setSwitchingLocale(false);
-      }
-    },
-    [sessionId, switchingLocale],
-  );
 
   /* -------------------------------------------------------------- proctoring */
   useEffect(() => {
@@ -515,18 +483,32 @@ export default function ExamRunner() {
   /* Visible questions: if sections exist, filter to active section */
   const visibleQuestions = useMemo(() => {
     if (!session) return [];
-    if (session.sections.length === 0 || !activeSection) return session.questions;
+    const all = session.questions;
+    if (session.sections.length === 0 || !activeSection) return all;
     const activeQuestionIds = new Set(
       session.sections.find((s) => s.id === activeSection)?.question_ids ?? [],
     );
-    return session.questions.filter((q) => activeQuestionIds.has(q.question_id));
+    const filtered = all.filter((q) => activeQuestionIds.has(q.question_id));
+    // A section whose `question_ids` do not line up with the paper would otherwise render
+    // an empty pane. Showing the whole paper is recoverable; showing nothing is not.
+    return filtered.length > 0 ? filtered : all;
   }, [session, activeSection]);
+
+  /* The index actually rendered.
+     `current` is a plain number that user actions set, and the section filter can shrink
+     `visibleQuestions` underneath it. Nothing re-clamped it, so picking a shorter section
+     left `current` past the end of the list and `visibleQuestions[current]` was
+     `undefined` - a TypeError that white-screened the paper mid-exam. Clamping *here*,
+     during render, means an out-of-range index can never be observed at all, and it costs
+     no extra render the way correcting it in an effect would. */
+  const activeIndex =
+    visibleQuestions.length === 0 ? 0 : Math.min(current, visibleQuestions.length - 1);
 
   /* Tell the engine which question is on screen, so a proctoring event can be tied to it. */
   useEffect(() => {
-    const q = visibleQuestions[current] ?? session?.questions[current];
+    const q = visibleQuestions[activeIndex];
     engine.current?.setCurrentQuestionId(q?.question_id);
-  }, [current, visibleQuestions, session]);
+  }, [activeIndex, visibleQuestions, session]);
 
   if (booting || (!session && !loadError)) return <Splash label="Loading your paper" />;
 
@@ -574,7 +556,25 @@ export default function ExamRunner() {
   const mustReturnToFullscreen =
     Boolean(session.proctor_config.require_fullscreen) && !inFullscreen && !finished;
 
-  const question = visibleQuestions[current] ?? session.questions[current];
+  // Indexes strictly into `visibleQuestions`, via the clamped `activeIndex` above. The old
+  // `?? session.questions[current]` fallback was not a safety net: while a section filter
+  // was active the two lists hold different questions, so it could quietly show a question
+  // from the wrong section.
+  const question = visibleQuestions[activeIndex];
+  if (!question) {
+    // Unreachable while `visibleQuestions` falls back to the whole paper and `activeIndex`
+    // is clamped - but a thrown TypeError here costs a candidate their entire sitting, so
+    // degrade to something they can act on rather than white-screening the exam.
+    return (
+      <CentredNotice
+        title="Could not open that question"
+        body="This question is not part of the paper you were given. Reload the page to carry on — your answers so far are saved."
+        action={
+          <Button onClick={() => window.location.reload()}>Reload the exam</Button>
+        }
+      />
+    );
+  }
   const answer = answers[question.question_id] ?? { options: [], text: "", imageUrl: null };
   const lowTime = remaining <= 300;
   const criticalTime = remaining <= 60;
@@ -583,18 +583,6 @@ export default function ExamRunner() {
 
   return (
     <div className="flex h-screen flex-col bg-paper">
-      {/* Live camera - pinned to the top-left corner of the exam window itself, above
-          everything else, so it stays put across every question and never depends on
-          the palette sidebar being open. */}
-      <div className="pointer-events-none fixed left-3 top-16 z-40 w-28 sm:w-32">
-        <WebcamPreview
-          videoRef={videoRef}
-          canvasRef={canvasRef}
-          status={proctor}
-          enabled={session.proctor_config.webcam_enabled}
-        />
-      </div>
-
       {/* ------------------------------------------------- the fullscreen gate
        *
        * Covers the paper whenever fullscreen is required and not active. The button is
@@ -660,24 +648,18 @@ export default function ExamRunner() {
       )}
 
       {/* ------------------------------------------------------------ top bar */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-2.5 lg:px-6"
-        style={{
-          background: "rgba(248,249,252,0.95)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-        }}>
+      <header className="relative flex h-[76px] shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/95 px-5 backdrop-blur-md lg:px-7">
         {/* Accent top line */}
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent opacity-50" />
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px]"
-            style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))", border: "1px solid rgba(99,102,241,0.2)" }}>
-            <Mark size={18} />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft/60 ring-1 ring-accent/20">
+            <Mark size={19} />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[13.5px] font-bold tracking-tight text-ink">
+            <p className="truncate text-[15px] font-bold tracking-tight text-ink">
               {session.exam_title}
             </p>
-            <p className="text-[11px] text-ink-muted">
+            <p className="text-[12px] text-ink-muted">
               {answeredCount}/{session.questions.length} answered
               <span className="mx-1.5 opacity-40">·</span>
               {session.total_marks} marks
@@ -685,29 +667,21 @@ export default function ExamRunner() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {session.available_languages.length > 1 && (
-            <ExamLanguageSelector
-              locale={session.locale}
-              languages={session.available_languages}
-              busy={switchingLocale}
-              onChange={changeExamLocale}
-            />
-          )}
+        <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
           <SaveIndicator state={saveState} />
           <ProctorPill status={proctor} enabled={session.proctor_config.webcam_enabled} severity={lastSeverity} />
-          {/* Premium timer */}
+          {/* Timer */}
           <div
             className={cx(
-              "rounded-[10px] border px-2.5 py-1.5 text-center tabular-nums transition-all duration-300 sm:px-3 sm:py-2",
+              "rounded-[10px] border px-3 py-1.5 text-center tabular-nums transition-all duration-300",
               criticalTime
                 ? "border-rose/40 bg-rose-soft animate-[pulse-ring-alert_1.1s_ease-out_infinite]"
                 : lowTime
                   ? "border-amber/30 bg-amber-soft"
-                  : "border-accent/20 bg-accent-soft/30",
+                  : "border-accent/20 bg-accent-soft/40",
             )}
           >
-            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">Time Left</p>
+            <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">Time left</p>
             <p
               className={cx(
                 "text-[18px] font-bold leading-tight tabular-nums tracking-tight",
@@ -717,8 +691,7 @@ export default function ExamRunner() {
               {formatDuration(remaining)}
             </p>
           </div>
-          <Button size="sm" onClick={() => setConfirming(true)}
-            style={{ background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", border: "none", boxShadow: "0 2px 8px -2px rgba(79,70,229,0.4)" }}>
+          <Button size="sm" onClick={() => setConfirming(true)}>
             Submit
           </Button>
         </div>
@@ -737,11 +710,6 @@ export default function ExamRunner() {
         />
       )}
 
-      {localeNotice && (
-        <div className="shrink-0 border-b border-amber/25 bg-amber-soft px-4 py-2 lg:px-6">
-          <p className="text-[12.5px] font-medium text-amber">{localeNotice}</p>
-        </div>
-      )}
       {warnings.length > 0 && (
         <div
           className={cx(
@@ -773,35 +741,45 @@ export default function ExamRunner() {
       {/* --------------------------------------------------------------- body */}
       <div
         className={cx(
-          "flex min-h-0 flex-1 flex-col lg:flex-row transition-shadow duration-300",
+          "flex min-h-0 flex-1 flex-col transition-shadow duration-300 lg:flex-row",
           // A high-risk event outlines the content area briefly and fades on its own -
           // the interface must never go permanently red, only flag the moment.
           riskFlash && "ring-4 ring-inset ring-rose/70",
         )}
       >
-        {/* Palette */}
-        <aside className="flex shrink-0 flex-col border-b border-line bg-surface p-3 lg:w-[228px] lg:border-b-0 lg:border-r lg:p-4">
-          <div className="flex items-center justify-between gap-3 lg:block">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted lg:mb-3">
-              Questions
-            </p>
-            <button
-              type="button"
-              onClick={() => setPaletteOpen((open) => !open)}
-              aria-expanded={paletteOpen}
-              className="shrink-0 rounded-[8px] border border-line px-2.5 py-1 text-[12px] font-medium text-ink-soft transition hover:bg-sunken lg:hidden"
-            >
-              {paletteOpen ? "Hide" : `${current + 1} of ${visibleQuestions.length}`}
-            </button>
-          </div>
+        {/* Sidebar: camera first, then question navigation - both always visible on
+            desktop; on small screens the camera stays put and only the question grid
+            collapses behind a toggle, so a candidate never loses sight of the camera. */}
+        <aside className="flex shrink-0 flex-col gap-4 overflow-y-auto border-b border-line bg-surface p-3 lg:w-[300px] lg:border-b-0 lg:border-r lg:p-4">
+          <WebcamPreview
+            videoRef={videoRef}
+            canvasRef={canvasRef}
+            status={proctor}
+            enabled={session.proctor_config.webcam_enabled}
+          />
 
-          <div className={cx("mt-3 lg:mt-0 lg:block", paletteOpen ? "block" : "hidden")}>
-            <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 lg:grid-cols-5">
+          <div className="border-t border-line pt-3.5">
+            <div className="flex items-center justify-between gap-3 lg:block">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted lg:mb-3">
+                Questions
+              </p>
+              <button
+                type="button"
+                onClick={() => setPaletteOpen((open) => !open)}
+                aria-expanded={paletteOpen}
+                className="shrink-0 rounded-[8px] border border-line px-2.5 py-1 text-[12px] font-medium text-ink-soft transition hover:bg-sunken lg:hidden"
+              >
+                {paletteOpen ? "Hide" : `${activeIndex + 1} of ${visibleQuestions.length}`}
+              </button>
+            </div>
+
+            <div className={cx("mt-3 lg:mt-0 lg:block", paletteOpen ? "block" : "hidden")}>
+              <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 lg:grid-cols-5">
               {visibleQuestions.map((q, index) => {
                 const a = answers[q.question_id];
                 const done = a && (a.options.length > 0 || a.text.trim() || a.imageUrl);
                 const flagged = reviewFlags.has(q.question_id);
-                const isCurrent = index === current;
+                const isCurrent = index === activeIndex;
                 return (
                   <button
                     key={q.question_id}
@@ -850,11 +828,12 @@ export default function ExamRunner() {
               <Legend swatch="bg-amber-soft border border-amber/40" label="Answered + review" icon="⚑" />
             </div>
           </div>
+          </div>
         </aside>
 
         {/* question pane */}
-        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 lg:px-10">
-          <div className="mx-auto max-w-3xl">
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-7 lg:px-10">
+          <div className="mx-auto max-w-[1040px]">
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <Badge tone="accent">
                 Question {(activeSection
@@ -931,30 +910,31 @@ export default function ExamRunner() {
                 variant={isReviewing ? "secondary" : "ghost"}
                 onClick={() => void toggleReview(question.question_id)}
               >
-                {isReviewing ? "⚑ Reviewing" : "Mark for review"}
+                <span aria-hidden className="mr-1.5">🔖</span>
+                {isReviewing ? "Reviewing" : "Mark for review"}
               </Button>
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-3">
+            <div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5">
               <Button
                 variant="secondary"
                 onClick={() => setCurrent((i) => Math.max(0, i - 1))}
-                disabled={current === 0}
+                disabled={activeIndex === 0}
               >
-                Previous
+                ← Previous
               </Button>
 
               <div className="flex gap-2 lg:hidden">
                 <span className="self-center text-[12px] text-ink-muted">
-                  {current + 1} / {visibleQuestions.length}
+                  {activeIndex + 1} / {visibleQuestions.length}
                 </span>
               </div>
 
-              {current === visibleQuestions.length - 1 ? (
-                <Button onClick={() => setConfirming(true)}>Review &amp; submit</Button>
+              {activeIndex === visibleQuestions.length - 1 ? (
+                <Button onClick={() => setConfirming(true)}>Review &amp; submit →</Button>
               ) : (
                 <Button onClick={() => setCurrent((i) => Math.min(visibleQuestions.length - 1, i + 1))}>
-                  Next
+                  Next →
                 </Button>
               )}
             </div>
@@ -1233,16 +1213,16 @@ function OptionList({
             key={option.id}
             onClick={() => onChoose(option.id)}
             className={cx(
-              "flex w-full items-start gap-3 rounded-[11px] border px-4 py-3 text-left transition",
+              "flex w-full min-h-[64px] items-center gap-3.5 rounded-[12px] border px-5 py-3.5 text-left transition",
               selected
-                ? "border-accent bg-accent-soft"
+                ? "border-accent bg-accent-soft shadow-[0_0_0_1px_rgba(79,70,229,0.15)]"
                 : "border-line hover:border-line-strong hover:bg-sunken",
             )}
           >
             <span
               className={cx(
-                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center border text-[11px] font-semibold",
-                multi ? "rounded-[5px]" : "rounded-full",
+                "flex h-7 w-7 shrink-0 items-center justify-center border text-[12.5px] font-semibold transition",
+                multi ? "rounded-[6px]" : "rounded-full",
                 selected
                   ? "border-accent bg-accent text-white"
                   : "border-line-strong text-ink-muted",
@@ -1250,7 +1230,7 @@ function OptionList({
             >
               {String.fromCharCode(65 + index)}
             </span>
-            <span className="text-[14px] leading-relaxed text-ink">{option.text}</span>
+            <span className="text-[14.5px] leading-relaxed text-ink">{option.text}</span>
           </button>
         );
       })}
@@ -1402,43 +1382,6 @@ function SaveIndicator({ state }: { state: SaveState }) {
   );
 }
 
-/**
- * The in-exam language selector. Only ever offers the languages the exam enabled (see
- * `ExamSessionOut.available_languages`) - never the full app-wide language list, so a
- * candidate never sees a language the examiner never translated anything into.
- */
-function ExamLanguageSelector({
-  locale,
-  languages,
-  busy,
-  onChange,
-}: {
-  locale: string;
-  languages: string[];
-  busy: boolean;
-  onChange: (locale: string) => void;
-}) {
-  return (
-    <label className="flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1.5 text-[12.5px] font-medium text-ink-soft">
-      <span aria-hidden="true">🌐</span>
-      <span className="sr-only">Language</span>
-      <select
-        aria-label="Exam language"
-        value={locale}
-        disabled={busy}
-        onChange={(e) => onChange(e.target.value)}
-        className="cursor-pointer border-0 bg-transparent pr-1 text-[12.5px] font-medium text-ink-soft outline-none disabled:opacity-50"
-      >
-        {languages.map((code) => (
-          <option key={code} value={code}>
-            {LOCALE_NAMES[code as Locale] ?? code}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 const SEVERITY_DOT_CLASS: Record<"info" | "warning" | "critical", string> = {
   info: "status-dot status-dot-live",
   warning: "status-dot status-dot-warn",
@@ -1476,33 +1419,74 @@ function WebcamPreview({
   enabled: boolean;
 }) {
   const live = enabled && Boolean(status?.cameraReady);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+
+  function toggleFullscreen() {
+    const el = frameRef.current;
+    if (!el) return;
+    if (document.fullscreenElement === el) {
+      void document.exitFullscreen();
+    } else {
+      void el.requestFullscreen?.();
+    }
+  }
+
   return (
-    <div className="w-full rounded-[11px] border border-line bg-sunken p-1.5 shadow-md">
-      <div className="relative overflow-hidden rounded-[9px] bg-ink/90">
+    <div className="w-full">
+      <div
+        ref={frameRef}
+        className="relative overflow-hidden rounded-[14px] border border-line bg-ink shadow-[var(--shadow-card)]"
+      >
         <video
           ref={videoRef}
           muted
           playsInline
-          className="h-[92px] w-full scale-x-[-1] object-cover sm:h-[104px]"
+          autoPlay
+          className="aspect-[4/3] w-full scale-x-[-1] object-cover"
         />
         <canvas ref={canvasRef} className="hidden" />
         {!enabled && (
-          <div className="absolute inset-0 grid place-items-center text-[10px] text-white/70">
+          <div className="absolute inset-0 grid place-items-center text-[11px] text-white/70">
             Webcam not required
           </div>
         )}
         {live && (
-          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
+          <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-            <span className="text-[9px] font-bold uppercase tracking-wide text-white">Live</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide text-white">Live</span>
           </div>
         )}
         {!live && enabled && (
-          <div className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 py-0.5 backdrop-blur-sm">
-            <span className="text-[9px] font-semibold text-white/80">
+          <div className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 backdrop-blur-sm">
+            <span className="text-[10px] font-semibold text-white/80">
               {status?.visionMode === "degraded" ? "Recording" : "Connecting…"}
             </span>
           </div>
+        )}
+        {enabled && (
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label="Expand camera view"
+            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/80 backdrop-blur-sm transition hover:text-white"
+          >
+            <span aria-hidden className="text-[11px] leading-none">⛶</span>
+          </button>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-1.5 text-[12px] font-medium">
+        {!enabled ? (
+          <span className="text-ink-muted">Camera not required for this exam</span>
+        ) : live ? (
+          <>
+            <span aria-hidden className="text-green">🛡</span>
+            <span className="text-ink-soft">Camera is on</span>
+          </>
+        ) : (
+          <>
+            <span aria-hidden className="text-amber">⚠</span>
+            <span className="text-amber">Camera connecting…</span>
+          </>
         )}
       </div>
     </div>

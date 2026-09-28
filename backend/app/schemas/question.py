@@ -9,6 +9,8 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.db.models.enums import (
+    DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
     Difficulty,
     QuestionCategory,
     QuestionSource,
@@ -16,6 +18,7 @@ from app.db.models.enums import (
     QuestionType,
 )
 from app.schemas.common import ORMModel
+from app.services.language_purity import check_language_purity
 from app.services.validators import OptionDraft, ValidationError, validate_question
 
 
@@ -23,19 +26,29 @@ class SubjectCreate(BaseModel):
     code: str = Field(..., min_length=2, max_length=32)
     name: str = Field(..., min_length=2, max_length=150)
     description: str | None = None
+    #: Per-locale subject label, e.g. ``{"ml": {"name": "പൈത്തൺ"}}``.
+    #: ``en`` is written from ``name`` above, just like questions and options.
+    translations: dict[str, dict[str, str]] | None = None
 
 
 class SubjectUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=150)
     description: str | None = None
+    #: Optional per-locale label changes. Locales left out are left on file.
+    translations: dict[str, dict[str, str]] | None = None
 
 
 class SubjectOut(ORMModel):
     id: uuid.UUID
     code: str
+    #: The label resolved for the request's locale (see ``app.services.i18n``).
     name: str
     description: str | None = None
     question_count: int = 0
+    #: Canonical English values, kept alongside the localised label so an editor can
+    #: rename a subject without accidentally overwriting English with a translation.
+    base_name: str | None = None
+    base_description: str | None = None
 
 
 class OptionIn(BaseModel):
@@ -45,9 +58,6 @@ class OptionIn(BaseModel):
     image_key: str | None = Field(default=None, max_length=512)
     is_correct: bool = False
     order_index: int = 0
-    #: Per-locale text, e.g. {"te": {"text": "..."}}. ``en`` is always upserted from the
-    #: ``text`` field above regardless of whether it's repeated here.
-    translations: dict[str, dict[str, str]] | None = None
 
 
 class OptionOut(ORMModel):
@@ -61,25 +71,14 @@ class OptionOut(ORMModel):
 
 class OptionOutWithAnswer(OptionOut):
     is_correct: bool
-    #: Per-locale text already on file, keyed by locale (``en`` included), for the
-    #: examiner's translation editor to load into its fields. Empty until a translation
-    #: has been written or generated.
-    translations: dict[str, str] = Field(default_factory=dict)
-
-    @field_validator("translations", mode="before")
-    @classmethod
-    def _from_rows(cls, value: Any) -> dict[str, str]:
-        # `model_validate(option, from_attributes=True)` finds `OptionTranslation` rows
-        # on the ORM object's own `.translations` relationship (same field name) before
-        # `_to_full` gets a chance to set the resolved dict - convert them here instead
-        # of forbidding the natural name.
-        if isinstance(value, dict):
-            return value
-        return {row.locale: (row.text or "") for row in value}
 
 
 class QuestionBase(BaseModel):
     subject_id: uuid.UUID
+    #: The bank this question belongs to. The bank is English-only: every question is
+    #: stored as ``en`` no matter which language the platform UI or the exam itself
+    #: uses.
+    language: str = DEFAULT_LOCALE
     question_type: QuestionType
     #: The bank's top-level shelf, orthogonal to subject. Corporate sections select on it.
     category: QuestionCategory = QuestionCategory.ACADEMIC
@@ -106,12 +105,20 @@ class QuestionBase(BaseModel):
     min_words: int | None = Field(default=None, ge=0, le=100_000)
     max_words: int | None = Field(default=None, ge=1, le=100_000)
 
+    @field_validator("language")
+    @classmethod
+    def _language_supported(cls, value: str) -> str:
+        if value not in SUPPORTED_LOCALES:
+            raise ValueError(f"Unsupported language '{value}'. Supported: {SUPPORTED_LOCALES}")
+        if value != DEFAULT_LOCALE:
+            raise ValueError(
+                "The question bank is English-only; only 'en' questions can be created."
+            )
+        return value
+
 
 class QuestionCreate(QuestionBase):
     options: list[OptionIn] = Field(default_factory=list)
-    #: Per-locale question text, e.g. {"te": {"body": "...", "explanation": "..."}}.
-    #: ``en`` is always upserted from ``body``/``model_answer``/``explanation`` above.
-    translations: dict[str, dict[str, str]] | None = None
 
     #: Where this question came from. The client may declare it, but the AI and import
     #: paths set it server-side - a caller cannot dress an AI draft up as hand-authored.
@@ -140,6 +147,18 @@ class QuestionCreate(QuestionBase):
                 max_words=self.max_words,
                 spec=self.spec,
                 image_key=self.image_key,
+            )
+            check_language_purity(
+                language=self.language,
+                fields={
+                    "question": self.body,
+                    "model answer": self.model_answer,
+                    "explanation": self.explanation,
+                    **{
+                        f"option {chr(65 + i)}": o.text
+                        for i, o in enumerate(self.options)
+                    },
+                },
             )
         except ValidationError as exc:
             raise ValueError(str(exc)) from exc
@@ -172,7 +191,6 @@ class QuestionUpdate(BaseModel):
     max_words: int | None = Field(default=None, ge=1, le=100_000)
     is_active: bool | None = None
     options: list[OptionIn] | None = None
-    translations: dict[str, dict[str, str]] | None = None
 
 
 class QuestionOut(ORMModel):
@@ -180,6 +198,8 @@ class QuestionOut(ORMModel):
     subject_id: uuid.UUID
     #: Denormalised for the bank browser, which shows the subject on every card.
     subject_code: str | None = None
+    #: The bank this question belongs to. See ``QuestionBase.language``.
+    language: str = DEFAULT_LOCALE
     question_type: QuestionType
     category: QuestionCategory
     topic: str | None = None
@@ -218,24 +238,6 @@ class QuestionOutFull(QuestionOut):
     rubric: dict[str, Any] | None = None
     spec: dict[str, Any] | None = None
     options: list[OptionOutWithAnswer] = Field(default_factory=list)
-    #: Per-locale {body, model_answer, explanation} already on file, keyed by locale
-    #: (``en`` included), for the examiner's translation editor to load. Empty until a
-    #: translation has been written or generated.
-    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
-
-    @field_validator("translations", mode="before")
-    @classmethod
-    def _from_rows(cls, value: Any) -> dict[str, dict[str, str]]:
-        if isinstance(value, dict):
-            return value
-        return {
-            row.locale: {
-                "body": row.body or "",
-                "model_answer": row.model_answer or "",
-                "explanation": row.explanation or "",
-            }
-            for row in value
-        }
 
 
 class QuestionImageOut(BaseModel):
@@ -270,27 +272,3 @@ class DuplicateMatch(BaseModel):
 
 class DuplicateCheckOut(BaseModel):
     matches: list[DuplicateMatch] = Field(default_factory=list)
-
-
-class GenerateTranslationsRequest(BaseModel):
-    #: Locales to (re)generate. Defaults to every supported locale except English, which
-    #: is the source and is never generated.
-    locales: list[str] | None = None
-    #: Regenerate a locale even if it already has a saved translation. Off by default -
-    #: a generate click should never silently blow away an examiner's hand edits.
-    overwrite_existing: bool = False
-
-
-class GenerateTranslationsOut(BaseModel):
-    #: {locale: {body, explanation}} - a *preview* only, nothing is saved here. The
-    #: examiner reviews/edits these in the form, then PATCHes the question with
-    #: ``translations`` to actually persist them.
-    translations: dict[str, dict[str, str]] = Field(default_factory=dict)
-    #: {option_id: {locale: text}}.
-    options: dict[uuid.UUID, dict[str, str]] = Field(default_factory=dict)
-    #: "stub" | "openai" - which provider actually produced this, so the UI can warn
-    #: when no real translation model is configured.
-    provider: str
-    #: Locales that already had a saved translation and were skipped because
-    #: ``overwrite_existing`` was false.
-    skipped_existing: list[str] = Field(default_factory=list)
