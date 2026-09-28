@@ -13,7 +13,7 @@
 // Bump this string on any production release that changes cached asset behavior -
 // the "activate" handler below only evicts caches under a *different* name, so an
 // unbumped version never frees the entries a previous deploy left behind.
-const CACHE_NAME = "examina-static-v3";
+const CACHE_NAME = "examina-static-v4";
 
 const PRECACHE_ASSETS = [
   "/",
@@ -24,18 +24,27 @@ const PRECACHE_ASSETS = [
   "/icons/apple-touch-icon.png",
 ];
 
+// Path fragments that always mean "auth/API/session traffic" - matched with
+// includes(), not startsWith(), so this holds regardless of whether the backend
+// is mounted at the origin root, behind /api, or behind a versioned /api/v1.
+const RESTRICTED_PATH_FRAGMENTS = [
+  "/api/",
+  "/auth/",
+  "/login",
+  "/register",
+  "/token",
+  "/exam/",
+  "/ws/",
+];
+
 // URLs/patterns that must NEVER be handled or cached by the service worker
 function isRestrictedOrDynamic(url) {
   const pathname = url.pathname;
 
-  // Never touch backend API requests
-  if (pathname.startsWith("/api/")) return true;
-
-  // Never touch live exam session interactions
-  if (pathname.startsWith("/exam/")) return true;
+  if (RESTRICTED_PATH_FRAGMENTS.some((fragment) => pathname.includes(fragment))) return true;
 
   // Never touch WebSocket endpoints
-  if (pathname.includes("/ws/") || url.protocol === "ws:" || url.protocol === "wss:") return true;
+  if (url.protocol === "ws:" || url.protocol === "wss:") return true;
 
   return false;
 }
