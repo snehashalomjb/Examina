@@ -13,10 +13,11 @@
 // Bump this string on any production release that changes cached asset behavior -
 // the "activate" handler below only evicts caches under a *different* name, so an
 // unbumped version never frees the entries a previous deploy left behind.
-const CACHE_NAME = "examina-static-v2";
+const CACHE_NAME = "examina-static-v3";
 
 const PRECACHE_ASSETS = [
   "/",
+  "/offline",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -124,7 +125,7 @@ self.addEventListener("fetch", (event) => {
         .catch(() => {
           return caches.match(request).then((cached) => {
             if (cached) return cached;
-            return caches.match("/");
+            return caches.match("/offline");
           });
         })
     );

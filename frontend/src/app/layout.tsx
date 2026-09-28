@@ -5,6 +5,7 @@ import { AuthProvider } from "@/lib/auth";
 import { LocaleProvider } from "@/lib/locale";
 import { ToastHost } from "@/components/ui";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import "./globals.css";
 
 /**
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ToastHost />
           </AuthProvider>
         </LocaleProvider>
+        <InstallAppButton />
       </body>
     </html>
   );
