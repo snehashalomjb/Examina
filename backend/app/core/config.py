@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any
 
-from pydantic import BeforeValidator, Field
+from pydantic import BeforeValidator, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -30,6 +30,25 @@ def parse_cors_origins(v: Any) -> list[str]:
     if isinstance(v, (list, tuple, set)):
         return [str(item).strip() for item in v if str(item).strip()]
     return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def normalize_postgres_url(v: str) -> str:
+    """Force the psycopg3 dialect the project is built on.
+
+    Render (and Heroku-style hosts) hand out a bare `postgresql://` or
+    `postgres://` connection string. SQLAlchemy resolves that to the psycopg2
+    dialect by default, which isn't installed here (only psycopg3 is - see
+    pyproject.toml) and blows up with `ModuleNotFoundError: No module named
+    'psycopg2'`. Rewriting the scheme keeps every environment on the driver
+    that's actually installed, without touching host/user/password/db.
+    """
+    if v.startswith("postgresql+") or v.startswith("postgres+"):
+        return v
+    if v.startswith("postgresql://"):
+        return "postgresql+psycopg://" + v[len("postgresql://") :]
+    if v.startswith("postgres://"):
+        return "postgresql+psycopg://" + v[len("postgres://") :]
+    return v
 
 
 class Settings(BaseSettings):
@@ -55,6 +74,11 @@ class Settings(BaseSettings):
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 30
     SQL_ECHO: bool = False
+
+    @field_validator("DATABASE_URL", "TEST_DATABASE_URL")
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        return normalize_postgres_url(v)
 
     # Security
     SECRET_KEY: str = "dev-only-secret-key-change-me"
