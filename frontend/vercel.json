@@ -4,6 +4,6 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://examina-backend-7trx.onrender.com/api/v1"
+    "NEXT_PUBLIC_API_URL": "https://examina-backend-iugk.onrender.com/api/v1"
   }
 }

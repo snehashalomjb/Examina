@@ -14,10 +14,12 @@
 //
 // PRODUCTION_API is the authoritative correct URL. The Vercel dashboard had a typo
 // (7tx vs 7trx) - we auto-correct it here so the app works even with a stale env var.
-const PRODUCTION_API = "https://examina-backend-7trx.onrender.com/api/v1";
+const PRODUCTION_API = "https://examina-backend-iugk.onrender.com/api/v1";
 const _raw = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? PRODUCTION_API;
-// Auto-correct the known wrong URL from the stale Vercel env var
-const configuredBase = _raw.includes("examina-backend-7tx.onrender.com") ? PRODUCTION_API : _raw;
+// Auto-correct any stale/wrong URL from old Vercel env vars
+const configuredBase = (_raw.includes("examina-backend-7tx") || _raw.includes("examina-backend-7trx"))
+  ? PRODUCTION_API
+  : _raw;
 const BASE = configuredBase.endsWith("/api/v1") ? configuredBase : `${configuredBase}/api/v1`;
 
 const ACCESS_KEY = "exam.access";
