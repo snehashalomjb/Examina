@@ -2,8 +2,10 @@ services:
   - type: web
     name: examina-backend
     env: python
-    buildCommand: uv pip install -e ".[openai]"
-    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    buildCommand: pip install -e ".[openai]"
+    preDeployCommand: python -m alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: standard
     envVars:
       - key: ENVIRONMENT
