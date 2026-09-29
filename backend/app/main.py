@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -72,9 +73,26 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+# Build the set of explicitly allowed origins from settings
+_EXPLICIT_ORIGINS: set[str] = set(settings.BACKEND_CORS_ORIGINS)
+
+# Wildcard patterns — any Vercel preview/production URL is allowed automatically
+_VERCEL_PATTERN = re.compile(r"https://[\w-]+\.vercel\.app$")
+
+
+def _is_allowed_origin(origin: str) -> bool:
+    if origin in _EXPLICIT_ORIGINS:
+        return True
+    if _VERCEL_PATTERN.match(origin):
+        return True
+    return False
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    # Pass "*" as a sentinel — we override the real check via allow_origin_regex
+    allow_origins=list(_EXPLICIT_ORIGINS),
+    allow_origin_regex=r"https://[\w-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
