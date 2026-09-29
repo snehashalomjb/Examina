@@ -21,7 +21,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: BACKEND_CORS_ORIGINS
-        value: "https://examina-1-git-main-snehashalomjb-9684s-projects.vercel.app,https://examina-1.snehashalomjb-9684s-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
+        value: "https://examina-1.vercel.app,https://examina-1-git-main-snehashalomjb-9684s-projects.vercel.app,https://examina-1.snehashalomjb-9684s-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
       - key: S3_ENDPOINT_URL
         sync: false
       - key: S3_ACCESS_KEY
