@@ -2989,4 +2989,5 @@ INFO:     127.0.0.1:59063 - "OPTIONS /api/v1/notifications HTTP/1.1" 200 OK
 INFO:     127.0.0.1:59063 - "OPTIONS /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60817 - "GET /api/v1/notifications HTTP/1.1" 200 OK
 INFO:     127.0.0.1:59063 - "GET /api/v1/subjects?lang=en&language=en HTTP/1.1" 200 OK
+ 2026-09-29 01:30:04 | INFO     | exam.app                     | Shutdown complete
  

@@ -6289,3 +6289,35 @@
 2026-09-28 19:04:17 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
 2026-09-28 19:04:20 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
 2026-09-29 01:30:04 | INFO     | exam.app                     | Shutdown complete
+2026-09-29 15:49:29 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:49:32 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:49:34 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:49:40 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:50:03 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:50:04 | INFO     | exam.app                     | Starting AI-Based Intelligent Examination Platform (development)
+2026-09-29 15:50:05 | INFO     | exam.app                     | Object storage ready: bucket exam-media
+2026-09-29 15:50:05 | INFO     | exam.app                     | Session sweeper started (every 60s)
+2026-09-29 15:50:13 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 15:50:14 | INFO     | exam.app                     | Starting AI-Based Intelligent Examination Platform (development)
+2026-09-29 15:50:14 | INFO     | exam.app                     | Object storage ready: bucket exam-media
+2026-09-29 15:50:14 | INFO     | exam.app                     | Session sweeper started (every 60s)
+2026-09-29 15:50:14 | INFO     | exam.app                     | Shutdown complete
+2026-09-29 15:51:17 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+2026-09-29 15:51:25 | INFO     | exam.auth                    | Profile updated for admin@exam.edu
+2026-09-29 15:52:01 | INFO     | exam.auth                    | Login: admin@exam.edu (admin/approved)
+2026-09-29 15:54:16 | INFO     | exam.auth                    | Profile updated for admin@exam.edu
+2026-09-29 15:57:37 | INFO     | exam.auth                    | Login: snehashalomjb@gmail.com (candidate/approved, login=approved)
+2026-09-29 15:57:40 | INFO     | exam.auth                    | Login: snehashalomjb@gmail.com (candidate/approved, login=approved)
+2026-09-29 15:57:54 | INFO     | exam.auth                    | Profile updated for snehashalomjb@gmail.com
+2026-09-29 16:07:11 | INFO     | exam.auth                    | Login: snehashalomjb@gmail.com (candidate/approved, login=approved)
+2026-09-29 16:07:19 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+2026-09-29 16:07:19 | WARNING  | exam.app                     | SLOW POST /api/v1/auth/login took 1244ms
+2026-09-29 16:07:25 | INFO     | exam.auth                    | Login: examiner@exam.edu (examiner/approved)
+2026-09-29 16:07:25 | WARNING  | exam.app                     | SLOW POST /api/v1/auth/login took 1786ms
+2026-09-29 16:07:33 | INFO     | exam.auth                    | Profile updated for examiner@exam.edu
+2026-09-29 21:10:21 | INFO     | exam.app                     | Shutdown complete
+2026-09-29 21:10:26 | INFO     | exam                         | Logging initialised -> D:\AI_Based_Examination_platform\logs
+2026-09-29 21:10:31 | INFO     | exam.app                     | Starting AI-Based Intelligent Examination Platform (development)
+2026-09-29 21:10:32 | INFO     | exam.app                     | Object storage ready: bucket exam-media
+2026-09-29 21:10:32 | INFO     | exam.app                     | Session sweeper started (every 60s)
+2026-09-29 21:10:49 | INFO     | exam.app                     | Shutdown complete

@@ -8,7 +8,14 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.db.models.enums import DEFAULT_LOCALE, SUPPORTED_LOCALES, Difficulty, DraftStatus, QuestionCategory, QuestionType
+from app.db.models.enums import (
+    DEFAULT_LOCALE,
+    SUPPORTED_LOCALES,
+    Difficulty,
+    DraftStatus,
+    QuestionCategory,
+    QuestionType,
+)
 from app.schemas.common import ORMModel
 
 

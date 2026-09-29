@@ -28,8 +28,8 @@ class UrlImportError(ValueError):
 class Node:
     tag: str
     attrs: dict[str, str]
-    parent: "Node | None" = None
-    children: list["Node | str"] = field(default_factory=list)
+    parent: Node | None = None
+    children: list[Node | str] = field(default_factory=list)
 
     def text(self) -> str:
         value = " ".join(
@@ -39,7 +39,7 @@ class Node:
         )
         return re.sub(r"\s+", " ", value).strip()
 
-    def walk(self) -> list["Node"]:
+    def walk(self) -> list[Node]:
         found: list[Node] = []
         for child in self.children:
             if isinstance(child, Node):

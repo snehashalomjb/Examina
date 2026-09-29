@@ -206,7 +206,7 @@ class Exam(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     enrollments: Mapped[list[ExamEnrollment]] = relationship(
         back_populates="exam", cascade="all, delete-orphan"
     )
-    translations: Mapped[list["ExamTranslation"]] = relationship(
+    translations: Mapped[list[ExamTranslation]] = relationship(
         back_populates="exam", cascade="all, delete-orphan"
     )
 
@@ -274,7 +274,7 @@ class ExamSection(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
 
     exam: Mapped[Exam] = relationship(back_populates="sections")
-    translations: Mapped[list["ExamSectionTranslation"]] = relationship(
+    translations: Mapped[list[ExamSectionTranslation]] = relationship(
         back_populates="section", cascade="all, delete-orphan"
     )
 

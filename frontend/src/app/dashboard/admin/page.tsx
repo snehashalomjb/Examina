@@ -12,7 +12,6 @@ import {
   EmptyState,
   KPIBanner,
   Skeleton,
-  StatCard,
   StatusDot,
   TimelineCard,
   cx,
@@ -74,10 +73,11 @@ export default function AdminDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
-    if (user) void load();
+    if (!user) return;
+    void (async () => { await load(); })();
   }, [user, load]);
 
   async function decide(target: AdminUser, status: "approved" | "revoked") {
@@ -482,6 +482,7 @@ export default function AdminDashboard() {
 }
 
 /* ─── Inline Icons ───────────────────────────────────────────────── */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 function BellIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>;
 }

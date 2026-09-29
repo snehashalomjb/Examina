@@ -7,8 +7,13 @@
  * "something went wrong".
  */
 
-const BASE =
+// The backend always mounts its routes under /api/v1 (see backend/app/main.py). If
+// NEXT_PUBLIC_API_URL is set to the bare origin (a common deploy-config slip, e.g. on
+// Render/Vercel), every request would 404 one path segment short - so the prefix is
+// enforced here rather than trusted to be included by whoever sets the env var.
+const configuredBase =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
+const BASE = configuredBase.endsWith("/api/v1") ? configuredBase : `${configuredBase}/api/v1`;
 
 const ACCESS_KEY = "exam.access";
 const REFRESH_KEY = "exam.refresh";

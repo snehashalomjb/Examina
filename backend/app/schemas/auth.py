@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.db.models.enums import AccessStatus, LoginAccessStatus, SUPPORTED_LOCALES, UserRole
+from app.db.models.enums import SUPPORTED_LOCALES, AccessStatus, LoginAccessStatus, UserRole
 from app.schemas.common import ORMModel
 
 PASSWORD_MIN = 8

@@ -57,7 +57,8 @@ export default function SystemHealthPage() {
   }, []);
 
   useEffect(() => {
-    if (user) void load();
+    if (!user) return;
+    void (async () => { await load(); })();
   }, [user, load]);
 
   if (!user) return null;

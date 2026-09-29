@@ -56,8 +56,8 @@ def dedupe(db) -> int:
             ).all()
         )
 
-        def sort_key(s: Subject) -> tuple[int, int]:
-            return (-counts.get(s.id, 0), 0 if not _is_generated_code(s.code) else 1)
+        def sort_key(s: Subject, _counts: dict = counts) -> tuple[int, int]:
+            return (-_counts.get(s.id, 0), 0 if not _is_generated_code(s.code) else 1)
 
         group_sorted = sorted(group, key=sort_key)
         winner = group_sorted[0]

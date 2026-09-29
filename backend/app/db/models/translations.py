@@ -40,7 +40,7 @@ class QuestionTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     model_answer: Mapped[str | None] = mapped_column(Text)
     explanation: Mapped[str | None] = mapped_column(Text)
 
-    question: Mapped["Question"] = relationship(back_populates="translations")  # noqa: F821
+    question: Mapped[Question] = relationship(back_populates="translations")  # noqa: F821
 
 
 class OptionTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -59,7 +59,7 @@ class OptionTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     locale: Mapped[str] = mapped_column(String(5), nullable=False, index=True)
     text: Mapped[str | None] = mapped_column(Text)
 
-    option: Mapped["QuestionOption"] = relationship(back_populates="translations")  # noqa: F821
+    option: Mapped[QuestionOption] = relationship(back_populates="translations")  # noqa: F821
 
 
 class ExamTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -82,7 +82,7 @@ class ExamTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     company_name: Mapped[str | None] = mapped_column(String(200))
     job_role: Mapped[str | None] = mapped_column(String(200))
 
-    exam: Mapped["Exam"] = relationship(back_populates="translations")  # noqa: F821
+    exam: Mapped[Exam] = relationship(back_populates="translations")  # noqa: F821
 
 
 class SubjectTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -99,7 +99,7 @@ class SubjectTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str | None] = mapped_column(String(150))
     description: Mapped[str | None] = mapped_column(Text)
 
-    subject: Mapped["Subject"] = relationship(back_populates="translations")  # noqa: F821
+    subject: Mapped[Subject] = relationship(back_populates="translations")  # noqa: F821
 
 
 class ExamSectionTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -116,4 +116,4 @@ class ExamSectionTranslation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str | None] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text)
 
-    section: Mapped["ExamSection"] = relationship(back_populates="translations")  # noqa: F821
+    section: Mapped[ExamSection] = relationship(back_populates="translations")  # noqa: F821

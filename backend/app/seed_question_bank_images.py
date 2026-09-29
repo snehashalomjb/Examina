@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
