@@ -11,8 +11,13 @@
 // NEXT_PUBLIC_API_URL is set to the bare origin (a common deploy-config slip, e.g. on
 // Render/Vercel), every request would 404 one path segment short - so the prefix is
 // enforced here rather than trusted to be included by whoever sets the env var.
-const configuredBase =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
+//
+// PRODUCTION_API is the authoritative correct URL. The Vercel dashboard had a typo
+// (7tx vs 7trx) - we auto-correct it here so the app works even with a stale env var.
+const PRODUCTION_API = "https://examina-backend-7trx.onrender.com/api/v1";
+const _raw = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? PRODUCTION_API;
+// Auto-correct the known wrong URL from the stale Vercel env var
+const configuredBase = _raw.includes("examina-backend-7tx.onrender.com") ? PRODUCTION_API : _raw;
 const BASE = configuredBase.endsWith("/api/v1") ? configuredBase : `${configuredBase}/api/v1`;
 
 const ACCESS_KEY = "exam.access";
