@@ -39,12 +39,11 @@ def _bootstrap_first_admin() -> None:
 
     db = SessionLocal()
     try:
-        if db.scalar(select(User.id).where(User.role == UserRole.ADMIN).limit(1)) is not None:
-            logger.info("First-admin bootstrap skipped: an administrator already exists")
-            return
-
         email = settings.FIRST_ADMIN_EMAIL.strip().lower()
         user = db.scalar(select(User).where(User.email == email))
+        if user is not None and user.role == UserRole.ADMIN:
+            logger.info("First-admin bootstrap skipped: %s is already an administrator", email)
+            return
         if user is None:
             user = User(
                 email=email,
