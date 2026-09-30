@@ -593,9 +593,9 @@ function DemoAccounts({ onPick }: { onPick: (email: string, password: string) =>
             key={account.email}
             type="button"
             onClick={() => onPick(account.email, account.password)}
-            className="group flex items-center justify-between rounded-[10px] border border-line px-3.5 py-2.5 text-left transition-all duration-200 hover:border-accent/30 hover:bg-accent-soft hover:shadow-sm"
+            className="group flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-line px-3.5 py-2.5 text-left transition-all duration-200 hover:border-accent/30 hover:bg-accent-soft hover:shadow-sm"
           >
-            <span className="text-[12px] text-ink-muted font-mono group-hover:text-ink-soft transition-colors">{account.email}</span>
+            <span className="min-w-0 truncate text-[12px] text-ink-muted font-mono group-hover:text-ink-soft transition-colors">{account.email}</span>
             <Badge tone={account.tone}>{account.role}</Badge>
           </button>
         ))}

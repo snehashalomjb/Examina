@@ -282,7 +282,7 @@ export default function RankingPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full min-w-[860px] text-[13px]">
               <thead>
                 <tr className="border-b border-line bg-sunken/40 text-[11px] uppercase tracking-wide text-ink-muted">
                   <th className="px-5 py-3 text-left">{t("rank")}</th>

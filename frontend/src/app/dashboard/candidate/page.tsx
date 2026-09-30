@@ -393,7 +393,7 @@ function ExamAvailableCard({ card, onEnter }: { card: CandidateExamCard; onEnter
       </div>
 
       {/* Metadata grid */}
-      <div className="grid grid-cols-3 gap-2 rounded-[11px] bg-sunken px-3 py-2.5">
+      <div className="grid grid-cols-2 gap-2 rounded-[11px] bg-sunken px-3 py-2.5 sm:grid-cols-3">
         {[
           [t("duration_label"), t("value_min", { count: card.duration_minutes })],
           [t("questions_label"), String(card.total_questions)],

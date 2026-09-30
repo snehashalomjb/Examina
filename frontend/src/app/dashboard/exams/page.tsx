@@ -253,7 +253,7 @@ export default function ExamsPage() {
                   </Badge>
                 </div>
 
-                <dl className="mt-4 grid grid-cols-4 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
+                <dl className="mt-4 grid grid-cols-2 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center sm:grid-cols-4">
                   {[
                     ["Duration", `${exam.duration_minutes}m`],
                     ["Questions", String(exam.total_questions)],

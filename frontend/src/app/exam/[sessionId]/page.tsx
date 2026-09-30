@@ -648,7 +648,7 @@ export default function ExamRunner() {
       )}
 
       {/* ------------------------------------------------------------ top bar */}
-      <header className="relative flex h-[76px] shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/95 px-5 backdrop-blur-md lg:px-7">
+      <header className="relative flex min-h-[76px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-surface/95 px-5 py-2 backdrop-blur-md lg:h-[76px] lg:flex-nowrap lg:px-7">
         {/* Accent top line */}
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-accent to-transparent opacity-50" />
         <div className="flex min-w-0 items-center gap-3">
@@ -774,7 +774,7 @@ export default function ExamRunner() {
             </div>
 
             <div className={cx("mt-3 lg:mt-0 lg:block", paletteOpen ? "block" : "hidden")}>
-              <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 lg:grid-cols-5">
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 lg:grid-cols-5">
               {visibleQuestions.map((q, index) => {
                 const a = answers[q.question_id];
                 const done = a && (a.options.length > 0 || a.text.trim() || a.imageUrl);
@@ -1109,7 +1109,7 @@ function QuestionRenderer({
             onChange={(e) => onWrite(e.target.value)}
             placeholder="0"
             step="any"
-            className="w-48 rounded-[10px] border border-line bg-surface px-4 py-3 text-[14.5px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
+            className="w-full max-w-[192px] rounded-[10px] border border-line bg-surface px-4 py-3 text-[14.5px] text-ink outline-none placeholder:text-ink-muted focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
           />
           {spec?.unit && (
             <span className="text-[13px] font-medium text-ink-muted">{spec.unit}</span>

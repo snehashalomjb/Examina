@@ -280,7 +280,7 @@ function ExamCard({ card, t }: { card: CandidateExamCard; t: ReturnType<typeof u
           </div>
         </div>
 
-        <dl className="mt-4 grid grid-cols-3 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center">
+        <dl className="mt-4 grid grid-cols-2 gap-2 rounded-[10px] bg-sunken/60 p-3 text-center sm:grid-cols-3">
           {[
             [t("duration_label"), t("value_min", { count: card.duration_minutes })],
             [t("questions_label"), String(card.total_questions)],

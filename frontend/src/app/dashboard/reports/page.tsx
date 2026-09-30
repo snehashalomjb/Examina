@@ -96,7 +96,7 @@ export default function ExamReportsPage() {
                 <Badge tone="neutral">{summary.total_candidates} candidates</Badge>
               </div>
 
-              <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
                 {[
                   ["Completed", summary.completed, "text-ink"],
                   ["Pending Review", summary.pending_review, "text-amber"],

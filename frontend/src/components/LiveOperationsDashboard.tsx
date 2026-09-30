@@ -194,26 +194,26 @@ export function LiveOperationsDashboard({
 
       {/* ── Filters ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="w-auto">
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="w-full min-w-0 sm:w-auto">
           <option value="all">{t("filter_all_status")}</option>
           <option value="normal">{t("filter_normal")}</option>
           <option value="warning">{t("filter_warning")}</option>
           <option value="flagged">{t("filter_flagged")}</option>
           <option value="critical">{t("filter_critical")}</option>
         </Select>
-        <Select value={examFilter} onChange={(e) => setExamFilter(e.target.value)} className="w-auto">
+        <Select value={examFilter} onChange={(e) => setExamFilter(e.target.value)} className="w-full min-w-0 sm:w-auto sm:max-w-[220px]">
           <option value="all">{t("filter_all_exams")}</option>
           {exams.map((title) => (
             <option key={title} value={title}>{title}</option>
           ))}
         </Select>
-        <Select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="w-auto">
+        <Select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className="w-full min-w-0 sm:w-auto">
           <option value="suspicion">Sort: suspicion score</option>
           <option value="latest_alert">Sort: latest alert</option>
           <option value="name">Sort: candidate name</option>
           <option value="time_remaining">Sort: time remaining</option>
         </Select>
-        <div className="min-w-[200px] flex-1">
+        <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-[200px]">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -91,7 +91,7 @@ export default function MyResultsPage() {
                   <ProgressBar value={result.percentage} tone={tone} />
                 </div>
 
-                <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
                   {[
                     [t("correct"), result.correct_count, "text-mint"],
                     [t("incorrect"), result.incorrect_count, "text-rose"],
