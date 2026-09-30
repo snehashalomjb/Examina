@@ -239,8 +239,8 @@ export default function AdminDashboard() {
             <div className="space-y-2.5">
               {liveExams.map((row) => (
                 <div key={row.exam_id} className="rounded-[12px] border border-line bg-gradient-to-r from-rose/[0.03] to-transparent p-3.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-rose animate-pulse" />
                         <p className="truncate text-[13px] font-semibold text-ink">{row.exam_title}</p>
