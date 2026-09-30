@@ -11,17 +11,66 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.logging_config import get_logger, setup_logging
+from app.core.security import hash_password
 from app.core.storage import ensure_bucket
+from app.db.models import AccessStatus, User, UserRole
 from app.db.session import SessionLocal
 from app.services.exam_engine import sweep_expired_sessions
 from app.services.validators import ValidationError
 
 logger = get_logger("app")
 _scheduler: BackgroundScheduler | None = None
+
+
+def _bootstrap_first_admin() -> None:
+    """Create or promote the explicitly configured first admin once.
+
+    Public registration must never mint an administrator. This opt-in startup task is
+    for an empty deployment only; it requires an operator-controlled environment
+    variable and becomes a no-op as soon as any admin exists.
+    """
+    if not settings.BOOTSTRAP_ADMIN_ENABLED:
+        return
+
+    db = SessionLocal()
+    try:
+        if db.scalar(select(User.id).where(User.role == UserRole.ADMIN).limit(1)) is not None:
+            logger.info("First-admin bootstrap skipped: an administrator already exists")
+            return
+
+        email = settings.FIRST_ADMIN_EMAIL.strip().lower()
+        user = db.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(
+                email=email,
+                password_hash=hash_password(settings.FIRST_ADMIN_PASSWORD),
+                full_name="Platform Administrator",
+                first_name="Platform",
+                last_name="Administrator",
+                role=UserRole.ADMIN,
+                access_status=AccessStatus.APPROVED,
+            )
+            db.add(user)
+            action = "created"
+        else:
+            user.role = UserRole.ADMIN
+            user.access_status = AccessStatus.APPROVED
+            user.is_active = True
+            action = "promoted"
+
+        db.commit()
+        logger.warning("First administrator %s: %s", action, email)
+    except Exception:
+        db.rollback()
+        logger.exception("First-admin bootstrap failed")
+        raise
+    finally:
+        db.close()
 
 
 def _sweep_job() -> None:
@@ -42,6 +91,8 @@ async def lifespan(app: FastAPI):
     global _scheduler
     setup_logging()
     logger.info("Starting %s (%s)", settings.APP_NAME, settings.ENVIRONMENT)
+
+    _bootstrap_first_admin()
 
     if ensure_bucket():
         logger.info("Object storage ready: bucket %s", settings.S3_BUCKET)

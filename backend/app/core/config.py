@@ -117,6 +117,9 @@ class Settings(BaseSettings):
     OCR_ENABLED: bool = True
 
     # Bootstrap
+    # Disabled by default. Turn this on once in a new deployment to promote the
+    # configured first-admin email (or create it when it does not yet exist).
+    BOOTSTRAP_ADMIN_ENABLED: bool = False
     FIRST_ADMIN_EMAIL: str = "admin@exam.edu"
     FIRST_ADMIN_PASSWORD: str = "Admin@12345"
 
